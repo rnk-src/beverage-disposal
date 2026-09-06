@@ -1,0 +1,8 @@
+[submodule "ros2_ws/src/gz_ros2_control"]
+	path = ros2_ws/src/gz_ros2_control
+	url = https://github.com/ros-controls/gz_ros2_control.git
+	branch = humble
+[submodule "ros2_ws/src/ros_gz"]
+	path = ros2_ws/src/ros_gz
+	url = https://github.com/gazebosim/ros_gz.git
+	branch = humble

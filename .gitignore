@@ -1,0 +1,19 @@
+# colcon / ROS 2 workspace build artifacts
+build/
+install/
+log/
+
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+.coverage
+
+# Editors / OS
+.vscode/
+.DS_Store
+
+# Claude Code working files (development log, local settings)
+.claude/
+CLAUDE.md
