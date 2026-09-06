@@ -86,8 +86,10 @@ Notes specific to this setup:
   glitchy viewport. The fix is to force the older Ogre1 engine when
   launching Gazebo with a GUI:
   ```
-  gz sim --render-engine ogre <world file>
+  ign gazebo --render-engine ogre <world file>
   ```
+  (Fortress uses the `ign` command name; the newer `gz` alias isn't
+  available on this version.)
   This is a VMware-specific workaround, not something native Linux or
   other virtualization software should need.
 - **GUI over SSH.** If you're working over SSH into the VM (rather than at
