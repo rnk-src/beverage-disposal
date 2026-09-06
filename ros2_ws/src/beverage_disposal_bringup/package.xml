@@ -3,12 +3,14 @@
 <package format="3">
   <name>beverage_disposal_bringup</name>
   <version>0.0.1</version>
-  <description>Fortress/gz-sim bringup for the beverage disposal arm simulation (replaces the OpenManipulator-X repo's Gazebo Classic launch files, which don't work on this arm64 setup).</description>
+  <description>Fortress/gz-sim bringup for the beverage disposal arm simulation.</description>
   <maintainer email="rounakrai.mail@gmail.com">rouna</maintainer>
   <license>Apache-2.0</license>
 
-  <exec_depend>open_manipulator_x_bringup</exec_depend>
-  <exec_depend>open_manipulator_x_description</exec_depend>
+  <exec_depend>so_arm101_description</exec_depend>
+  <exec_depend>xacro</exec_depend>
+  <exec_depend>robot_state_publisher</exec_depend>
+  <exec_depend>controller_manager</exec_depend>
   <exec_depend>ros_gz_sim</exec_depend>
   <exec_depend>ros_gz_bridge</exec_depend>
   <exec_depend>rclpy</exec_depend>

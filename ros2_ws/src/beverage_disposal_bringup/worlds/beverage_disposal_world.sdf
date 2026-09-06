@@ -61,10 +61,13 @@ staying within the OpenManipulator-X's short reach over realism.
       </link>
     </model>
 
-    <!-- Low table (solid box, not hollow) within the arm's reach -->
+    <!-- Low table (solid box, not hollow) within the arm's reach. Placement
+    tuned for the SO-101 (~0.49m total link-chain length, joint limits give
+    a comfortable working radius well short of that) rather than the
+    previous OpenManipulator-X placement. -->
     <model name="table">
       <static>true</static>
-      <pose>0.22 0 0.075 0 0 0</pose>
+      <pose>0.26 0 0.075 0 0 0</pose>
       <link name="table_link">
         <collision name="table_collision">
           <geometry>
@@ -90,7 +93,7 @@ staying within the OpenManipulator-X's short reach over realism.
     <!-- Bin: open-top box made of 5 walls, sitting on the ground -->
     <model name="bin">
       <static>true</static>
-      <pose>-0.05 -0.28 0 0 0 0</pose>
+      <pose>-0.07 -0.32 0 0 0 0</pose>
       <link name="bin_link">
         <collision name="bin_floor_collision">
           <pose>0 0 0.005 0 0 0</pose>
@@ -153,7 +156,7 @@ staying within the OpenManipulator-X's short reach over realism.
 
     <!-- Can: short, wide cylinder on the table (roughly a 12oz soda can) -->
     <model name="can">
-      <pose>0.22 0.06 0.211 0 0 0</pose>
+      <pose>0.26 0.06 0.211 0 0 0</pose>
       <link name="can_link">
         <inertial>
           <mass>0.014</mass>
@@ -182,7 +185,7 @@ staying within the OpenManipulator-X's short reach over realism.
 
     <!-- Bottle: taller, narrower cylinder with a small neck, also on the table -->
     <model name="bottle">
-      <pose>0.22 -0.06 0.25 0 0 0</pose>
+      <pose>0.26 -0.06 0.25 0 0 0</pose>
       <link name="bottle_link">
         <inertial>
           <mass>0.03</mass>

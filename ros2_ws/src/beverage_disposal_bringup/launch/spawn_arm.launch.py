@@ -1,35 +1,35 @@
-"""Bring up the OpenManipulator-X in Gazebo Fortress (gz-sim), replacing the
-upstream Gazebo Classic launch path which doesn't run on this arm64 setup.
+"""Bring up the SO-101 arm in Gazebo Fortress (gz-sim).
 
 Combines:
-  - open_manipulator_x_bringup/base.launch.py (robot_state_publisher +
-    ros2_control spawners; simulator-agnostic, reused unmodified)
+  - robot_state_publisher, built from so_arm101_description's URDF with
+    ros2_control_hardware_type:=gazebo (this project's own bringup piece;
+    the upstream package's controllers_bringup.launch.py doesn't support
+    the gazebo hardware type, only mock_components/real, so there's no
+    upstream launch file to reuse for this path)
   - ros_gz_sim/gz_sim.launch.py (launches gz-sim/Fortress itself; built from
     source, see CLAUDE.md)
   - ros_gz_sim's `create` tool to spawn the robot into the running world
+  - controller spawners (joint_state_broadcaster, arm_controller,
+    gripper_controller) — no standalone ros2_control_node, because in
+    Gazebo the gz_ros2_control plugin loaded from the URDF's <gazebo> tag
+    runs the controller_manager itself
   - a ros_gz_bridge clock bridge so use_sim_time works
-  - a ros_gz_bridge pose bridge (object poses -> tf2_msgs/TFMessage) feeding
-    our own ultrasonic_range_node, which computes a simulated ultrasonic
-    reading from pose data since Gazebo's native sensor pipeline was
-    unreliable on this VM (see CLAUDE.md)
+  - a ros_gz_bridge pose bridge (object poses -> tf2_msgs/TFMessage), read
+    by later pipeline stages to find the can/bottle in the world
 """
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch.substitutions import Command, FindExecutable, LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description():
-    start_rviz = LaunchConfiguration('start_rviz')
     world = LaunchConfiguration('world')
 
     declared_arguments = [
-        DeclareLaunchArgument(
-            'start_rviz', default_value='false',
-            description='Whether to launch rviz2'),
         DeclareLaunchArgument(
             'world',
             default_value=PathJoinSubstitution(
@@ -38,16 +38,26 @@ def generate_launch_description():
             description='World file to load (bundled gz-sim world name or path)'),
     ]
 
-    arm_base = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            PathJoinSubstitution(
-                [FindPackageShare('open_manipulator_x_bringup'), 'launch', 'base.launch.py']
-            )
+    robot_description = Command([
+        PathJoinSubstitution([FindExecutable(name='xacro')]),
+        ' ',
+        PathJoinSubstitution(
+            [FindPackageShare('so_arm101_description'), 'urdf', 'so_arm101.urdf.xacro']
         ),
-        launch_arguments={
-            'start_rviz': start_rviz,
-            'use_sim': 'true',
-        }.items(),
+        ' ',
+        'ros2_control_hardware_type:=gazebo',
+        ' ',
+        'simulation_controllers:=',
+        PathJoinSubstitution(
+            [FindPackageShare('beverage_disposal_bringup'), 'config', 'so_arm101_controllers.yaml']
+        ),
+    ])
+
+    robot_state_publisher = Node(
+        package='robot_state_publisher',
+        executable='robot_state_publisher',
+        parameters=[{'robot_description': robot_description, 'use_sim_time': True}],
+        output='screen',
     )
 
     gz_sim = IncludeLaunchDescription(
@@ -66,9 +76,30 @@ def generate_launch_description():
         executable='create',
         arguments=[
             '-topic', 'robot_description',
-            '-name', 'open_manipulator_x',
+            '-name', 'so_arm101',
             '-z', '0.01',
         ],
+        output='screen',
+    )
+
+    joint_state_broadcaster_spawner = Node(
+        package='controller_manager',
+        executable='spawner',
+        arguments=['joint_state_broadcaster'],
+        output='screen',
+    )
+
+    arm_controller_spawner = Node(
+        package='controller_manager',
+        executable='spawner',
+        arguments=['arm_controller'],
+        output='screen',
+    )
+
+    gripper_controller_spawner = Node(
+        package='controller_manager',
+        executable='spawner',
+        arguments=['gripper_controller'],
         output='screen',
     )
 
@@ -92,17 +123,13 @@ def generate_launch_description():
         output='screen',
     )
 
-    ultrasonic_node = Node(
-        package='beverage_disposal_bringup',
-        executable='ultrasonic_range_node',
-        output='screen',
-    )
-
     return LaunchDescription(declared_arguments + [
         gz_sim,
-        arm_base,
+        robot_state_publisher,
         spawn_robot,
+        joint_state_broadcaster_spawner,
+        arm_controller_spawner,
+        gripper_controller_spawner,
         clock_bridge,
         pose_bridge,
-        ultrasonic_node,
     ])
