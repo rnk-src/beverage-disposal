@@ -17,3 +17,6 @@ __pycache__/
 # Claude Code working files (development log, local settings)
 .claude/
 CLAUDE.md
+
+# Beginner-facing commit explanations (personal learning notes, not for publication)
+commit-notes/
