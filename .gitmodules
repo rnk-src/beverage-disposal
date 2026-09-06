@@ -6,3 +6,6 @@
 	path = ros2_ws/src/ros_gz
 	url = https://github.com/gazebosim/ros_gz.git
 	branch = humble
+[submodule "ros2_ws/src/ros2_so_arm100"]
+	path = ros2_ws/src/ros2_so_arm100
+	url = https://github.com/JafarAbdi/ros2_so_arm100.git

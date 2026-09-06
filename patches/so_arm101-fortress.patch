@@ -1,0 +1,13 @@
+diff --git a/so_arm101_description/urdf/so_arm101_macro.xacro b/so_arm101_description/urdf/so_arm101_macro.xacro
+index 1116cbd..d0a90de 100644
+--- a/so_arm101_description/urdf/so_arm101_macro.xacro
++++ b/so_arm101_description/urdf/so_arm101_macro.xacro
+@@ -580,7 +580,7 @@
+     </transmission>
+ 
+     <!-- Joint from upper_arm to lower_arm -->
+-    <!-- Note: 5-degree calibration offset applied to joint limits -->
++    <!-- 5-degree calibration offset applied to joint limits -->
+     <joint name="${prefix}elbow_flex_joint" type="revolute">
+       <origin
+         xyz="-0.11257 -0.028 1.73763e-16"
