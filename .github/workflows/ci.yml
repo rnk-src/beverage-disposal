@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Check out repository (with submodules)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Apply vendor patches
+        run: scripts/apply_vendor_patches.sh
+
+      - name: Set up ROS 2 Humble
+        uses: ros-tooling/setup-ros@v0.7
+        with:
+          required-ros-distributions: humble
+
+      - name: Install Gazebo Fortress and other system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ignition-fortress libgflags-dev
+
+      - name: Install ROS package dependencies
+        run: |
+          source /opt/ros/humble/setup.bash
+          rosdep update
+          rosdep install --from-paths ros2_ws/src --ignore-src -r -y
+
+      - name: Build workspace
+        run: |
+          source /opt/ros/humble/setup.bash
+          cd ros2_ws
+          colcon build
+
+      - name: Run tests
+        run: |
+          source /opt/ros/humble/setup.bash
+          source ros2_ws/install/setup.bash
+          cd ros2_ws
+          colcon test --packages-select beverage_disposal_bringup
+          colcon test-result --verbose
