@@ -9,7 +9,7 @@ controller_manager:
       type: joint_trajectory_controller/JointTrajectoryController
 
     gripper_controller:
-      type: position_controllers/GripperActionController
+      type: effort_controllers/JointGroupEffortController
 
 arm_controller:
   ros__parameters:
@@ -27,8 +27,5 @@ arm_controller:
 
 gripper_controller:
   ros__parameters:
-    joint: gripper_joint
-    goal_tolerance: 0.05
-    allow_stalling: true
-    stall_velocity_threshold: 0.001
-    stall_timeout: 1.0
+    joints:
+      - gripper_joint

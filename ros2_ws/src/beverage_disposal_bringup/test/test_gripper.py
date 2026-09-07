@@ -78,6 +78,13 @@ def generate_test_description():
         output='screen',
     )
 
+    gripper_action_server = launch_ros.actions.Node(
+        package='beverage_disposal_bringup',
+        executable='gripper_action_server',
+        parameters=[{'use_sim_time': True}],
+        output='screen',
+    )
+
     clock_bridge = launch_ros.actions.Node(
         package='ros_gz_bridge',
         executable='parameter_bridge',
@@ -91,6 +98,7 @@ def generate_test_description():
         spawn_robot,
         joint_state_broadcaster_spawner,
         gripper_controller_spawner,
+        gripper_action_server,
         clock_bridge,
         launch_testing.actions.ReadyToTest(),
     ]), {}
@@ -118,7 +126,7 @@ class TestGripperOpenClose(unittest.TestCase):
     def _on_joint_state(self, msg):
         self.latest_joint_state = msg
 
-    def _wait_for_gripper_position(self, target, timeout_sec=20.0):
+    def _wait_for_gripper_position(self, target, timeout_sec=30.0):
         end_time = self.node.get_clock().now().nanoseconds + int(timeout_sec * 1e9)
         while self.node.get_clock().now().nanoseconds < end_time:
             rclpy.spin_once(self.node, timeout_sec=0.5)
@@ -135,8 +143,8 @@ class TestGripperOpenClose(unittest.TestCase):
             f'(last seen: {self.latest_joint_state})')
 
     def test_gripper_opens_and_closes(self):
-        move_gripper(self.node, GRIPPER_OPEN, timeout_sec=10.0)
+        move_gripper(self.node, GRIPPER_OPEN, timeout_sec=25.0)
         self._wait_for_gripper_position(GRIPPER_OPEN)
 
-        move_gripper(self.node, GRIPPER_CLOSED, timeout_sec=10.0)
+        move_gripper(self.node, GRIPPER_CLOSED, timeout_sec=25.0)
         self._wait_for_gripper_position(GRIPPER_CLOSED)

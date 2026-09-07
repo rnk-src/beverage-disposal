@@ -13,6 +13,11 @@ Combines:
     gripper_controller) — no standalone ros2_control_node, because in
     Gazebo the gz_ros2_control plugin loaded from the URDF's <gazebo> tag
     runs the controller_manager itself
+  - gripper_action_server (this project's own node, not a stock
+    ros2_control controller): gripper_joint only moves under an effort
+    command in this simulator (see commit-notes/09), so gripper_controller
+    is a plain effort passthrough and this node is the PID loop that turns
+    a target position into the effort commands it needs
   - a ros_gz_bridge clock bridge so use_sim_time works
   - a ros_gz_bridge pose bridge (object poses -> tf2_msgs/TFMessage), read
     by later pipeline stages to find the can/bottle in the world
@@ -103,6 +108,13 @@ def generate_launch_description():
         output='screen',
     )
 
+    gripper_action_server = Node(
+        package='beverage_disposal_bringup',
+        executable='gripper_action_server',
+        parameters=[{'use_sim_time': True}],
+        output='screen',
+    )
+
     clock_bridge = Node(
         package='ros_gz_bridge',
         executable='parameter_bridge',
@@ -130,6 +142,7 @@ def generate_launch_description():
         joint_state_broadcaster_spawner,
         arm_controller_spawner,
         gripper_controller_spawner,
+        gripper_action_server,
         clock_bridge,
         pose_bridge,
     ])
