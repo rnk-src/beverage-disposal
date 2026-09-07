@@ -47,3 +47,9 @@ jobs:
           cd ros2_ws
           colcon test --packages-select beverage_disposal_bringup
           colcon test-result --verbose
+
+      - name: Show full test output
+        if: always()
+        run: |
+          find ros2_ws/log/latest_test -name "stdout_stderr.log" \
+            -exec echo "===== {} =====" \; -exec cat {} \;
