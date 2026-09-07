@@ -113,9 +113,3 @@ welcome.
 This project is under active, iterative development. Capabilities are
 added and tested one at a time; see the commit history for the order they
 were built in and what each one covers.
-
-This README is a living document — it's updated whenever the project's
-actual structure, setup steps, or component choices (arm, sensing
-approach, etc.) change, so it shouldn't go stale relative to the code. If
-something here doesn't match what you find in the repository, the code is
-the source of truth.
