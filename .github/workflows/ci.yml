@@ -45,11 +45,12 @@ jobs:
           source /opt/ros/humble/setup.bash
           source ros2_ws/install/setup.bash
           cd ros2_ws
-          colcon test --packages-select beverage_disposal_bringup
+          colcon test --packages-select beverage_disposal_bringup \
+            --event-handlers console_direct+
           colcon test-result --verbose
 
       - name: Show full test output
         if: always()
         run: |
-          find ros2_ws/log/latest_test -name "stdout_stderr.log" \
+          find ros2_ws/log -name "stdout_stderr.log" \
             -exec echo "===== {} =====" \; -exec cat {} \;
