@@ -9,7 +9,7 @@ controller_manager:
       type: joint_trajectory_controller/JointTrajectoryController
 
     gripper_controller:
-      type: position_controllers/GripperActionController
+      type: effort_controllers/JointGroupEffortController
 
 arm_controller:
   ros__parameters:
@@ -27,4 +27,5 @@ arm_controller:
 
 gripper_controller:
   ros__parameters:
-    joint: gripper_joint
+    joints:
+      - gripper_joint

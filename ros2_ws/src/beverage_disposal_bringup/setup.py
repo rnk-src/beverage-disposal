@@ -28,6 +28,7 @@ setup(
         'console_scripts': [
             'ultrasonic_range_node = beverage_disposal_bringup.ultrasonic_range_node:main',
             'pick_and_place_demo = beverage_disposal_bringup.pick_and_place_demo:main',
+            'gripper_action_server = beverage_disposal_bringup.gripper_action_server:main',
         ],
     },
 )

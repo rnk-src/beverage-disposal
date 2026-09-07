@@ -1,5 +1,5 @@
 diff --git a/so_arm101_description/control/so_arm101.ros2_control.xacro b/so_arm101_description/control/so_arm101.ros2_control.xacro
-index acab905..82424d1 100644
+index acab905..657c10c 100644
 --- a/so_arm101_description/control/so_arm101.ros2_control.xacro
 +++ b/so_arm101_description/control/so_arm101.ros2_control.xacro
 @@ -32,6 +32,7 @@
@@ -42,8 +42,12 @@ index acab905..82424d1 100644
        </joint>
  
        <joint name="${prefix}gripper_joint">
-@@ -82,6 +87,7 @@
-         <command_interface name="position" />
+@@ -79,9 +84,10 @@
+         <param name="offset">2070</param>
+         <param name="p_cofficient">16</param>
+         <param name="initial_position">0.0</param>
+-        <command_interface name="position" />
++        <command_interface name="effort" />
          <state_interface name="position" />
          <state_interface name="velocity" />
 +        <state_interface name="effort" />
