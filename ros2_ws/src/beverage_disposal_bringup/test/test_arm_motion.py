@@ -1,3 +1,4 @@
+import os
 import time
 import unittest
 
@@ -26,6 +27,24 @@ TARGET_POSITIONS = [0.3, 0.0, 0.0, 0.0, 0.0]
 
 @pytest.mark.launch_test
 def generate_test_description():
+    # Each launch_testing file in this package gets Gazebo/ROS processes of
+    # its own, run back-to-back within the same colcon test invocation.
+    # Gazebo is known to sometimes not exit cleanly on SIGTERM (see
+    # commit-notes), so a leftover instance from a previous test file can
+    # still be alive when this file's own instance starts. Two separate
+    # transport layers need isolating from that leftover, not just one:
+    # ROS_DOMAIN_ID for ROS2/DDS topics like /joint_states, and GZ_PARTITION
+    # for Ignition Transport, Gazebo's own internal pub/sub that ROS_DOMAIN_ID
+    # has no effect on at all - without a unique partition, a leftover
+    # Gazebo process can still confuse this file's new instance at the
+    # simulator level even with the ROS side fully isolated. This must be
+    # set here, inside this function, rather than at module level: pytest
+    # imports every test file during collection before running any of them,
+    # so a module-level assignment would just get overwritten by whichever
+    # test file collects last.
+    os.environ['ROS_DOMAIN_ID'] = '34'
+    os.environ['GZ_PARTITION'] = 'test_arm_motion'
+
     robot_description = Command([
         PathJoinSubstitution([FindExecutable(name='xacro')]),
         ' ',

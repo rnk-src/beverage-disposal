@@ -1,9 +1,12 @@
+import time
+
 import rclpy
 from control_msgs.action import FollowJointTrajectory
 from rclpy.action import ActionClient
 from trajectory_msgs.msg import JointTrajectoryPoint
 
 ARM_CONTROLLER_ACTION = '/arm_controller/follow_joint_trajectory'
+GOAL_RETRY_INTERVAL_SEC = 0.5
 
 
 def move_to_joint_position(node, joint_names, positions, timeout_sec=15.0, duration_sec=3.0):
@@ -20,10 +23,25 @@ def move_to_joint_position(node, joint_names, positions, timeout_sec=15.0, durat
     point.time_from_start.nanosec = int((duration_sec % 1) * 1e9)
     goal.trajectory.points = [point]
 
-    send_goal_future = client.send_goal_async(goal)
-    rclpy.spin_until_future_complete(node, send_goal_future, timeout_sec=timeout_sec)
-    goal_handle = send_goal_future.result()
-    if goal_handle is None or not goal_handle.accepted:
+    # The action server appears as soon as the controller is *configured*,
+    # but a freshly spawned controller can still reject goals for a brief
+    # moment longer, until controller_manager finishes *activating* it. That
+    # window is real but short-lived, so retry on rejection instead of
+    # failing outright - this is a real race, not a broken connection.
+    deadline = time.monotonic() + timeout_sec
+    goal_handle = None
+    while time.monotonic() < deadline:
+        send_goal_future = client.send_goal_async(goal)
+        rclpy.spin_until_future_complete(node, send_goal_future, timeout_sec=timeout_sec)
+        goal_handle = send_goal_future.result()
+        if goal_handle is not None and goal_handle.accepted:
+            break
+        node.get_logger().warning('Trajectory goal rejected (controller may still be '
+                                   'activating); retrying')
+        time.sleep(GOAL_RETRY_INTERVAL_SEC)
+        goal_handle = None
+
+    if goal_handle is None:
         node.get_logger().error('Trajectory goal was rejected or timed out')
         return False
 
