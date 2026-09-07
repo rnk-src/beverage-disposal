@@ -30,9 +30,18 @@ class GripperActionServer(Node):
     def __init__(self):
         super().__init__('gripper_action_server')
 
-        self.declare_parameter('p_gain', 40.0)
+        # jaw_link (the part this joint actually moves) has a tiny mass
+        # relative to the arm's other links - see commit-notes/09. The
+        # original gains (p=40, d=2) combined with the default 10 N*m
+        # max_effort produced enough torque to fling the joint straight
+        # through its target and into the hard 1.70 rad limit before the
+        # (comparatively weak) derivative term could slow it down. These
+        # lower, more damped gains were retuned empirically against the
+        # live simulation to settle near the target instead of overshooting
+        # into the limit.
+        self.declare_parameter('p_gain', 10.0)
         self.declare_parameter('i_gain', 0.0)
-        self.declare_parameter('d_gain', 2.0)
+        self.declare_parameter('d_gain', 1.2)
         self.declare_parameter('goal_tolerance', 0.05)
         self.declare_parameter('stall_velocity_threshold', 0.001)
         self.declare_parameter('stall_timeout', 1.0)

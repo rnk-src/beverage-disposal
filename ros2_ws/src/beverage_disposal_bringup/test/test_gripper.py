@@ -1,3 +1,4 @@
+import os
 import unittest
 
 import launch
@@ -22,6 +23,16 @@ GRIPPER_TOLERANCE = 0.05
 @pytest.mark.launch_test
 @launch_testing.markers.keep_alive
 def generate_test_description():
+    # See test_arm_motion.py for why this is needed and why it must be set
+    # here rather than at module level: an isolated ROS_DOMAIN_ID per test
+    # file prevents a leftover Gazebo/ROS process from a previous test
+    # (Gazebo doesn't always exit cleanly on SIGTERM) from cross-talking on
+    # /joint_states with this file's own, fresh instance. GZ_PARTITION does
+    # the same for Ignition Transport, Gazebo's own internal pub/sub that
+    # ROS_DOMAIN_ID has no effect on - both layers need a unique name here.
+    os.environ['ROS_DOMAIN_ID'] = '35'
+    os.environ['GZ_PARTITION'] = 'test_gripper'
+
     robot_description = Command([
         PathJoinSubstitution([FindExecutable(name='xacro')]),
         ' ',
