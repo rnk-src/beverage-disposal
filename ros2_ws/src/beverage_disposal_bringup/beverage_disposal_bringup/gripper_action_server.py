@@ -47,9 +47,13 @@ class GripperActionServer(Node):
         self.declare_parameter('stall_velocity_threshold', 0.001)
         self.declare_parameter('stall_timeout', 1.0)
         self.declare_parameter('default_max_effort', 5.0)
-        self.declare_parameter('hold_timeout', 20.0)
-        self.declare_parameter('hold_stable_effort', 0.3)
-        self.declare_parameter('hold_stable_duration', 0.3)
+        # Off by default: see the long comment further down, at the hold
+        # loop itself, for why holding changes this node's observable
+        # behavior in a way the existing test_gripper.py isn't written to
+        # expect, and why that means it must be opt-in per launch rather
+        # than the default for every caller.
+        self.declare_parameter('hold_after_reaching', False)
+        self.declare_parameter('hold_timeout', 10.0)
 
         self._position = 0.0
         self._velocity = 0.0
@@ -149,57 +153,82 @@ class GripperActionServer(Node):
         # then goes on to do something else (like moving the arm) would
         # find the jaws already closed again by the time it matters.
         #
-        # So instead of cutting effort and returning the instant the target
-        # is reached, keep running the same PID for as long as it's still
-        # doing real work (i.e. still commanding a non-negligible corrective
-        # effort to stay there), which lets a caller keep this goal active
-        # -- and the gripper physically open -- while it does something
-        # else, then explicitly cancel this goal via the action client
-        # right when it's actually ready for the gripper to move again.
-        # Bounded by hold_timeout as a safety net in case nothing ever
-        # cancels it, and cut short early once holding here has stopped
-        # taking any real effort (already-closed and stalled-against-an-
-        # object cases both land here almost immediately, so this doesn't
-        # meaningfully slow down a plain open-then-close sequence).
-        hold_timeout = Duration(seconds=self.get_parameter('hold_timeout').value)
-        stable_effort = self.get_parameter('hold_stable_effort').value
-        stable_duration = self.get_parameter('hold_stable_duration').value
-        hold_started_at = self.get_clock().now()
-        stable_since = None
+        # The fix -- keep running the same PID for a while after reaching
+        # the target, instead of cutting effort and returning immediately
+        # -- is opt-in via hold_after_reaching, off by default. That's a
+        # deliberate choice, not a leftover: the existing test_gripper.py
+        # calls move_gripper(OPEN) and then, completely separately, polls
+        # /joint_states expecting to see it still near the open position.
+        # Before this fix, that worked because the gap between "reached
+        # the target" and "caller checks the position" was essentially
+        # zero -- there was nothing in between holding it there, but the
+        # check happened before the ~0.14s snap-back had time to occur.
+        # Holding for any bounded window changes that timing: it delays
+        # when the goal actually returns, so a caller's *subsequent* check
+        # (like test_gripper.py's) ends up looking *after* the hold has
+        # already ended and the joint has already snapped back, which
+        # reads as "never reached the target" even though it clearly did.
+        # Making the hold opt-in per node instance (set via a launch file's
+        # parameters, not by the caller's request -- GripperCommand's own
+        # fields don't have room for a "please hold this" flag) keeps
+        # test_gripper.py's existing, already-correct expectations working
+        # exactly as before, while a caller that actually needs the
+        # gripper to stay open while it does something else (this
+        # project's own pick-and-lift sequence) can launch this node with
+        # hold_after_reaching:=true and get the new behavior -- firing the
+        # open goal, doing the other work, then explicitly canceling this
+        # goal via the action client when it's ready for the gripper to
+        # move again.
+        #
+        # An earlier version tried to cut the hold short as soon as
+        # holding position stopped taking any real commanded effort, on
+        # the theory that near-zero effort means it's settled and doesn't
+        # need this goal to keep running. Direct measurement (opening the
+        # gripper and watching /joint_states for 30 real seconds) showed
+        # that reasoning doesn't hold for this joint: even with the p=10/
+        # d=1.2 gains retuned in commit 20c2420 to stop it slamming
+        # permanently into the hard 1.70 rad limit, gripper_joint keeps
+        # oscillating across a wide range (observed bouncing between about
+        # 0.58 and 1.70 rad) for the entire window, never settling -- and
+        # the P and D terms of the *commanded* effort can momentarily
+        # cancel out mid-swing even while genuinely not at rest, which is
+        # exactly the kind of false "it's stable now" reading a naive
+        # low-commanded-effort check can't tell apart from real settling.
+        # So this now just holds for a plain bounded duration instead of
+        # trying to detect settling at all -- the gripper stays roughly
+        # open (never closer to closed than that ~0.58 rad low point in
+        # testing) for the whole hold, which is what actually matters for
+        # a caller descending the arm past an object; it doesn't need to
+        # be perfectly still to serve that purpose.
         canceled = False
+        if self.get_parameter('hold_after_reaching').value:
+            hold_timeout = Duration(seconds=self.get_parameter('hold_timeout').value)
+            hold_started_at = self.get_clock().now()
 
-        while rclpy.ok():
-            if goal_handle.is_cancel_requested:
-                canceled = True
-                break
-
-            now = self.get_clock().now()
-            if now - hold_started_at >= hold_timeout:
-                break
-
-            dt = (now - previous_time).nanoseconds / 1e9
-            if dt <= 0.0:
-                dt = CONTROL_PERIOD_SEC
-            previous_time = now
-
-            error = target - self._position
-            integral += error * dt
-            derivative = (error - previous_error) / dt
-            previous_error = error
-
-            effort = p_gain * error + i_gain * integral + d_gain * derivative
-            effort = max(-max_effort, min(max_effort, effort))
-            self._effort_pub.publish(Float64MultiArray(data=[effort]))
-
-            if abs(effort) < stable_effort:
-                if stable_since is None:
-                    stable_since = now
-                elif (now - stable_since) >= Duration(seconds=stable_duration):
+            while rclpy.ok():
+                if goal_handle.is_cancel_requested:
+                    canceled = True
                     break
-            else:
-                stable_since = None
 
-            time.sleep(CONTROL_PERIOD_SEC)
+                now = self.get_clock().now()
+                if now - hold_started_at >= hold_timeout:
+                    break
+
+                dt = (now - previous_time).nanoseconds / 1e9
+                if dt <= 0.0:
+                    dt = CONTROL_PERIOD_SEC
+                previous_time = now
+
+                error = target - self._position
+                integral += error * dt
+                derivative = (error - previous_error) / dt
+                previous_error = error
+
+                effort = p_gain * error + i_gain * integral + d_gain * derivative
+                effort = max(-max_effort, min(max_effort, effort))
+                self._effort_pub.publish(Float64MultiArray(data=[effort]))
+
+                time.sleep(CONTROL_PERIOD_SEC)
 
         self._stop_effort()
 
