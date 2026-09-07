@@ -1,3 +1,55 @@
+diff --git a/so_arm101_description/control/so_arm101.ros2_control.xacro b/so_arm101_description/control/so_arm101.ros2_control.xacro
+index acab905..82424d1 100644
+--- a/so_arm101_description/control/so_arm101.ros2_control.xacro
++++ b/so_arm101_description/control/so_arm101.ros2_control.xacro
+@@ -32,6 +32,7 @@
+         <command_interface name="position" />
+         <state_interface name="position" />
+         <state_interface name="velocity" />
++        <state_interface name="effort" />
+       </joint>
+ 
+       <joint name="${prefix}shoulder_lift_joint">
+@@ -42,6 +43,7 @@
+         <command_interface name="position" />
+         <state_interface name="position" />
+         <state_interface name="velocity" />
++        <state_interface name="effort" />
+       </joint>
+ 
+       <joint name="${prefix}elbow_flex_joint">
+@@ -52,6 +54,7 @@
+         <command_interface name="position" />
+         <state_interface name="position" />
+         <state_interface name="velocity" />
++        <state_interface name="effort" />
+       </joint>
+ 
+       <joint name="${prefix}wrist_flex_joint">
+@@ -62,6 +65,7 @@
+         <command_interface name="position" />
+         <state_interface name="position" />
+         <state_interface name="velocity" />
++        <state_interface name="effort" />
+       </joint>
+ 
+       <joint name="${prefix}wrist_roll_joint">
+@@ -72,6 +76,7 @@
+         <command_interface name="position" />
+         <state_interface name="position" />
+         <state_interface name="velocity" />
++        <state_interface name="effort" />
+       </joint>
+ 
+       <joint name="${prefix}gripper_joint">
+@@ -82,6 +87,7 @@
+         <command_interface name="position" />
+         <state_interface name="position" />
+         <state_interface name="velocity" />
++        <state_interface name="effort" />
+       </joint>
+     </ros2_control>
+   </xacro:macro>
 diff --git a/so_arm101_description/urdf/so_arm101_macro.xacro b/so_arm101_description/urdf/so_arm101_macro.xacro
 index 1116cbd..d0a90de 100644
 --- a/so_arm101_description/urdf/so_arm101_macro.xacro
