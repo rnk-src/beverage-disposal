@@ -37,7 +37,7 @@ verified here.
 All three share the same basic flow once the OS and ROS2 are in place:
 
 ```
-git clone --recurse-submodules <this-repo-url>
+git clone --recurse-submodules https://github.com/rnk-src/beverage-disposal.git
 cd beverage-disposal
 git submodule update --init --recursive
 scripts/apply_vendor_patches.sh
