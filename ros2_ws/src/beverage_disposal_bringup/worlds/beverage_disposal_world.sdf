@@ -170,6 +170,23 @@ staying within the OpenManipulator-X's short reach over realism.
           <geometry>
             <cylinder><radius>0.033</radius><length>0.122</length></cylinder>
           </geometry>
+          <!-- No friction was ever specified here before this iteration,
+               so every jaw-can contact ran on Gazebo/DART's raw physics
+               defaults, which are not necessarily grippy. mu/mu2 are the
+               standard SDF ODE-surface friction coefficients along the two
+               orthogonal directions of the contact patch; a smooth,
+               un-textured can body is a reasonable candidate for something
+               moderate-to-high rather than default, so a real gripper
+               attempt has a fair chance of holding it via friction alone.
+               See commit-notes/10 for the diagnosis this responds to. -->
+          <surface>
+            <friction>
+              <ode>
+                <mu>3.0</mu>
+                <mu2>3.0</mu2>
+              </ode>
+            </friction>
+          </surface>
         </collision>
         <visual name="can_visual">
           <geometry>
