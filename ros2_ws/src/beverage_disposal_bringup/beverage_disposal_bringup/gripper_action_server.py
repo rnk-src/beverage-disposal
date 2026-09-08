@@ -43,6 +43,22 @@ class GripperActionServer(Node):
         self.declare_parameter('p_gain', 10.0)
         self.declare_parameter('i_gain', 0.0)
         self.declare_parameter('d_gain', 1.2)
+        # Effort tapering, see commit-notes/10 for the full diagnosis: this
+        # joint's inertia (~6.6e-6 kg*m^2, from jaw_link's 0.012 kg mass) is
+        # small enough that any effort above roughly 0.03 N*m saturates its
+        # 10 rad/s velocity limit in under one control cycle at any
+        # ROS2/Python-achievable loop rate, so the full max_effort (needed
+        # to reach far-away targets like the joint's own extremes in
+        # reasonable time) makes it impossible to settle smoothly once
+        # close to an intermediate target -- it just bounces off the limit
+        # repeatedly. Clamping to a much smaller effort once within
+        # near_target_threshold of the goal keeps the joint in the
+        # non-saturating regime for its final approach, where the physical
+        # damping added to gripper_joint's URDF definition (also see
+        # commit-notes/10) can actually do its job of dissipating energy
+        # instead of being negligible next to a multi-newton-meter torque.
+        self.declare_parameter('near_target_threshold', 0.15)
+        self.declare_parameter('near_target_max_effort', 0.05)
         self.declare_parameter('goal_tolerance', 0.05)
         self.declare_parameter('stall_velocity_threshold', 0.001)
         self.declare_parameter('stall_timeout', 1.0)
@@ -85,6 +101,25 @@ class GripperActionServer(Node):
     def _stop_effort(self):
         self._effort_pub.publish(Float64MultiArray(data=[0.0]))
 
+    def _compute_and_publish_effort(self, error, integral, derivative, p_gain, i_gain,
+                                     d_gain, max_effort, near_target_threshold,
+                                     near_target_max_effort):
+        """One PID step: compute effort from the given terms, taper the
+        allowed magnitude down once close to the target (see the
+        near_target_threshold/near_target_max_effort parameter comment in
+        __init__ for why), publish it, and return the clamped value.
+        Shared between the tracking loop and the hold loop so both behave
+        identically instead of two copies drifting apart.
+        """
+        effective_max = max_effort
+        if abs(error) < near_target_threshold:
+            effective_max = min(max_effort, near_target_max_effort)
+
+        effort_raw = p_gain * error + i_gain * integral + d_gain * derivative
+        effort = max(-effective_max, min(effective_max, effort_raw))
+        self._effort_pub.publish(Float64MultiArray(data=[effort]))
+        return effort
+
     def _execute_goal(self, goal_handle):
         target = goal_handle.request.command.position
         max_effort = goal_handle.request.command.max_effort
@@ -94,6 +129,8 @@ class GripperActionServer(Node):
         p_gain = self.get_parameter('p_gain').value
         i_gain = self.get_parameter('i_gain').value
         d_gain = self.get_parameter('d_gain').value
+        near_target_threshold = self.get_parameter('near_target_threshold').value
+        near_target_max_effort = self.get_parameter('near_target_max_effort').value
         goal_tolerance = self.get_parameter('goal_tolerance').value
         stall_velocity_threshold = self.get_parameter('stall_velocity_threshold').value
         stall_timeout = self.get_parameter('stall_timeout').value
@@ -123,9 +160,9 @@ class GripperActionServer(Node):
             derivative = (error - previous_error) / dt
             previous_error = error
 
-            effort = p_gain * error + i_gain * integral + d_gain * derivative
-            effort = max(-max_effort, min(max_effort, effort))
-            self._effort_pub.publish(Float64MultiArray(data=[effort]))
+            effort = self._compute_and_publish_effort(
+                error, integral, derivative, p_gain, i_gain, d_gain, max_effort,
+                near_target_threshold, near_target_max_effort)
 
             if abs(error) <= goal_tolerance:
                 reached_goal = True
@@ -224,9 +261,9 @@ class GripperActionServer(Node):
                 derivative = (error - previous_error) / dt
                 previous_error = error
 
-                effort = p_gain * error + i_gain * integral + d_gain * derivative
-                effort = max(-max_effort, min(max_effort, effort))
-                self._effort_pub.publish(Float64MultiArray(data=[effort]))
+                effort = self._compute_and_publish_effort(
+                    error, integral, derivative, p_gain, i_gain, d_gain, max_effort,
+                    near_target_threshold, near_target_max_effort)
 
                 time.sleep(CONTROL_PERIOD_SEC)
 
