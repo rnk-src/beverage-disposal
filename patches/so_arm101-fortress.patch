@@ -55,7 +55,7 @@ index acab905..657c10c 100644
      </ros2_control>
    </xacro:macro>
 diff --git a/so_arm101_description/urdf/so_arm101_macro.xacro b/so_arm101_description/urdf/so_arm101_macro.xacro
-index 1116cbd..d0a90de 100644
+index 1116cbd..56e4eef 100644
 --- a/so_arm101_description/urdf/so_arm101_macro.xacro
 +++ b/so_arm101_description/urdf/so_arm101_macro.xacro
 @@ -580,7 +580,7 @@
@@ -67,3 +67,27 @@ index 1116cbd..d0a90de 100644
      <joint name="${prefix}elbow_flex_joint" type="revolute">
        <origin
          xyz="-0.11257 -0.028 1.73763e-16"
+@@ -673,6 +673,23 @@
+       <child link="${prefix}jaw_link" />
+       <axis xyz="0 0 1" />
+       <limit effort="10" velocity="10" lower="0.0" upper="1.70" />
++      <!-- jaw_link's mass (0.012 kg) gives this joint an inertia around
++           6.6e-6 kg*m^2, roughly three orders of magnitude below the
++           arm's other joints. With zero physical damping (the vendored
++           default), any nonzero commanded effort accelerates it to its
++           10 rad/s velocity limit in well under one millisecond, and with
++           no friction to dissipate energy, it never settles on its own,
++           see commit-notes/10 for the full diagnosis (direct per-cycle
++           logging of effort/velocity/position showed the joint pinned at
++           its velocity limit on essentially every control cycle,
++           regardless of control-loop rate or gain). A real gripper joint
++           always has some viscous damping from its own mechanics; this
++           vendored model simply omits it. Adding a small, physically
++           plausible damping value here lets the physics engine dissipate
++           energy every simulation timestep (1ms), far faster than any
++           ROS2/Python control loop could react, which is what actually
++           makes closed-loop position holding possible for this joint. -->
++      <dynamics damping="0.05" friction="0.0" />
+     </joint>
+ 
+     <transmission name="${prefix}gripper_trans">
