@@ -55,7 +55,7 @@ index acab905..657c10c 100644
      </ros2_control>
    </xacro:macro>
 diff --git a/so_arm101_description/urdf/so_arm101_macro.xacro b/so_arm101_description/urdf/so_arm101_macro.xacro
-index 1116cbd..29932b4 100644
+index 1116cbd..1dc0a89 100644
 --- a/so_arm101_description/urdf/so_arm101_macro.xacro
 +++ b/so_arm101_description/urdf/so_arm101_macro.xacro
 @@ -528,6 +528,76 @@
@@ -85,7 +85,7 @@ index 1116cbd..29932b4 100644
 +      <collision>
 +        <origin xyz="0 0 0" rpy="0 0 0" />
 +        <geometry>
-+          <box size="0.006 0.006 0.006" />
++          <box size="0.010 0.010 0.010" />
 +        </geometry>
 +      </collision>
 +    </link>
@@ -181,7 +181,7 @@ index 1116cbd..29932b4 100644
 +      <collision>
 +        <origin xyz="0 0 0" rpy="0 0 0" />
 +        <geometry>
-+          <box size="0.006 0.006 0.006" />
++          <box size="0.010 0.010 0.010" />
 +        </geometry>
 +      </collision>
 +    </link>
