@@ -3,10 +3,12 @@ import pytest
 from beverage_disposal_bringup.grasp_geometry import (
     CALIBRATION_CAN_HEIGHT,
     CALIBRATION_CAN_RADIUS,
+    grasp_joint_targets,
     grasp_pose_for_can,
+    hover_joint_targets,
     hover_pose_for_can,
 )
-from beverage_disposal_bringup.kinematics import forward_kinematics
+from beverage_disposal_bringup.kinematics import forward_kinematics, solve_arm_ik
 
 WRIST_ROLL = 1.5708
 
@@ -79,3 +81,39 @@ def test_grasp_and_hover_poses_are_reachable_via_solve_arm_ik():
     hover = hover_pose_for_can(CALIBRATION_CAN_RADIUS, CALIBRATION_CAN_HEIGHT)
     solve_arm_ik(*grasp, WRIST_ROLL, elbow_up=False)
     solve_arm_ik(*hover, WRIST_ROLL, elbow_up=False)
+
+
+# grasp_joint_targets/hover_joint_targets (below) exist to formalize what
+# every throwaway pipeline script in commit-notes/10-iteration-3-pick-and-
+# lift.md's "closure-stall" investigation had to hand-write inline: compose
+# grasp_pose_for_can/hover_pose_for_can with solve_arm_ik to get the arm's
+# three pitch-joint values directly, rather than every caller repeating that
+# two-step composition (and its clamp_near_limits reasoning -- both the
+# calibrated GRASP and HOVER poses sit exactly at wrist_flex's hard limit,
+# see grasp_geometry.py's module docstring) itself.
+def test_grasp_joint_targets_matches_manual_ik_composition():
+    can_r, can_z = CALIBRATION_CAN_RADIUS + 0.008, CALIBRATION_CAN_HEIGHT - 0.006
+    expected = solve_arm_ik(*grasp_pose_for_can(can_r, can_z), WRIST_ROLL, elbow_up=False,
+                             clamp_near_limits=0.1)
+    actual = grasp_joint_targets(can_r, can_z)
+    assert actual == pytest.approx(expected, abs=1e-12)
+
+
+def test_hover_joint_targets_matches_manual_ik_composition():
+    can_r, can_z = CALIBRATION_CAN_RADIUS - 0.005, CALIBRATION_CAN_HEIGHT + 0.004
+    expected = solve_arm_ik(*hover_pose_for_can(can_r, can_z), WRIST_ROLL, elbow_up=False,
+                             clamp_near_limits=0.1)
+    actual = hover_joint_targets(can_r, can_z)
+    assert actual == pytest.approx(expected, abs=1e-12)
+
+
+def test_grasp_joint_targets_recovers_known_good_joints_at_calibration_position():
+    """Regression guard tying this all the way back to the real, live-sim-
+    verified joint tuple this whole module is calibrated from."""
+    actual = grasp_joint_targets(CALIBRATION_CAN_RADIUS, CALIBRATION_CAN_HEIGHT)
+    assert actual == pytest.approx(KNOWN_GOOD_GRASP_JOINTS, abs=1e-6)
+
+
+def test_hover_joint_targets_recovers_known_good_joints_at_calibration_position():
+    actual = hover_joint_targets(CALIBRATION_CAN_RADIUS, CALIBRATION_CAN_HEIGHT)
+    assert actual == pytest.approx(KNOWN_GOOD_HOVER_JOINTS, abs=1e-6)

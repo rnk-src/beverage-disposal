@@ -24,7 +24,7 @@ world the can happened to spawn at.
 """
 import math
 
-from .kinematics import forward_kinematics
+from .kinematics import forward_kinematics, solve_arm_ik
 
 WRIST_ROLL = 1.5708
 
@@ -71,3 +71,37 @@ def hover_pose_for_can(can_radius, can_height):
     """(radius, height, pitch) the gripper should be at, gripper open,
     immediately before descending to grasp_pose_for_can's target."""
     return can_radius + _HOVER_RADIUS_OFFSET, can_height + _HOVER_HEIGHT_OFFSET, _HOVER_PITCH
+
+
+# clamp_near_limits=0.1: both the calibrated GRASP and HOVER poses sit
+# exactly at wrist_flex's hard 1.6 rad limit (see _KNOWN_GOOD_*_JOINTS
+# above), so any live radial/vertical disturbance to the can's measured
+# position (real, see commit-notes/10-iteration-3-pick-and-lift.md) can
+# push the exact-pitch solution a few hundredths of a radian past that
+# limit -- a real geometric consequence of targeting a pose that already
+# sits on a joint's boundary, not a bug to reject the target over.
+_LIMIT_CLAMP = 0.1
+
+
+def grasp_joint_targets(can_radius, can_height, wrist_roll=WRIST_ROLL, elbow_up=False):
+    """(shoulder_lift, elbow_flex, wrist_flex) to close the gripper on a can
+    at (can_radius, can_height) -- the single-call replacement for every
+    pipeline script that used to hand-compose
+    solve_arm_ik(*grasp_pose_for_can(...), ...) itself. See
+    commit-notes/10-iteration-3-pick-and-lift.md's "closure-stall" entry:
+    a single direct move to this target (not a multi-step interpolated
+    descent) is what a real A/B trial comparison found actually produces a
+    firm, reliable grip -- the interpolated path's discrete stop-start
+    sub-goals left the jaw in a measurably worse position to engage the
+    contact patches, even though it caused less pre-contact can
+    displacement than a single direct move does in isolation."""
+    return solve_arm_ik(*grasp_pose_for_can(can_radius, can_height), wrist_roll,
+                         elbow_up=elbow_up, clamp_near_limits=_LIMIT_CLAMP)
+
+
+def hover_joint_targets(can_radius, can_height, wrist_roll=WRIST_ROLL, elbow_up=False):
+    """(shoulder_lift, elbow_flex, wrist_flex) for the hover pose above a
+    can at (can_radius, can_height), gripper open -- see
+    grasp_joint_targets' docstring."""
+    return solve_arm_ik(*hover_pose_for_can(can_radius, can_height), wrist_roll,
+                         elbow_up=elbow_up, clamp_near_limits=_LIMIT_CLAMP)
