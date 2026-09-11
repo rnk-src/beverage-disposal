@@ -205,7 +205,15 @@ def solve_arm_ik(target_radius, target_height, target_pitch, wrist_roll, elbow_u
     dz = wrist_z - p_shoulder[2]
     r_sq = dx * dx + dz * dz
     r = math.sqrt(r_sq)
-    if r > l1 + l2 or r < abs(l1 - l2):
+    # Tiny floating-point tolerance, same idea (and same 1e-6 size) as
+    # limit_tol below: a target reconstructed from this arm's own true
+    # max/min reach (e.g. a path endpoint computed via this module's own
+    # forward_kinematics) can land a hair outside [abs(l1-l2), l1+l2]
+    # purely from floating-point roundoff in whatever arithmetic produced
+    # it, not because it's actually unreachable. Without this, a
+    # mathematically-exact boundary target could spuriously raise.
+    reach_tol = 1e-6
+    if r > l1 + l2 + reach_tol or r < abs(l1 - l2) - reach_tol:
         raise ValueError(
             f'target (radius={target_radius:.4f}, height={target_height:.4f}, '
             f'pitch={target_pitch:.4f}) is out of reach: wrist-center distance '
