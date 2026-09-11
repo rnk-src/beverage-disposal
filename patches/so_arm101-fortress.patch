@@ -55,10 +55,10 @@ index acab905..657c10c 100644
      </ros2_control>
    </xacro:macro>
 diff --git a/so_arm101_description/urdf/so_arm101_macro.xacro b/so_arm101_description/urdf/so_arm101_macro.xacro
-index 1116cbd..1dc0a89 100644
+index 1116cbd..c4d31d5 100644
 --- a/so_arm101_description/urdf/so_arm101_macro.xacro
 +++ b/so_arm101_description/urdf/so_arm101_macro.xacro
-@@ -528,6 +528,76 @@
+@@ -528,6 +528,89 @@
        </collision>
      </link>
  
@@ -76,7 +76,20 @@ index 1116cbd..1dc0a89 100644
 +         flickering point. This position is jaw_link's own real fingertip,
 +         found by directly parsing moving_jaw_so101_v1.stl for the point
 +         farthest from the joint axis, then shifted by jaw_link's own
-+         visual/collision origin (z=0.0189) to land in jaw_link's frame. -->
++         visual/collision origin (z=0.0189) to land in jaw_link's frame.
++
++         An asymmetric reshape (7mm thin / 16mm wide, oriented via a
++         hinge-axis argument: every joint here rotates about its own
++         local Z, and a joint's child link's frame Z axis IS that
++         rotation axis by construction, so jaw_link's local Z is exactly
++         gripper_joint's hinge axis) was tried and reverted in a later
++         session - two fresh trials both landed well below this cube's
++         proven closure range (0.0077 and 0.1238 rad vs. 0.31-0.52 rad
++         here), matching the same "oversized/over-reaching pad" failure
++         signature as the 14mm-cube regression below. See
++         commit-notes/10-iteration-3-pick-and-lift.md for the full
++         reasoning and results; kept as a cube here since that's what's
++         actually verified to work. -->
 +    <link name="${prefix}jaw_pad_link">
 +      <inertial>
 +        <mass value="0.0005" />
@@ -135,7 +148,7 @@ index 1116cbd..1dc0a89 100644
      <!-- Joint from base to shoulder -->
      <joint name="${prefix}shoulder_pan_joint" type="revolute">
        <origin
-@@ -580,7 +650,7 @@
+@@ -580,7 +663,7 @@
      </transmission>
  
      <!-- Joint from upper_arm to lower_arm -->
@@ -144,7 +157,7 @@ index 1116cbd..1dc0a89 100644
      <joint name="${prefix}elbow_flex_joint" type="revolute">
        <origin
          xyz="-0.11257 -0.028 1.73763e-16"
-@@ -658,6 +728,55 @@
+@@ -658,6 +741,65 @@
        </actuator>
      </transmission>
  
@@ -172,7 +185,17 @@ index 1116cbd..1dc0a89 100644
 +         can-to-mesh-point direction so the pad protrudes only slightly
 +         from the existing mesh instead of sitting flush on its surface -
 +         disableFixedJointLumping keeps it a separate SDF link so the
-+         friction override just below applies only to this small patch. -->
++         friction override just below applies only to this small patch.
++
++         An asymmetric reshape was tried here too in a later session
++         (unlike jaw_pad_link, this link's parent gripper_link is NOT the
++         child of gripper_joint, so its local frame isn't automatically
++         aligned with the hinge axis - computed directly, gripper_joint's
++         origin rpy (1.5708, 0.18, ~0) relative to gripper_link maps the
++         axis vector (0,0,1) to approximately (0,-1,0), i.e. the hinge
++         axis is gripper_link's own local -Y here) and reverted for the
++         same reason as jaw_pad_link above - see
++         commit-notes/10-iteration-3-pick-and-lift.md. -->
 +    <link name="${prefix}fixed_jaw_pad_link">
 +      <inertial>
 +        <mass value="0.0005" />
@@ -200,7 +223,7 @@ index 1116cbd..1dc0a89 100644
      <!-- Fixed joint for gripper frame -->
      <joint name="${prefix}gripper_frame_joint" type="fixed">
        <origin xyz="-0.0079 -0.000218121 -0.0981274" rpy="0 3.14159 0" />
-@@ -673,6 +792,23 @@
+@@ -673,6 +815,23 @@
        <child link="${prefix}jaw_link" />
        <axis xyz="0 0 1" />
        <limit effort="10" velocity="10" lower="0.0" upper="1.70" />
