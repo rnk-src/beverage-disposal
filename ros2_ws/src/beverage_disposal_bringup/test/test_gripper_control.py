@@ -122,6 +122,23 @@ def test_contact_status_locks_in_and_keeps_holding():
     assert result.status == GripperCloseStatus.CONTACT_DETECTED
 
 
+def test_large_first_dt_does_not_falsely_trigger_contact():
+    """Real bug, found by independently re-running test_gripper.py fresh
+    (not hypothesized): the very first control tick after a fresh node/goal
+    start can see an anomalously large dt -- e.g. the sim-clock subscription
+    catching up right after node startup, before the joint has had any real
+    chance to move -- while velocity still reads 0 because nothing has
+    happened yet, not because anything is blocking it. Before this fix, one
+    such tick (dt=5.0, far exceeding contact_confirm_time=0.1) instantly and
+    permanently locked the controller into CONTACT_DETECTED at the starting
+    position, with the commanded goal nowhere near reached -- this is
+    exactly what made gripper_action_server stop applying any real effort
+    after a single tick, reproducing the 5/5 test_gripper.py failures."""
+    controller = GripperCloseController(target=1.5, params=default_params())
+    result = controller.step(position=0.0, velocity=0.0, dt=5.0)
+    assert result.status == GripperCloseStatus.TRACKING
+
+
 def test_contact_hold_pushes_in_original_closing_direction():
     """The hold effort must keep squeezing toward the original target
     direction (a real, physically motivated sustained push), not drift
