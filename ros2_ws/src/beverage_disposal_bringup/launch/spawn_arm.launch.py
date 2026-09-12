@@ -41,7 +41,18 @@ def generate_launch_description():
                 [FindPackageShare('beverage_disposal_bringup'), 'worlds', 'beverage_disposal_world.sdf']
             ),
             description='World file to load (bundled gz-sim world name or path)'),
+        # Off by default: see gripper_action_server.py's own long comment on
+        # hold_after_reaching for why this changes the node's observable
+        # behavior in a way test_gripper.py isn't written to expect. A
+        # caller that needs the gripper to hold position afterward (this
+        # project's own pick_and_lift pipeline) passes hold_after_reaching:=true.
+        DeclareLaunchArgument(
+            'hold_after_reaching',
+            default_value='false',
+            description='Keep gripper_action_server driving toward/holding its target '
+                         'after reaching or contacting it, instead of releasing immediately'),
     ]
+    hold_after_reaching = LaunchConfiguration('hold_after_reaching')
 
     robot_description = Command([
         PathJoinSubstitution([FindExecutable(name='xacro')]),
@@ -111,7 +122,7 @@ def generate_launch_description():
     gripper_action_server = Node(
         package='beverage_disposal_bringup',
         executable='gripper_action_server',
-        parameters=[{'use_sim_time': True}],
+        parameters=[{'use_sim_time': True, 'hold_after_reaching': hold_after_reaching}],
         output='screen',
     )
 
