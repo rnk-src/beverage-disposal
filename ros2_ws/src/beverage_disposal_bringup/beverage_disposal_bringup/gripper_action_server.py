@@ -8,6 +8,8 @@ from rclpy.node import Node
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Float64MultiArray
 
+from .gripper_control import GripperCloseController, GripperCloseStatus, GripperControlParams
+
 GRIPPER_JOINT_NAME = 'gripper_joint'
 EFFORT_COMMAND_TOPIC = '/gripper_controller/commands'
 ACTION_NAME = '/gripper_controller/gripper_cmd'
@@ -61,7 +63,25 @@ class GripperActionServer(Node):
         self.declare_parameter('near_target_max_effort', 0.05)
         self.declare_parameter('goal_tolerance', 0.05)
         self.declare_parameter('stall_velocity_threshold', 0.001)
-        self.declare_parameter('stall_timeout', 1.0)
+        # How long a stall has to persist, in sim time, before it's treated
+        # as real contact rather than sensor/control noise. See
+        # commit-notes/10-iteration-3-pick-and-lift.md's "closing strategy
+        # redesign" entry and gripper_control.py's module docstring for the
+        # full reasoning: unlike the old near_target_threshold taper (a
+        # *distance* trigger, which can't tell "arrived gently" apart from
+        # "blocked, needs real force"), this is a *stall* trigger -- the
+        # actual physical signature of hitting an object -- so it works
+        # correctly regardless of where the stall happens to land relative
+        # to the originally commanded target.
+        self.declare_parameter('contact_confirm_time', 0.1)
+        # Effort sustained once contact is confirmed -- deliberately
+        # separate from near_target_max_effort (tuned for gentle,
+        # non-oscillating settling onto a free-space target with nothing
+        # resisting it) and from the raw PID output (which would relax
+        # toward zero once error is small, exactly wrong for holding a
+        # grip). This needs to be large enough to actually hold an object
+        # against gravity/disturbance but no larger than max_effort.
+        self.declare_parameter('contact_hold_effort', 2.0)
         self.declare_parameter('default_max_effort', 5.0)
         # Off by default: see the long comment further down, at the hold
         # loop itself, for why holding changes this node's observable
@@ -101,24 +121,19 @@ class GripperActionServer(Node):
     def _stop_effort(self):
         self._effort_pub.publish(Float64MultiArray(data=[0.0]))
 
-    def _compute_and_publish_effort(self, error, integral, derivative, p_gain, i_gain,
-                                     d_gain, max_effort, near_target_threshold,
-                                     near_target_max_effort):
-        """One PID step: compute effort from the given terms, taper the
-        allowed magnitude down once close to the target (see the
-        near_target_threshold/near_target_max_effort parameter comment in
-        __init__ for why), publish it, and return the clamped value.
-        Shared between the tracking loop and the hold loop so both behave
-        identically instead of two copies drifting apart.
-        """
-        effective_max = max_effort
-        if abs(error) < near_target_threshold:
-            effective_max = min(max_effort, near_target_max_effort)
-
-        effort_raw = p_gain * error + i_gain * integral + d_gain * derivative
-        effort = max(-effective_max, min(effective_max, effort_raw))
-        self._effort_pub.publish(Float64MultiArray(data=[effort]))
-        return effort
+    def _build_params(self, max_effort):
+        return GripperControlParams(
+            p_gain=self.get_parameter('p_gain').value,
+            i_gain=self.get_parameter('i_gain').value,
+            d_gain=self.get_parameter('d_gain').value,
+            max_effort=max_effort,
+            goal_tolerance=self.get_parameter('goal_tolerance').value,
+            stall_velocity_threshold=self.get_parameter('stall_velocity_threshold').value,
+            contact_confirm_time=self.get_parameter('contact_confirm_time').value,
+            near_target_threshold=self.get_parameter('near_target_threshold').value,
+            near_target_max_effort=self.get_parameter('near_target_max_effort').value,
+            contact_hold_effort=self.get_parameter('contact_hold_effort').value,
+        )
 
     def _execute_goal(self, goal_handle):
         target = goal_handle.request.command.position
@@ -126,20 +141,12 @@ class GripperActionServer(Node):
         if max_effort <= 0.0:
             max_effort = self.get_parameter('default_max_effort').value
 
-        p_gain = self.get_parameter('p_gain').value
-        i_gain = self.get_parameter('i_gain').value
-        d_gain = self.get_parameter('d_gain').value
-        near_target_threshold = self.get_parameter('near_target_threshold').value
-        near_target_max_effort = self.get_parameter('near_target_max_effort').value
-        goal_tolerance = self.get_parameter('goal_tolerance').value
-        stall_velocity_threshold = self.get_parameter('stall_velocity_threshold').value
-        stall_timeout = self.get_parameter('stall_timeout').value
-
-        integral = 0.0
-        previous_error = target - self._position
+        # All the PID/taper/contact-detection decision logic lives in
+        # gripper_control.py (see its module docstring) so it can be unit
+        # tested without ROS/Gazebo. This node's job is just I/O: feed it
+        # real joint-state samples, publish the effort it decides on.
+        controller = GripperCloseController(target, self._build_params(max_effort))
         previous_time = self.get_clock().now()
-        stall_started_at = None
-        reached_goal = False
         effort = 0.0
 
         # Timing here uses the simulation clock (self.get_clock(), backed by
@@ -155,29 +162,22 @@ class GripperActionServer(Node):
                 dt = CONTROL_PERIOD_SEC
             previous_time = now
 
-            error = target - self._position
-            integral += error * dt
-            derivative = (error - previous_error) / dt
-            previous_error = error
+            step_result = controller.step(self._position, self._velocity, dt)
+            effort = step_result.effort
+            self._effort_pub.publish(Float64MultiArray(data=[effort]))
 
-            effort = self._compute_and_publish_effort(
-                error, integral, derivative, p_gain, i_gain, d_gain, max_effort,
-                near_target_threshold, near_target_max_effort)
-
-            if abs(error) <= goal_tolerance:
-                reached_goal = True
+            if controller.status != GripperCloseStatus.TRACKING:
                 break
 
-            if abs(self._velocity) < stall_velocity_threshold:
-                if stall_started_at is None:
-                    stall_started_at = now
-                elif (now - stall_started_at).nanoseconds / 1e9 >= stall_timeout:
-                    reached_goal = False
-                    break
-            else:
-                stall_started_at = None
-
             time.sleep(CONTROL_PERIOD_SEC)
+
+        # reached_goal / stalled follow the real control_msgs/GripperCommand
+        # convention: reached_goal only when the joint actually settled at
+        # the commanded number (the free-space case); stalled when it
+        # stopped early against real resistance -- which, for a grasp goal,
+        # is the *success* signal a caller should act on, not a failure.
+        reached_goal = controller.status == GripperCloseStatus.REACHED_FREE
+        contact_detected = controller.status == GripperCloseStatus.CONTACT_DETECTED
 
         # gripper_joint does not stay where it's put once effort commanding
         # stops (see commit-notes/10): its very low inertia -- the same
@@ -237,6 +237,14 @@ class GripperActionServer(Node):
         # testing) for the whole hold, which is what actually matters for
         # a caller descending the arm past an object; it doesn't need to
         # be perfectly still to serve that purpose.
+        #
+        # The hold loop just keeps stepping the *same* controller instance
+        # instead of a separate copy of the PID math: status is already
+        # locked at REACHED_FREE or CONTACT_DETECTED by this point, so
+        # step() naturally keeps doing the right thing for either case --
+        # gentle taper-servoing for a free-space hold, sustained real grip
+        # effort for a contact hold -- with no risk of the two loops'
+        # formulas drifting apart the way two hand-written copies could.
         canceled = False
         if self.get_parameter('hold_after_reaching').value:
             hold_timeout = Duration(seconds=self.get_parameter('hold_timeout').value)
@@ -256,14 +264,9 @@ class GripperActionServer(Node):
                     dt = CONTROL_PERIOD_SEC
                 previous_time = now
 
-                error = target - self._position
-                integral += error * dt
-                derivative = (error - previous_error) / dt
-                previous_error = error
-
-                effort = self._compute_and_publish_effort(
-                    error, integral, derivative, p_gain, i_gain, d_gain, max_effort,
-                    near_target_threshold, near_target_max_effort)
+                step_result = controller.step(self._position, self._velocity, dt)
+                effort = step_result.effort
+                self._effort_pub.publish(Float64MultiArray(data=[effort]))
 
                 time.sleep(CONTROL_PERIOD_SEC)
 
@@ -272,7 +275,7 @@ class GripperActionServer(Node):
         result = GripperCommand.Result()
         result.position = self._position
         result.effort = effort
-        result.stalled = not reached_goal
+        result.stalled = contact_detected
         result.reached_goal = reached_goal
         if canceled:
             goal_handle.canceled()
