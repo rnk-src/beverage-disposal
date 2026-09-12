@@ -141,6 +141,26 @@ class GripperActionServer(Node):
         if max_effort <= 0.0:
             max_effort = self.get_parameter('default_max_effort').value
 
+        # A goal can start executing before this node has ever received a
+        # real /joint_states message: wait_for_server() only waits for this
+        # action server to exist, which happens as soon as this node
+        # constructs it -- well before Gazebo/the controllers have actually
+        # come up and started publishing. Before this fix, the contact-
+        # detection loop below had no way to tell "haven't heard from the
+        # real joint yet" apart from "heard from it, and it reports zero
+        # velocity" -- both look identical (self._position/self._velocity
+        # sitting at their Python-default 0.0/0.0), so a goal that starts
+        # that early accumulates several real control-loop ticks' worth of
+        # what looks exactly like a stall, before the very first genuine
+        # sensor sample ever arrives, and falsely locks into
+        # CONTACT_DETECTED before the joint has had any real chance to
+        # move at all. Waiting here for _have_joint_state closes that gap
+        # at its source, rather than trying to make the stall-detection
+        # math itself robust to missing data.
+        wait_deadline = self.get_clock().now() + Duration(seconds=10.0)
+        while rclpy.ok() and not self._have_joint_state and self.get_clock().now() < wait_deadline:
+            time.sleep(CONTROL_PERIOD_SEC)
+
         # All the PID/taper/contact-detection decision logic lives in
         # gripper_control.py (see its module docstring) so it can be unit
         # tested without ROS/Gazebo. This node's job is just I/O: feed it

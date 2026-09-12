@@ -28,6 +28,23 @@ still exists because it works and test_gripper.py already depends on it).
 import enum
 from dataclasses import dataclass
 
+# A single anomalously large dt must never count as a big chunk of stalled
+# time in one tick. This happens for real on the very first control cycle
+# after a fresh node/goal start: velocity still reads 0 because the joint
+# hasn't had any chance to move yet (not because anything is blocking it),
+# while dt can be inflated by the sim-clock subscription only just catching
+# up after node startup -- found by independently re-running
+# test_gripper.py fresh and tracing a reproducible failure back to this
+# exact mechanism (see test_large_first_dt_does_not_falsely_trigger_contact).
+# Capping dt to one nominal control cycle means an anomalous gap can
+# contribute at most one real tick's worth of stall time, the same as it
+# would if the clock had behaved normally -- it takes contact_confirm_time's
+# worth of *actually consecutive* stalled ticks to trigger detection, not
+# one inflated one. This also protects the PID's integral/derivative terms
+# from the same kind of single-tick shock, which is good practice regardless
+# of the stall-detection bug.
+_MAX_DT_SEC = 0.02
+
 
 class GripperCloseStatus(enum.Enum):
     TRACKING = 'tracking'
@@ -77,6 +94,7 @@ class GripperCloseController:
 
     def step(self, position, velocity, dt):
         p = self.params
+        dt = min(dt, _MAX_DT_SEC)
         error = self.target - position
 
         if self._previous_error is None:
