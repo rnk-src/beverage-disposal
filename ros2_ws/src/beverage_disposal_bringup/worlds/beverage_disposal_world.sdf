@@ -179,6 +179,24 @@ staying within the OpenManipulator-X's short reach over realism.
                moderate-to-high rather than default, so a real gripper
                attempt has a fair chance of holding it via friction alone.
                See commit-notes/10 for the diagnosis this responds to. -->
+          <!-- kp/kd contact softness (SDF <surface><contact><ode>) was
+               tried and reverted this iteration: a real aluminum can wall
+               gives slightly under a firm grip, wrapping into a conforming
+               patch rather than touching at one rigid line, and every
+               collision in this world was (and still is) perfectly rigid
+               otherwise. Tested kp (contact stiffness, N/m - lower means
+               softer/more penetration under load) at 1e4, 1e6, and 1e8,
+               each with a correspondingly damped kd, spanning four orders
+               of magnitude from "very soft" to "close to rigid": 0/18
+               fresh trials succeeded at any of the three, no better (the
+               softest setting was arguably worse - more catastrophic
+               flings) than the rigid default. Simulated compliance this
+               way changes how deeply two shapes interpenetrate before
+               resisting, but doesn't reproduce the real mechanism (the
+               can's wall actually deforming and wrapping around the
+               fingers, increasing contact area) - see
+               commit-notes/10-iteration-3-pick-and-lift.md for the full
+               reasoning and results. Reverted to the rigid default. -->
           <surface>
             <friction>
               <ode>
