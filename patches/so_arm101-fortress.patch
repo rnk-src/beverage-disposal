@@ -55,7 +55,7 @@ index acab905..657c10c 100644
      </ros2_control>
    </xacro:macro>
 diff --git a/so_arm101_description/urdf/so_arm101_macro.xacro b/so_arm101_description/urdf/so_arm101_macro.xacro
-index 1116cbd..405ff04 100644
+index 1116cbd..489e5c8 100644
 --- a/so_arm101_description/urdf/so_arm101_macro.xacro
 +++ b/so_arm101_description/urdf/so_arm101_macro.xacro
 @@ -528,6 +528,105 @@
@@ -66,11 +66,11 @@ index 1116cbd..405ff04 100644
 +         matching one on gripper_link (fixed_jaw_pad_link, defined near the
 +         gripper_joint below) for the full story. Someone else solved this
 +         exact problem for this exact gripper in MuJoCo (see commit-notes/10
-+         for the source): raw mesh-to-mesh collision produces a single,
++         for the source). Raw mesh-to-mesh collision produces a single,
 +         unstable contact point that can't hold an object without wobbling,
 +         *regardless of friction coefficient* - which is why tuning
 +         mu1/mu2 alone (below) helped but never fully fixed the slipping.
-+         Their fix, applied here: small box primitives at the actual
++         Their fix, applied here, is small box primitives at the actual
 +         contact area on *both* surfaces, sized to protrude only slightly
 +         from each mesh, give real multi-point contact instead of one
 +         flickering point. This position is jaw_link's own real fingertip,
@@ -79,7 +79,7 @@ index 1116cbd..405ff04 100644
 +         visual/collision origin (z=0.0189) to land in jaw_link's frame.
 +
 +         An asymmetric reshape (7mm thin / 16mm wide, oriented via a
-+         hinge-axis argument: every joint here rotates about its own
++         hinge-axis argument. Every joint here rotates about its own
 +         local Z, and a joint's child link's frame Z axis IS that
 +         rotation axis by construction, so jaw_link's local Z is exactly
 +         gripper_joint's hinge axis) was tried and reverted in a later
@@ -95,7 +95,7 @@ index 1116cbd..405ff04 100644
 +         - a small torsional-spring revolute joint in place of this fixed
 +         mount, approximating TheRobotStudio's real "Compliant Gripper"
 +         TPU attachment for this arm) was tried and reverted in a later
-+         session: SDF spring joints were confirmed to genuinely work on
++         session. SDF spring joints were confirmed to genuinely work on
 +         this project's Gazebo Fortress build (a real, useful finding on
 +         its own - see commit-notes/10), but every stiffness/damping
 +         combination tried produced worse grasps than this plain rigid
@@ -182,20 +182,20 @@ index 1116cbd..405ff04 100644
 +         separate "static jaw" part, and gripper_link's only collision
 +         geometry is its two big body meshes, giving no small, specific
 +         contact surface. See jaw_pad_link above (on jaw_link) for the
-+         full story: someone else solved this exact grip-slipping problem
++         full story. Someone else solved this exact grip-slipping problem
 +         for this exact gripper in MuJoCo by adding small box-primitive
 +         contact patches on *both* gripping surfaces, since raw
 +         mesh-to-mesh collision produces one unstable contact point
 +         regardless of friction. This is the fixed-side half of that pair.
 +
-+         Position: not derived from jaw geometry (four earlier attempts at
++         Position not derived from jaw geometry (four earlier attempts at
 +         that each failed differently - full story in commit-notes/10).
 +         Instead, measured the can's own real position relative to
-+         gripper_link directly via TF during an actual grasp attempt:
-+         (0.0071, 0.0010, -0.1208). Found the closest real vertex on
++         gripper_link directly via TF during an actual grasp attempt,
++         giving (0.0071, 0.0010, -0.1208). Found the closest real vertex on
 +         gripper_link's own body meshes to that point by brute-force
-+         nearest-neighbor search over the actual mesh triangle data:
-+         (-0.0082, -0.0002, -0.1041), about 2.3cm away (close to the can's
++         nearest-neighbor search over the actual mesh triangle data,
++         landing at (-0.0082, -0.0002, -0.1041), about 2.3cm away (close to the can's
 +         own radius, so genuinely near the real contact zone). Then, per
 +         the working recipe found above, nudged 2mm further along the
 +         can-to-mesh-point direction so the pad protrudes only slightly
