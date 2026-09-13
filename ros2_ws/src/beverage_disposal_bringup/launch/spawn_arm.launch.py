@@ -21,6 +21,9 @@ Combines:
   - a ros_gz_bridge clock bridge so use_sim_time works
   - a ros_gz_bridge pose bridge (object poses -> tf2_msgs/TFMessage), read
     by later pipeline stages to find the can/bottle in the world
+  - a ros_gz_bridge service bridge exposing gz-sim's world "set entity
+    pose" control as a ROS2 service, used by pick_and_lift.py's kinematic
+    snap-grasp (see kinematic_grasp.py)
 """
 
 from launch import LaunchDescription
@@ -146,6 +149,27 @@ def generate_launch_description():
         output='screen',
     )
 
+    # Exposes gz-sim's world-control "set entity pose" service as a real
+    # ROS2 service. Needed for kinematic_grasp.py's snap-grasp: once a real
+    # grip is confirmed (via gripper_action_server.py's live contact-
+    # detection feedback), pick_and_lift.py directly overrides the grasped
+    # object's world pose every control tick to track the gripper, rather
+    # than relying on friction/contact physics to keep it in hand through a
+    # lift -- see commit-notes/10-iteration-3-pick-and-lift.md's research
+    # entry for why: no comparable SO-101 sim environment actually solves
+    # real friction-contact grasping either, they all use this same
+    # kinematic-snap-grasp technique. Verified empirically (round-trip
+    # latency ~0.7ms via a persistent client, far below one control tick)
+    # before relying on it here.
+    pose_set_bridge = Node(
+        package='ros_gz_bridge',
+        executable='parameter_bridge',
+        arguments=[
+            '/world/beverage_disposal_world/set_pose@ros_gz_interfaces/srv/SetEntityPose',
+        ],
+        output='screen',
+    )
+
     return LaunchDescription(declared_arguments + [
         gz_sim,
         robot_state_publisher,
@@ -156,4 +180,5 @@ def generate_launch_description():
         gripper_action_server,
         clock_bridge,
         pose_bridge,
+        pose_set_bridge,
     ])

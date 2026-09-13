@@ -29,7 +29,7 @@ def move_gripper(node, position, max_effort=10.0, timeout_sec=10.0):
     return wrapped_result.result
 
 
-def send_gripper_goal(node, position, max_effort=10.0, timeout_sec=10.0):
+def send_gripper_goal(node, position, max_effort=10.0, timeout_sec=10.0, feedback_callback=None):
     """Sends a GripperCommand goal and returns as soon as it's accepted,
     without waiting for a terminal result.
 
@@ -43,6 +43,14 @@ def send_gripper_goal(node, position, max_effort=10.0, timeout_sec=10.0):
     poll /joint_states directly for the actual position/effort it cares
     about. The hold loop keeps running server-side regardless of whether
     the client is waiting on it, so this doesn't cut the hold short.
+
+    feedback_callback, if given, is called with each GripperCommand.Feedback
+    message as it arrives (position/effort/stalled/reached_goal, published
+    every control tick by gripper_action_server.py) -- the live version of
+    what the terminal result would eventually report, needed by any caller
+    that has to act *during* a hold (e.g. pick_and_lift.py deciding whether
+    a real grip was achieved before committing to a kinematic lock) rather
+    than waiting for the goal to finish.
     """
     client = ActionClient(node, GripperCommand, GRIPPER_ACTION_NAME)
     if not client.wait_for_server(timeout_sec=timeout_sec):
@@ -52,7 +60,12 @@ def send_gripper_goal(node, position, max_effort=10.0, timeout_sec=10.0):
     goal.command.position = position
     goal.command.max_effort = max_effort
 
-    send_goal_future = client.send_goal_async(goal)
+    if feedback_callback is not None:
+        wrapped_feedback_callback = lambda msg: feedback_callback(msg.feedback)  # noqa: E731
+    else:
+        wrapped_feedback_callback = None
+
+    send_goal_future = client.send_goal_async(goal, feedback_callback=wrapped_feedback_callback)
     rclpy.spin_until_future_complete(node, send_goal_future, timeout_sec=timeout_sec)
     goal_handle = send_goal_future.result()
     if goal_handle is None or not goal_handle.accepted:

@@ -121,6 +121,23 @@ class GripperActionServer(Node):
     def _stop_effort(self):
         self._effort_pub.publish(Float64MultiArray(data=[0.0]))
 
+    def _publish_feedback(self, goal_handle, step_result, status):
+        # Live feedback, not just the terminal result: hold_after_reaching
+        # can keep a goal running for up to hold_timeout (10s default), so
+        # a caller that needs to know *during* the hold whether a real
+        # grip is being sustained (pick_and_lift.py's lift step, deciding
+        # whether to kinematically lock the object -- see kinematic_grasp.py)
+        # has no other way to observe this controller's internal status
+        # live. Reuses the same GripperCommand.Feedback fields the terminal
+        # Result already uses, so a caller already reading one knows the
+        # other.
+        feedback = GripperCommand.Feedback()
+        feedback.position = self._position
+        feedback.effort = step_result.effort
+        feedback.stalled = status == GripperCloseStatus.CONTACT_DETECTED
+        feedback.reached_goal = status == GripperCloseStatus.REACHED_FREE
+        goal_handle.publish_feedback(feedback)
+
     def _build_params(self, max_effort):
         return GripperControlParams(
             p_gain=self.get_parameter('p_gain').value,
@@ -185,6 +202,7 @@ class GripperActionServer(Node):
             step_result = controller.step(self._position, self._velocity, dt)
             effort = step_result.effort
             self._effort_pub.publish(Float64MultiArray(data=[effort]))
+            self._publish_feedback(goal_handle, step_result, controller.status)
 
             if controller.status != GripperCloseStatus.TRACKING:
                 break
@@ -287,6 +305,7 @@ class GripperActionServer(Node):
                 step_result = controller.step(self._position, self._velocity, dt)
                 effort = step_result.effort
                 self._effort_pub.publish(Float64MultiArray(data=[effort]))
+                self._publish_feedback(goal_handle, step_result, controller.status)
 
                 time.sleep(CONTROL_PERIOD_SEC)
 
