@@ -62,7 +62,17 @@ class GripperActionServer(Node):
         self.declare_parameter('near_target_threshold', 0.15)
         self.declare_parameter('near_target_max_effort', 0.05)
         self.declare_parameter('goal_tolerance', 0.05)
-        self.declare_parameter('stall_velocity_threshold', 0.001)
+        # A real, live-verified finding (2026-09-13, see commit-notes/10):
+        # gripper_joint's reported /joint_states velocity for this
+        # effort-controlled joint is unreliable -- observed pinned at its
+        # declared +-10 rad/s limit on nearly every tick regardless of the
+        # joint's actual motion, confirmed against a genuinely smooth,
+        # slowly-changing position trace at the same moments. A
+        # velocity-threshold stall check could therefore almost never fire
+        # reliably. stall_position_threshold instead measures real net
+        # position progress over contact_confirm_time -- see
+        # gripper_control.py's module docstring for the full reasoning.
+        self.declare_parameter('stall_position_threshold', 0.02)
         # How long a stall has to persist, in sim time, before it's treated
         # as real contact rather than sensor/control noise. See
         # commit-notes/10-iteration-3-pick-and-lift.md's "closing strategy
@@ -73,7 +83,7 @@ class GripperActionServer(Node):
         # actual physical signature of hitting an object -- so it works
         # correctly regardless of where the stall happens to land relative
         # to the originally commanded target.
-        self.declare_parameter('contact_confirm_time', 0.1)
+        self.declare_parameter('contact_confirm_time', 0.4)
         # Effort sustained once contact is confirmed -- deliberately
         # separate from near_target_max_effort (tuned for gentle,
         # non-oscillating settling onto a free-space target with nothing
@@ -92,7 +102,6 @@ class GripperActionServer(Node):
         self.declare_parameter('hold_timeout', 10.0)
 
         self._position = 0.0
-        self._velocity = 0.0
         self._have_joint_state = False
 
         self._effort_pub = self.create_publisher(
@@ -114,8 +123,6 @@ class GripperActionServer(Node):
             return
         index = msg.name.index(GRIPPER_JOINT_NAME)
         self._position = msg.position[index]
-        if msg.velocity:
-            self._velocity = msg.velocity[index]
         self._have_joint_state = True
 
     def _stop_effort(self):
@@ -145,7 +152,7 @@ class GripperActionServer(Node):
             d_gain=self.get_parameter('d_gain').value,
             max_effort=max_effort,
             goal_tolerance=self.get_parameter('goal_tolerance').value,
-            stall_velocity_threshold=self.get_parameter('stall_velocity_threshold').value,
+            stall_position_threshold=self.get_parameter('stall_position_threshold').value,
             contact_confirm_time=self.get_parameter('contact_confirm_time').value,
             near_target_threshold=self.get_parameter('near_target_threshold').value,
             near_target_max_effort=self.get_parameter('near_target_max_effort').value,
@@ -199,7 +206,7 @@ class GripperActionServer(Node):
                 dt = CONTROL_PERIOD_SEC
             previous_time = now
 
-            step_result = controller.step(self._position, self._velocity, dt)
+            step_result = controller.step(self._position, dt)
             effort = step_result.effort
             self._effort_pub.publish(Float64MultiArray(data=[effort]))
             self._publish_feedback(goal_handle, step_result, controller.status)
@@ -302,7 +309,7 @@ class GripperActionServer(Node):
                     dt = CONTROL_PERIOD_SEC
                 previous_time = now
 
-                step_result = controller.step(self._position, self._velocity, dt)
+                step_result = controller.step(self._position, dt)
                 effort = step_result.effort
                 self._effort_pub.publish(Float64MultiArray(data=[effort]))
                 self._publish_feedback(goal_handle, step_result, controller.status)
