@@ -17,32 +17,47 @@ force down to a value tuned for gentle free-space settling, not for
 holding an object.
 
 The fix here uses the stall itself as the signal, not proximity to a
-stored target number: while still tracking, a stall (near-zero velocity)
-that persists for contact_confirm_time while the joint is still far
-outside goal_tolerance is contact, and the response is a dedicated,
-sustained hold effort -- not a distance-based taper. Reaching
-goal_tolerance normally, without an early stall, is the free-space case,
-and keeps the original taper behavior (nothing has changed there; it
-still exists because it works and test_gripper.py already depends on it).
+stored target number: while still tracking, a stall that persists for
+contact_confirm_time while the joint is still far outside goal_tolerance
+is contact, and the response is a dedicated, sustained hold effort -- not
+a distance-based taper. Reaching goal_tolerance normally, without an
+early stall, is the free-space case, and keeps the original taper
+behavior (nothing has changed there; it still exists because it works and
+test_gripper.py already depends on it).
+
+Stall detection is based on real POSITION progress over a window, not
+instantaneous velocity, and step() takes no velocity argument at all.
+This is a real, live-verified finding (2026-09-13, see
+commit-notes/10-iteration-3-pick-and-lift.md): gripper_joint's reported
+/joint_states velocity for this effort-controlled joint turned out to be
+unreliable -- captured live traces showed it pinned at the joint's
+declared +-10 rad/s velocity limit on nearly every control tick,
+regardless of the joint's *actual* motion (confirmed from the position
+trace itself, which showed genuinely smooth, small per-tick changes at
+the same moments). A velocity-threshold stall check could therefore
+almost never fire reliably against a real, sustained grip -- directly
+observed live: a captured trace showed position genuinely stable
+(drifting a few thousandths of a radian per tick) for well over a second
+of real sustained contact, which never triggered CONTACT_DETECTED under
+the old velocity-based check, and the joint eventually collapsed all the
+way through to the free-space target instead of holding. Comparing
+current position against a reference position from up to
+contact_confirm_time ago is immune to per-tick velocity-reporting noise
+by construction: a genuinely stalled joint shows near-zero *net*
+displacement over that window even if any single instantaneous velocity
+reading is unreliable.
 """
 import enum
 from dataclasses import dataclass
 
 # A single anomalously large dt must never count as a big chunk of stalled
-# time in one tick. This happens for real on the very first control cycle
-# after a fresh node/goal start: velocity still reads 0 because the joint
-# hasn't had any chance to move yet (not because anything is blocking it),
-# while dt can be inflated by the sim-clock subscription only just catching
-# up after node startup -- found by independently re-running
-# test_gripper.py fresh and tracing a reproducible failure back to this
-# exact mechanism (see test_large_first_dt_does_not_falsely_trigger_contact).
-# Capping dt to one nominal control cycle means an anomalous gap can
-# contribute at most one real tick's worth of stall time, the same as it
-# would if the clock had behaved normally -- it takes contact_confirm_time's
-# worth of *actually consecutive* stalled ticks to trigger detection, not
-# one inflated one. This also protects the PID's integral/derivative terms
-# from the same kind of single-tick shock, which is good practice regardless
-# of the stall-detection bug.
+# time in one tick -- e.g. the sim-clock subscription catching up right
+# after node startup, or any other clock irregularity. Clamping dt means
+# such a gap can contribute at most one real tick's worth toward the
+# stall window, the same as it would if the clock had behaved normally --
+# it takes contact_confirm_time's worth of *actually consecutive* ticks to
+# trigger detection, not one inflated one. Also protects the PID's
+# integral/derivative terms from the same kind of single-tick shock.
 _MAX_DT_SEC = 0.02
 
 
@@ -59,7 +74,7 @@ class GripperControlParams:
     d_gain: float
     max_effort: float
     goal_tolerance: float
-    stall_velocity_threshold: float
+    stall_position_threshold: float
     contact_confirm_time: float
     near_target_threshold: float
     near_target_max_effort: float
@@ -91,8 +106,15 @@ class GripperCloseController:
         self._previous_error = None
         self._close_direction = 1.0
         self._stall_elapsed = 0.0
+        # Position this joint was at when the current stall window started
+        # (or None before the first tick). Real progress -- moving more
+        # than stall_position_threshold away from this -- resets the
+        # window; otherwise elapsed time toward contact_confirm_time
+        # accumulates. See the module docstring for why this replaced a
+        # velocity-based check.
+        self._stall_reference_position = None
 
-    def step(self, position, velocity, dt):
+    def step(self, position, dt):
         p = self.params
         dt = min(dt, _MAX_DT_SEC)
         error = self.target - position
@@ -112,12 +134,16 @@ class GripperCloseController:
         if self.status == GripperCloseStatus.TRACKING:
             if abs(error) <= p.goal_tolerance:
                 self.status = GripperCloseStatus.REACHED_FREE
-            elif abs(velocity) < p.stall_velocity_threshold:
+            elif self._stall_reference_position is None:
+                self._stall_reference_position = position
+                self._stall_elapsed = 0.0
+            elif abs(position - self._stall_reference_position) >= p.stall_position_threshold:
+                self._stall_reference_position = position
+                self._stall_elapsed = 0.0
+            else:
                 self._stall_elapsed += dt
                 if self._stall_elapsed >= p.contact_confirm_time:
                     self.status = GripperCloseStatus.CONTACT_DETECTED
-            else:
-                self._stall_elapsed = 0.0
 
         if self.status == GripperCloseStatus.CONTACT_DETECTED:
             # Sustained squeeze in the original closing direction, at a

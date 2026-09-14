@@ -55,10 +55,116 @@ index acab905..657c10c 100644
      </ros2_control>
    </xacro:macro>
 diff --git a/so_arm101_description/urdf/so_arm101_macro.xacro b/so_arm101_description/urdf/so_arm101_macro.xacro
-index 1116cbd..56e4eef 100644
+index 1116cbd..489e5c8 100644
 --- a/so_arm101_description/urdf/so_arm101_macro.xacro
 +++ b/so_arm101_description/urdf/so_arm101_macro.xacro
-@@ -580,7 +580,7 @@
+@@ -528,6 +528,105 @@
+       </collision>
+     </link>
+ 
++    <!-- Small contact-patch primitives on both gripping surfaces, see the
++         matching one on gripper_link (fixed_jaw_pad_link, defined near the
++         gripper_joint below) for the full story. Someone else solved this
++         exact problem for this exact gripper in MuJoCo (see commit-notes/10
++         for the source). Raw mesh-to-mesh collision produces a single,
++         unstable contact point that can't hold an object without wobbling,
++         *regardless of friction coefficient* - which is why tuning
++         mu1/mu2 alone (below) helped but never fully fixed the slipping.
++         Their fix, applied here, is small box primitives at the actual
++         contact area on *both* surfaces, sized to protrude only slightly
++         from each mesh, give real multi-point contact instead of one
++         flickering point. This position is jaw_link's own real fingertip,
++         found by directly parsing moving_jaw_so101_v1.stl for the point
++         farthest from the joint axis, then shifted by jaw_link's own
++         visual/collision origin (z=0.0189) to land in jaw_link's frame.
++
++         An asymmetric reshape (7mm thin / 16mm wide, oriented via a
++         hinge-axis argument. Every joint here rotates about its own
++         local Z, and a joint's child link's frame Z axis IS that
++         rotation axis by construction, so jaw_link's local Z is exactly
++         gripper_joint's hinge axis) was tried and reverted in a later
++         session - two fresh trials both landed well below this cube's
++         proven closure range (0.0077 and 0.1238 rad vs. 0.31-0.52 rad
++         here), matching the same "oversized/over-reaching pad" failure
++         signature as the 14mm-cube regression below. See
++         commit-notes/10-iteration-3-pick-and-lift.md for the full
++         reasoning and results; kept as a cube here since that's what's
++         actually verified to work.
++
++         A Fin-Ray-effect compliant-flexure PRBM (pseudo-rigid-body model
++         - a small torsional-spring revolute joint in place of this fixed
++         mount, approximating TheRobotStudio's real "Compliant Gripper"
++         TPU attachment for this arm) was tried and reverted in a later
++         session. SDF spring joints were confirmed to genuinely work on
++         this project's Gazebo Fortress build (a real, useful finding on
++         its own - see commit-notes/10), but every stiffness/damping
++         combination tried produced worse grasps than this plain rigid
++         mount, for a structural reason rather than a tuning one - the
++         existing close command always targets a fixed fully-closed
++         position, which only ever worked because a rigid pad provided a
++         hard mechanical stop; a compliant pad removes that stop, so the
++         much stronger position-control effort simply drives through the
++         weaker spring resistance regardless of how it's tuned. Full
++         derivation and data in commit-notes/10-iteration-3-pick-and-lift.md. -->
++    <link name="${prefix}jaw_pad_link">
++      <inertial>
++        <mass value="0.0005" />
++        <inertia ixx="1e-10" ixy="0" ixz="0" iyy="1e-10" iyz="0" izz="1e-10" />
++      </inertial>
++      <collision>
++        <origin xyz="0 0 0" rpy="0 0 0" />
++        <geometry>
++          <box size="0.010 0.010 0.010" />
++        </geometry>
++      </collision>
++    </link>
++    <joint name="${prefix}jaw_pad_joint" type="fixed">
++      <origin xyz="-0.0114 -0.0820 0.0189" rpy="0 0 0" />
++      <parent link="${prefix}jaw_link" />
++      <child link="${prefix}jaw_pad_link" />
++      <axis xyz="0 0 0" />
++      <disableFixedJointLumping>true</disableFixedJointLumping>
++    </joint>
++    <gazebo reference="${prefix}jaw_pad_link">
++      <mu1>2.0</mu1>
++      <mu2>2.0</mu2>
++    </gazebo>
++
++    <!-- No friction was specified anywhere on the gripper before this
++         iteration, so every jaw-object contact ran on Gazebo/DART's raw
++         physics defaults. mu1/mu2 here are the URDF/SDF-extension
++         shorthand for the same ODE surface-friction coefficients used on
++         the can's collision (beverage_disposal_world.sdf), applying to
++         every collision in the named link at once rather than needing
++         per-collision surface blocks the way plain SDF models do. See
++         commit-notes/10 for the diagnosis this responds to. In short, a
++         can grip was reaching real, sustained squeeze effort but the
++         object still slipped free during a lift, the textbook symptom of
++         friction, not force.
++
++         Only jaw_link (the moving jaw, the part that actually contacts
++         the can) gets this override. An earlier version also applied it
++         to gripper_link, on the theory that the fixed prong the jaw
++         closes against is part of that link's body mesh, but that
++         measurably tanked simulation performance (test_gripper.py's real-time factor
++         collapsed to roughly a fifth of normal, timing the test out even
++         though the joint itself still worked) because gripper_link's
++         collision geometry is the whole servo body and wrist-roll-follower
++         mesh, not just the small patch that ever touches an object, so
++         every one of its many unrelated resting contacts got proportionally
++         more expensive to resolve for the whole simulation, not just the
++         moment of a grasp. Left off pending a scoped fix (e.g. a small,
++         separate collision primitive on just the actual fixed-jaw contact
++         area) rather than paying that global cost for every run. -->
++    <gazebo reference="${prefix}jaw_link">
++      <mu1>3.0</mu1>
++      <mu2>3.0</mu2>
++    </gazebo>
++
+     <!-- Joint from base to shoulder -->
+     <joint name="${prefix}shoulder_pan_joint" type="revolute">
+       <origin
+@@ -580,7 +679,7 @@
      </transmission>
  
      <!-- Joint from upper_arm to lower_arm -->
@@ -67,7 +173,73 @@ index 1116cbd..56e4eef 100644
      <joint name="${prefix}elbow_flex_joint" type="revolute">
        <origin
          xyz="-0.11257 -0.028 1.73763e-16"
-@@ -673,6 +673,23 @@
+@@ -658,6 +757,65 @@
+       </actuator>
+     </transmission>
+ 
++    <!-- The moving jaw closes against a fixed prong that's part of
++         gripper_link's own body casting on the real hardware - there's no
++         separate "static jaw" part, and gripper_link's only collision
++         geometry is its two big body meshes, giving no small, specific
++         contact surface. See jaw_pad_link above (on jaw_link) for the
++         full story. Someone else solved this exact grip-slipping problem
++         for this exact gripper in MuJoCo by adding small box-primitive
++         contact patches on *both* gripping surfaces, since raw
++         mesh-to-mesh collision produces one unstable contact point
++         regardless of friction. This is the fixed-side half of that pair.
++
++         Position not derived from jaw geometry (four earlier attempts at
++         that each failed differently - full story in commit-notes/10).
++         Instead, measured the can's own real position relative to
++         gripper_link directly via TF during an actual grasp attempt,
++         giving (0.0071, 0.0010, -0.1208). Found the closest real vertex on
++         gripper_link's own body meshes to that point by brute-force
++         nearest-neighbor search over the actual mesh triangle data,
++         landing at (-0.0082, -0.0002, -0.1041), about 2.3cm away (close to the can's
++         own radius, so genuinely near the real contact zone). Then, per
++         the working recipe found above, nudged 2mm further along the
++         can-to-mesh-point direction so the pad protrudes only slightly
++         from the existing mesh instead of sitting flush on its surface -
++         disableFixedJointLumping keeps it a separate SDF link so the
++         friction override just below applies only to this small patch.
++
++         An asymmetric reshape was tried here too in a later session
++         (unlike jaw_pad_link, this link's parent gripper_link is NOT the
++         child of gripper_joint, so its local frame isn't automatically
++         aligned with the hinge axis - computed directly, gripper_joint's
++         origin rpy (1.5708, 0.18, ~0) relative to gripper_link maps the
++         axis vector (0,0,1) to approximately (0,-1,0), i.e. the hinge
++         axis is gripper_link's own local -Y here) and reverted for the
++         same reason as jaw_pad_link above - see
++         commit-notes/10-iteration-3-pick-and-lift.md. -->
++    <link name="${prefix}fixed_jaw_pad_link">
++      <inertial>
++        <mass value="0.0005" />
++        <inertia ixx="1e-10" ixy="0" ixz="0" iyy="1e-10" iyz="0" izz="1e-10" />
++      </inertial>
++      <collision>
++        <origin xyz="0 0 0" rpy="0 0 0" />
++        <geometry>
++          <box size="0.010 0.010 0.010" />
++        </geometry>
++      </collision>
++    </link>
++    <joint name="${prefix}fixed_jaw_pad_joint" type="fixed">
++      <origin xyz="-0.0095 -0.0003 -0.1026" rpy="0 0 0" />
++      <parent link="${prefix}gripper_link" />
++      <child link="${prefix}fixed_jaw_pad_link" />
++      <axis xyz="0 0 0" />
++      <disableFixedJointLumping>true</disableFixedJointLumping>
++    </joint>
++    <gazebo reference="${prefix}fixed_jaw_pad_link">
++      <mu1>2.0</mu1>
++      <mu2>2.0</mu2>
++    </gazebo>
++
+     <!-- Fixed joint for gripper frame -->
+     <joint name="${prefix}gripper_frame_joint" type="fixed">
+       <origin xyz="-0.0079 -0.000218121 -0.0981274" rpy="0 3.14159 0" />
+@@ -673,6 +831,23 @@
        <child link="${prefix}jaw_link" />
        <axis xyz="0 0 1" />
        <limit effort="10" velocity="10" lower="0.0" upper="1.70" />
