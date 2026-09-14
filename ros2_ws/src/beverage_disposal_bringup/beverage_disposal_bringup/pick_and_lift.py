@@ -186,10 +186,6 @@ class PickAndLiftDemo(Node):
         # round-trip against this same service (see commit-notes/10) there's
         # no real risk of requests piling up at a 20Hz tick rate.
         self._set_pose_client.call_async(req)
-        self._lock_tick_count = getattr(self, '_lock_tick_count', 0) + 1
-        if self._lock_tick_count % 5 == 0:
-            print(f'DEBUG lock tick #{self._lock_tick_count}: gripper_z={gripper_pos[2]:.4f} '
-                  f'target_can_z={target_pos[2]:.4f} actual_can_z={self.can_pose[2]:.4f}', flush=True)
 
     def _start_kinematic_lock(self):
         """Records the can's current pose relative to the gripper's
