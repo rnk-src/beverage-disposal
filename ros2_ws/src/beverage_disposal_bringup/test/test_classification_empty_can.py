@@ -1,20 +1,14 @@
-"""launch_testing integration test for the pick-and-lift pipeline.
+"""launch_testing integration test: an empty-mass can classifies as empty.
 
-Real state as of 2026-09-13 (see commit-notes/10-iteration-3-pick-and-lift.md):
-across a 15-trial live batch, PickAndLiftDemo.run() succeeded 10/15 (67%)
-overall -- but every single trial where a real grip was confirmed (10/10)
-went on to sustain the lift. The ~33% overall miss rate is a separate,
-upstream, already-understood issue (the gripper sometimes closes without
-achieving a confirmed grip at all -- grip_confirmed=False, a known
-sensitivity/specificity tradeoff in the contact-detection stall criterion,
-tracked separately) -- it is not a lift-survival failure, and asserting an
-unconditional pass/fail on a single run would either be flaky (asserting
-success) or misrepresent a real, working capability as broken (asserting
-nothing). So this test asserts exactly what has actually been proven
-reliable: IF a real grip is confirmed, the kinematic-lock lift must
-succeed. If this run happens to land on the still-unresolved upstream
-miss, the test is skipped rather than failed or falsely passed -- that is
-an honest reflection of what's solved vs. still open, not a workaround.
+Companion to test_classification_full_can.py -- launch_testing fixes one
+LaunchDescription per module at collection time, so a real mass-variant
+comparison needs two files, not one parametrized generate_test_description()
+(the same real constraint test_pick_and_lift.py/test_gripper.py already
+work within, not a style choice).
+
+Skips rather than fails on the still-open upstream grip-detection miss
+rate, matching test_pick_and_lift.py's own skip style -- this test checks
+classification, not grip reliability.
 """
 import os
 import unittest
@@ -37,11 +31,8 @@ from beverage_disposal_bringup.pick_and_lift import PickAndLiftDemo
 @pytest.mark.launch_test
 @launch_testing.markers.keep_alive
 def generate_test_description():
-    # See test_arm_motion.py/test_gripper.py for why ROS_DOMAIN_ID and
-    # GZ_PARTITION must be set here, per test file, rather than at module
-    # level.
-    os.environ['ROS_DOMAIN_ID'] = '36'
-    os.environ['GZ_PARTITION'] = 'test_pick_and_lift'
+    os.environ['ROS_DOMAIN_ID'] = '37'
+    os.environ['GZ_PARTITION'] = 'test_classification_empty_can'
 
     robot_description = Command([
         PathJoinSubstitution([FindExecutable(name='xacro')]),
@@ -85,9 +76,6 @@ def generate_test_description():
         output='screen',
     )
 
-    # As of Iteration 4, the can is no longer in the static world file, so
-    # every launch that needs it (this one included) has to spawn it
-    # itself -- see spawn_arm.launch.py and classification.py for why.
     can_description = Command([
         PathJoinSubstitution([FindExecutable(name='xacro')]),
         ' ',
@@ -124,8 +112,6 @@ def generate_test_description():
         arguments=['gripper_controller'], output='screen',
     )
 
-    # hold_after_reaching:=true -- required for the grip to survive the
-    # lift move at all, see gripper_action_server.py's own docstring.
     gripper_action_server = launch_ros.actions.Node(
         package='beverage_disposal_bringup',
         executable='gripper_action_server',
@@ -151,8 +137,6 @@ def generate_test_description():
         output='screen',
     )
 
-    # Needed for kinematic_grasp.py's snap-grasp -- see spawn_arm.launch.py
-    # for the full reasoning.
     pose_set_bridge = launch_ros.actions.Node(
         package='ros_gz_bridge', executable='parameter_bridge',
         arguments=[
@@ -177,7 +161,7 @@ def generate_test_description():
     ]), {}
 
 
-class TestPickAndLift(unittest.TestCase):
+class TestClassificationEmptyCan(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
@@ -187,8 +171,8 @@ class TestPickAndLift(unittest.TestCase):
     def tearDownClass(cls):
         rclpy.shutdown()
 
-    def test_confirmed_grip_sustains_the_lift(self):
-        node = PickAndLiftDemo()
+    def test_empty_can_classifies_as_empty(self):
+        node = PickAndLiftDemo(can_mass_kg=EMPTY_CAN_MASS_KG)
         try:
             result = node.run()
         finally:
@@ -197,10 +181,7 @@ class TestPickAndLift(unittest.TestCase):
         if not result.get('grip_confirmed'):
             self.skipTest(
                 'No confirmed grip this run (reason=' + str(result.get('reason')) + ') -- '
-                'this is the separate, already-tracked upstream grip-detection miss rate '
-                '(see commit-notes/10-iteration-3-pick-and-lift.md), not what this test '
-                'checks. Re-run to exercise the confirmed-grip path.')
+                'the separate, already-tracked upstream grip-detection miss rate, not what '
+                'this test checks. Re-run to exercise the confirmed-grip path.')
 
-        self.assertTrue(
-            result['success'],
-            f'A confirmed real grip failed to sustain the kinematic-lock lift: {result}')
+        self.assertEqual(result['fullness'], 'empty', f'result: {result}')

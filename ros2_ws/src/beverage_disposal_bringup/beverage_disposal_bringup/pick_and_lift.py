@@ -44,6 +44,7 @@ from ros_gz_interfaces.srv import SetEntityPose
 from sensor_msgs.msg import JointState
 from tf2_msgs.msg import TFMessage
 
+from .classification import EMPTY_CAN_MASS_KG, classify_fullness
 from .grasp_geometry import WRIST_ROLL, grasp_joint_targets, hover_joint_targets
 from .gripper import send_gripper_goal
 from .kinematic_grasp import pose_from_relative, pose_relative_to
@@ -131,7 +132,7 @@ GRIPPER_CLOSE_CONFIRM_TIMEOUT_SEC = 4.0
 
 class PickAndLiftDemo(Node):
 
-    def __init__(self):
+    def __init__(self, can_mass_kg=None):
         # Every duration in this node (gripper settle waits, the lift-hold
         # check) is measured via self.get_clock().now(). use_sim_time is
         # already auto-declared by rclpy.Node itself (declaring it again
@@ -144,9 +145,23 @@ class PickAndLiftDemo(Node):
         # before the thing it's supposed to be waiting for (the gripper
         # settling, the arm finishing its trajectory) has actually happened
         # in sim time -- producing readings taken mid-motion, not at rest.
-        super().__init__(
-            'pick_and_lift_demo',
-            parameter_overrides=[Parameter('use_sim_time', Parameter.Type.BOOL, True)])
+        #
+        # can_mass_kg (constructor kwarg, for tests that construct this
+        # node directly) and the can_mass_kg ROS parameter (for
+        # `ros2 run ... --ros-args -p can_mass_kg:=...`) are two paths to
+        # the same value -- see classification.py's module docstring for
+        # why this pipeline needs a ground-truth mass at all, and this
+        # module's own docstring/CLAUDE.md for why it has to be kept in
+        # sync by hand with whatever spawn_arm.launch.py's can_mass_kg
+        # argument spawned (this pipeline already requires two separately-
+        # launched processes; this is one more value to match between
+        # them, not a new class of problem).
+        overrides = [Parameter('use_sim_time', Parameter.Type.BOOL, True)]
+        if can_mass_kg is not None:
+            overrides.append(Parameter('can_mass_kg', Parameter.Type.DOUBLE, can_mass_kg))
+        super().__init__('pick_and_lift_demo', parameter_overrides=overrides)
+        self.declare_parameter('can_mass_kg', EMPTY_CAN_MASS_KG)
+        self.can_mass_kg = self.get_parameter('can_mass_kg').value
         self.can_pose = None
         self.can_orientation = None
         # Distinct from gripper_position/gripper_effort below (those are
@@ -434,10 +449,19 @@ class PickAndLiftDemo(Node):
         # left fighting a still-active lock.
         self._stop_kinematic_lock()
 
+        # Iteration 4 (fullness classification): gated on success, not just
+        # grip_confirmed, for consistency with how this pipeline already
+        # treats "gripped but didn't sustain the lift" as a failure
+        # everywhere else -- see classification.py for why this reads
+        # self.can_mass_kg (a ground-truth value) rather than any joint
+        # signal.
+        fullness = classify_fullness(self.can_mass_kg) if success else None
+
         self.get_logger().info(
             f'Lift check: height_before={can_height_before:.4f} '
             f'height_after={can_height_after:.4f} gain={height_gain:.4f} '
-            f'success={success} kinematic_locked={kinematic_locked}')
+            f'success={success} kinematic_locked={kinematic_locked} '
+            f'fullness={fullness}')
 
         return {
             'success': success,
@@ -450,6 +474,7 @@ class PickAndLiftDemo(Node):
             'can_height_before': can_height_before,
             'can_height_after': can_height_after,
             'height_gain': height_gain,
+            'fullness': fullness,
         }
 
 
