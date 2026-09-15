@@ -24,6 +24,9 @@ Combines:
   - a ros_gz_bridge service bridge exposing gz-sim's world "set entity
     pose" control as a ROS2 service, used by pick_and_lift.py's kinematic
     snap-grasp (see kinematic_grasp.py)
+  - the can, spawned separately from a xacro-templated SDF (models/
+    can.sdf.xacro) rather than living in the static world file, so its
+    mass can be chosen per launch (see classification.py, Iteration 4)
 """
 
 from launch import LaunchDescription
@@ -32,6 +35,8 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import Command, FindExecutable, LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
+
+from beverage_disposal_bringup.classification import EMPTY_CAN_MASS_KG
 
 
 def generate_launch_description():
@@ -54,8 +59,20 @@ def generate_launch_description():
             default_value='false',
             description='Keep gripper_action_server driving toward/holding its target '
                          'after reaching or contacting it, instead of releasing immediately'),
+        # See classification.py: EMPTY_CAN_MASS_KG/FULL_CAN_MASS_KG are the
+        # two realistic presets. Whatever's passed here must be matched by
+        # the same value passed to `ros2 run beverage_disposal_bringup
+        # pick_and_lift --ros-args -p can_mass_kg:=<value>` -- these are two
+        # separately-launched processes, and this project doesn't yet have
+        # a single launch file that threads one value to both (a known,
+        # documented gap, not a bug).
+        DeclareLaunchArgument(
+            'can_mass_kg',
+            default_value=str(EMPTY_CAN_MASS_KG),
+            description='Ground-truth mass (kg) of the spawned can'),
     ]
     hold_after_reaching = LaunchConfiguration('hold_after_reaching')
+    can_mass_kg = LaunchConfiguration('can_mass_kg')
 
     robot_description = Command([
         PathJoinSubstitution([FindExecutable(name='xacro')]),
@@ -97,6 +114,38 @@ def generate_launch_description():
             '-topic', 'robot_description',
             '-name', 'so_arm101',
             '-z', '0.01',
+        ],
+        output='screen',
+    )
+
+    can_description = Command([
+        PathJoinSubstitution([FindExecutable(name='xacro')]),
+        ' ',
+        PathJoinSubstitution(
+            [FindPackageShare('beverage_disposal_bringup'), 'models', 'can.sdf.xacro']
+        ),
+        ' ',
+        'mass:=',
+        can_mass_kg,
+    ])
+
+    spawn_can = Node(
+        package='ros_gz_sim',
+        executable='create',
+        # -x/-y/-z are required here, not optional: ros_gz_sim's create
+        # tool always builds the spawn pose from these flags (each
+        # defaulting to 0) and sets it on the spawn request unconditionally
+        # (confirmed by reading its source, create.cpp:
+        # gz::msgs::Set(req.mutable_pose(), pose)), which overrides
+        # whatever <pose> is embedded in the -string SDF entirely. Without
+        # these, the can spawns at the world origin regardless of what
+        # can.sdf.xacro says -- found live via /world_pose reporting
+        # near-(0,0,0) instead of the real table-top pose. Must match
+        # can.sdf.xacro's own <pose> value.
+        arguments=[
+            '-string', can_description,
+            '-name', 'can',
+            '-x', '0.26', '-y', '0.06', '-z', '0.211',
         ],
         output='screen',
     )
@@ -174,6 +223,7 @@ def generate_launch_description():
         gz_sim,
         robot_state_publisher,
         spawn_robot,
+        spawn_can,
         joint_state_broadcaster_spawner,
         arm_controller_spawner,
         gripper_controller_spawner,
