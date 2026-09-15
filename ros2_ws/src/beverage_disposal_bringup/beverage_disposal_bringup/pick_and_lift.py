@@ -108,6 +108,26 @@ LIFT_SHOULDER_LIFT_DELTA = -0.4
 # action -- see gripper.py's send_gripper_goal docstring.
 GRIPPER_SETTLE_SEC = 1.5
 
+# How long the CLOSE step is willing to wait specifically for
+# grip_confirmed to become true, before giving up and treating this as a
+# miss (see run()'s _wait_for_grip_confirmed_or_timeout, and
+# commit-notes/10-iteration-3-pick-and-lift.md's "chasing the miss rate"
+# entry for the real reasoning): send_gripper_goal() returns as soon as
+# the goal is accepted, not once it finishes, and the goal's own
+# contact-detection loop keeps running server-side afterward (that's the
+# whole point of hold_after_reaching). A caller that only snapshots
+# grip_state['confirmed'] once, after one fixed short wait, can miss a
+# real contact-detection event that was always going to fire, just a
+# little later than that one snapshot -- a pure timing race, unrelated to
+# whether the underlying contact-detection criterion itself is sensitive
+# enough. This is deliberately generous (contact_confirm_time's own
+# default is 0.4s; this budgets several times that, on top of however
+# long the initial travel from GRIPPER_OPEN down to the point of contact
+# takes) since a bounded wait for the real signal is strictly better than
+# guessing a fixed delay -- it returns as soon as grip_confirmed is true
+# instead of always waiting the full budget.
+GRIPPER_CLOSE_CONFIRM_TIMEOUT_SEC = 4.0
+
 
 class PickAndLiftDemo(Node):
 
@@ -251,6 +271,18 @@ class PickAndLiftDemo(Node):
         while self.get_clock().now().nanoseconds < end_time:
             rclpy.spin_once(self, timeout_sec=0.1)
 
+    def _spin_until_or_timeout(self, condition, timeout_sec):
+        """Like _spin_for, but returns as soon as condition() is true
+        instead of always waiting the full duration -- see
+        GRIPPER_CLOSE_CONFIRM_TIMEOUT_SEC's comment for why a fixed-length
+        wait is the wrong tool for observing an event (grip_confirmed
+        going true) that can legitimately arrive at very different times
+        from one trial to the next."""
+        end_time = self.get_clock().now().nanoseconds + int(timeout_sec * 1e9)
+        while not condition() and self.get_clock().now().nanoseconds < end_time:
+            rclpy.spin_once(self, timeout_sec=0.1)
+        return condition()
+
     def move_arm(self, joint_positions, duration_sec=3.0):
         return move_to_joint_position(
             self, ARM_JOINTS, list(joint_positions), duration_sec=duration_sec)
@@ -339,7 +371,13 @@ class PickAndLiftDemo(Node):
         send_gripper_goal(
             self, GRIPPER_CLOSED, max_effort=GRIPPER_CLOSE_MAX_EFFORT,
             feedback_callback=_on_close_feedback)
-        self._spin_for(GRIPPER_SETTLE_SEC)
+        # Wait for the real signal, not a fixed guess at how long it takes
+        # to arrive -- see GRIPPER_CLOSE_CONFIRM_TIMEOUT_SEC's comment.
+        # Once grip_state['confirmed'] goes true this returns immediately;
+        # otherwise it waits out the full timeout (a real miss, or contact
+        # detection that would have taken even longer than this budget).
+        self._spin_until_or_timeout(
+            lambda: grip_state['confirmed'], GRIPPER_CLOSE_CONFIRM_TIMEOUT_SEC)
         close_position = self.gripper_position
         close_effort = self.gripper_effort
         grip_confirmed = grip_state['confirmed']
