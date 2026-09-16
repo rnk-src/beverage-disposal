@@ -44,7 +44,16 @@ from ros_gz_interfaces.srv import SetEntityPose
 from sensor_msgs.msg import JointState
 from tf2_msgs.msg import TFMessage
 
+from .bin_geometry import (
+    BIN_AZIMUTH,
+    BIN_SUCCESS_X_RANGE,
+    BIN_SUCCESS_Y_RANGE,
+    BIN_SUCCESS_Z_RANGE,
+    bin_hover_joint_targets,
+    bin_release_joint_targets,
+)
 from .classification import EMPTY_CAN_MASS_KG, classify_fullness
+from .disposal_decision import decide_disposal
 from .grasp_geometry import WRIST_ROLL, grasp_joint_targets, hover_joint_targets
 from .gripper import send_gripper_goal
 from .kinematic_grasp import pose_from_relative, pose_relative_to
@@ -128,6 +137,26 @@ GRIPPER_SETTLE_SEC = 1.5
 # guessing a fixed delay -- it returns as soon as grip_confirmed is true
 # instead of always waiting the full budget.
 GRIPPER_CLOSE_CONFIRM_TIMEOUT_SEC = 4.0
+
+# How long to wait, after opening the gripper at the release pose, before
+# reading the can's final resting pose for the disposal success check --
+# matches LIFT_HOLD_CHECK_SEC's own reasoning: real settle time for
+# whatever the can does once it's no longer held (a fall, a bounce, a
+# roll), not a guess.
+DISPOSAL_SETTLE_SEC = 2.0
+
+# "Did a set-aside can actually land back near where it was picked up"
+# bounds, measured against the can's own *original* measured pose (not a
+# new fixed point -- see run()'s state['can_x']/['can_y']). 0.05m is larger
+# than the can's own 0.066m diameter (so ordinary settle jitter can't
+# spuriously fail this), but tight enough to distinguish "back near
+# pickup" from "anywhere on the table."
+SET_ASIDE_SUCCESS_RADIUS_M = 0.05
+# Table top is at z=0.15; a can resting upright at its own center height is
+# 0.15+0.061=0.211 (matching the original spawn height exactly), lying on
+# its side is 0.15+0.033=0.183. This range covers both real resting
+# orientations with margin.
+SET_ASIDE_SUCCESS_Z_RANGE = (0.17, 0.28)
 
 
 class PickAndLiftDemo(Node):
@@ -493,23 +522,154 @@ class PickAndLiftDemo(Node):
             'fullness': fullness,
         }
 
+    def _check_disposal_bounds(self, decision, final_pose, state):
+        """Did the can actually end up where this decision says it should
+        have -- see DISPOSAL_SETTLE_SEC's/SET_ASIDE_SUCCESS_*'s/
+        bin_geometry.py's BIN_SUCCESS_*'s comments for the exact bounds
+        and their reasoning."""
+        if final_pose is None:
+            return False
+        x, y, z = final_pose
+        if decision == 'bin':
+            return (BIN_SUCCESS_X_RANGE[0] <= x <= BIN_SUCCESS_X_RANGE[1]
+                    and BIN_SUCCESS_Y_RANGE[0] <= y <= BIN_SUCCESS_Y_RANGE[1]
+                    and BIN_SUCCESS_Z_RANGE[0] <= z <= BIN_SUCCESS_Z_RANGE[1])
+        # set_aside: measured against the can's own original measured
+        # pose, not a new fixed point.
+        radius = math.hypot(x - state['can_x'], y - state['can_y'])
+        return (radius <= SET_ASIDE_SUCCESS_RADIUS_M
+                and SET_ASIDE_SUCCESS_Z_RANGE[0] <= z <= SET_ASIDE_SUCCESS_Z_RANGE[1])
+
+    def _dispose(self, state, fullness):
+        """Decides bin vs. set-aside from fullness (Iteration 5) and
+        carries it out: transit to the branch's hover pose, descend to its
+        release pose, release, check where the can actually ended up, then
+        retreat to hover and return home. Only called when the lift
+        succeeded -- see run().
+
+        KNOWN, UNSOLVED ISSUE with the 'bin' branch (see commit-notes/12
+        for the full investigation): a single move that changes both reach
+        and azimuth at once (a ~115-degree base rotation, what this does
+        today) let the can get flung well outside the bin on every live
+        trial tried. Three real, independently-tested mitigations --
+        isolating the rotation from the reach change (a fold-then-rotate
+        pattern, matching how Iteration 3's own now-deleted
+        OpenManipulator-X pipeline once solved a similar rotation problem),
+        slowing the rotation down, and increasing the kinematic lock's
+        update rate -- were each tried live and none reliably fixed it
+        (severity varied trial to trial with no clear trend tied to any of
+        them). Reverted all three back to this simple, honestly-labeled
+        version rather than keep unproven complexity that didn't
+        demonstrably help. The 'set_aside' branch never rotates the base
+        at all (it targets the can's own already-proven azimuth) and has
+        been reliable on every live trial (3/3 clean) -- this issue is
+        specific to the bin's large base rotation, not this method's
+        release/success-check logic in general.
+        """
+        decision = decide_disposal(fullness)
+
+        if decision == 'bin':
+            try:
+                hover_targets = bin_hover_joint_targets()
+                release_targets = bin_release_joint_targets()
+            except ValueError as exc:
+                self.get_logger().error(f'Bin target unreachable: {exc}')
+                self._stop_kinematic_lock()
+                self._cancel_gripper_goal(state['close_goal_handle'])
+                send_gripper_goal(self, GRIPPER_OPEN)
+                returned_home = self.move_arm(HOME, duration_sec=3.0)
+                return {
+                    'disposal_decision': decision,
+                    'disposal_success': False,
+                    'disposal_reason': 'bin_unreachable',
+                    'can_final_pose': self.can_pose,
+                    'returned_home': returned_home,
+                }
+            release_azimuth = BIN_AZIMUTH
+        else:  # set_aside: reuse the already-proven grasp-side reach exactly.
+            hover_targets = state['hover_joints'][1:4]
+            release_targets = state['grasp_joints'][1:4]
+            release_azimuth = state['azimuth']
+
+        hover_joints = (release_azimuth,) + tuple(hover_targets) + (WRIST_ROLL,)
+        release_joints = (release_azimuth,) + tuple(release_targets) + (WRIST_ROLL,)
+
+        # Kinematic lock stays active through this whole transit -- it
+        # only stops right at the release pose below, once the can is
+        # actually where it should be released (see this method's own
+        # release-ordering comment there).
+        move_ok = self.move_arm(hover_joints, duration_sec=3.0)
+        if move_ok:
+            move_ok = self.move_arm(release_joints, duration_sec=2.0)
+
+        if not move_ok:
+            self._stop_kinematic_lock()
+            self._cancel_gripper_goal(state['close_goal_handle'])
+            send_gripper_goal(self, GRIPPER_OPEN)
+            returned_home = self.move_arm(HOME, duration_sec=3.0)
+            return {
+                'disposal_decision': decision,
+                'disposal_success': False,
+                'disposal_reason': 'transit_move_failed',
+                'can_final_pose': self.can_pose,
+                'returned_home': returned_home,
+            }
+
+        # Release ordering: stop the lock *before* opening, so real
+        # physics (gravity, contact) governs the fall from here, not a
+        # lingering pose correction fighting it every tick.
+        self._stop_kinematic_lock()
+        self._cancel_gripper_goal(state['close_goal_handle'])
+        send_gripper_goal(self, GRIPPER_OPEN)
+        self._spin_for(DISPOSAL_SETTLE_SEC)
+
+        can_final_pose = self.can_pose
+        disposal_success = self._check_disposal_bounds(decision, can_final_pose, state)
+        self.get_logger().info(
+            f'Disposal ({decision}): final_pose={can_final_pose} success={disposal_success}')
+
+        # Retreat to hover before the big HOME move -- avoids a fresh
+        # joint-space jump starting right next to a wall/the table.
+        self.move_arm(hover_joints, duration_sec=3.0)
+        returned_home = self.move_arm(HOME, duration_sec=3.0)
+
+        return {
+            'disposal_decision': decision,
+            'disposal_success': disposal_success,
+            'disposal_reason': 'ok' if disposal_success else 'final_pose_out_of_bounds',
+            'can_final_pose': can_final_pose,
+            'returned_home': returned_home,
+        }
+
     def run(self):
-        """Runs one full pick-and-lift attempt. Returns a result dict --
-        not just logs -- so a caller (a live trial batch, a future disposal
-        pipeline stage, a launch_testing test) can act on the outcome
-        instead of re-deriving it from log output."""
+        """Runs one full pick-and-lift-and-dispose attempt. Returns a
+        result dict -- not just logs -- so a caller (a live trial batch, a
+        launch_testing test) can act on the outcome instead of re-deriving
+        it from log output."""
         state = self._acquire_and_grasp()
         if 'success' in state:
             return state  # early exit: no_can_pose or unreachable
 
         lift_result = self._lift_and_classify(state)
 
-        # Release hook: this pipeline doesn't carry the can to the bin yet
-        # (out of scope for this task -- see kinematic_grasp.py's module
-        # docstring / commit-notes/10), so this is deliberately minimal,
-        # just enough that a future caller reopening the gripper isn't
-        # left fighting a still-active lock.
-        self._stop_kinematic_lock()
+        if lift_result['success']:
+            # Iteration 5: only dispose of a can that was actually lifted
+            # -- a confirmed grip that didn't sustain the lift is already
+            # a failure everywhere else in this pipeline, and attempting
+            # to transit/release a can that's still sitting on the table
+            # (or worse, was never really gripped) would be meaningless.
+            dispose_result = self._dispose(state, lift_result['fullness'])
+        else:
+            # Mirrors the old unconditional call this replaced: the lock
+            # still needs stopping even when there's no disposal to do.
+            self._stop_kinematic_lock()
+            dispose_result = {
+                'disposal_decision': None,
+                'disposal_success': None,
+                'disposal_reason': 'n/a',
+                'can_final_pose': None,
+                'returned_home': False,
+            }
 
         return {
             'success': lift_result['success'],
@@ -523,6 +683,11 @@ class PickAndLiftDemo(Node):
             'can_height_after': lift_result['can_height_after'],
             'height_gain': lift_result['height_gain'],
             'fullness': lift_result['fullness'],
+            'disposal_decision': dispose_result['disposal_decision'],
+            'disposal_success': dispose_result['disposal_success'],
+            'disposal_reason': dispose_result['disposal_reason'],
+            'can_final_pose': dispose_result['can_final_pose'],
+            'returned_home': dispose_result['returned_home'],
         }
 
 
