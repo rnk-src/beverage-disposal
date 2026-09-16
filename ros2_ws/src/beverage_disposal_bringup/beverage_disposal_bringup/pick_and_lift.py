@@ -306,11 +306,12 @@ class PickAndLiftDemo(Node):
         cancel_future = goal_handle.cancel_goal_async()
         rclpy.spin_until_future_complete(self, cancel_future, timeout_sec=timeout_sec)
 
-    def run(self):
-        """Runs one full pick-and-lift attempt. Returns a result dict --
-        not just logs -- so a caller (a live trial batch, a future disposal
-        pipeline stage, a launch_testing test) can act on the outcome
-        instead of re-deriving it from log output."""
+    def _acquire_and_grasp(self):
+        """Everything from finding the can through confirming (or missing)
+        a grip and starting the kinematic lock. Returns either a terminal
+        early-exit dict (has a 'success' key -- 'no_can_pose'/'unreachable')
+        or an intermediate state dict for _lift_and_classify to continue
+        from (no 'success' key -- that's how run() tells the two apart)."""
         pose = self.wait_for_can_pose()
         if pose is None:
             self.get_logger().error('Never got a can pose on /world_pose, aborting.')
@@ -374,16 +375,18 @@ class PickAndLiftDemo(Node):
         # already sticky (see gripper_control.py), so once True it stays
         # True for the rest of this goal.
         #
-        # Left running (not canceled): this pipeline never re-opens after
-        # closing, so there's nothing that needs it released, and letting
-        # it keep holding is exactly what the following lift step needs.
+        # close_goal_handle is kept (not discarded) so _dispose() can
+        # cancel it later before sending the release-time OPEN goal --
+        # see this module's docstring / CLAUDE.md's Iteration 5 entry for
+        # why that mirrors the OPEN->CLOSE cancel-before-send discipline
+        # a few lines above, applied at the opposite transition.
         grip_state = {'confirmed': False}
 
         def _on_close_feedback(feedback):
             if feedback.stalled:
                 grip_state['confirmed'] = True
 
-        send_gripper_goal(
+        close_goal_handle = send_gripper_goal(
             self, GRIPPER_CLOSED, max_effort=GRIPPER_CLOSE_MAX_EFFORT,
             feedback_callback=_on_close_feedback)
         # Wait for the real signal, not a fixed guess at how long it takes
@@ -407,6 +410,32 @@ class PickAndLiftDemo(Node):
         # masked by kinematically locking an ungrasped can to the gripper
         # anyway.
         kinematic_locked = grip_confirmed and self._start_kinematic_lock()
+
+        return {
+            'azimuth': azimuth,
+            'can_x': can_x,
+            'can_y': can_y,
+            'can_radius': can_radius,
+            'can_height_before': can_height_before,
+            'grasp_joints': grasp_joints,
+            'hover_joints': hover_joints,
+            'close_position': close_position,
+            'close_effort': close_effort,
+            'grip_confirmed': grip_confirmed,
+            'kinematic_locked': kinematic_locked,
+            'close_goal_handle': close_goal_handle,
+        }
+
+    def _lift_and_classify(self, state):
+        """Lifts the grasped can and checks whether the lift actually
+        sustained (not just a transient bounce), then classifies its
+        fullness from the ground-truth mass if it did. Returns the fields
+        that make it into the final result dict for this phase --
+        run() merges them with _acquire_and_grasp's state and (once
+        wired) _dispose's fields."""
+        azimuth = state['azimuth']
+        can_height_before = state['can_height_before']
+        shoulder_lift, elbow_flex, wrist_flex = state['grasp_joints'][1:4]
 
         # Real bug found live (2026-09-13, see commit-notes/10): this used
         # to be (shoulder_lift - LIFT_SHOULDER_LIFT_DELTA, elbow_flex,
@@ -442,13 +471,6 @@ class PickAndLiftDemo(Node):
         height_gain = can_height_after - can_height_before
         success = height_gain >= LIFT_SUCCESS_HEIGHT_MARGIN
 
-        # Release hook: this pipeline doesn't carry the can to the bin yet
-        # (out of scope for this task -- see kinematic_grasp.py's module
-        # docstring / commit-notes/10), so this is deliberately minimal,
-        # just enough that a future caller reopening the gripper isn't
-        # left fighting a still-active lock.
-        self._stop_kinematic_lock()
-
         # Iteration 4 (fullness classification): gated on success, not just
         # grip_confirmed, for consistency with how this pipeline already
         # treats "gripped but didn't sustain the lift" as a failure
@@ -460,21 +482,47 @@ class PickAndLiftDemo(Node):
         self.get_logger().info(
             f'Lift check: height_before={can_height_before:.4f} '
             f'height_after={can_height_after:.4f} gain={height_gain:.4f} '
-            f'success={success} kinematic_locked={kinematic_locked} '
+            f'success={success} kinematic_locked={state["kinematic_locked"]} '
             f'fullness={fullness}')
 
         return {
             'success': success,
             'reason': 'ok' if success else 'lift_not_sustained',
-            'close_position': close_position,
-            'close_effort': close_effort,
-            'grip_confirmed': grip_confirmed,
-            'kinematic_locked': kinematic_locked,
-            'azimuth': azimuth,
-            'can_height_before': can_height_before,
             'can_height_after': can_height_after,
             'height_gain': height_gain,
             'fullness': fullness,
+        }
+
+    def run(self):
+        """Runs one full pick-and-lift attempt. Returns a result dict --
+        not just logs -- so a caller (a live trial batch, a future disposal
+        pipeline stage, a launch_testing test) can act on the outcome
+        instead of re-deriving it from log output."""
+        state = self._acquire_and_grasp()
+        if 'success' in state:
+            return state  # early exit: no_can_pose or unreachable
+
+        lift_result = self._lift_and_classify(state)
+
+        # Release hook: this pipeline doesn't carry the can to the bin yet
+        # (out of scope for this task -- see kinematic_grasp.py's module
+        # docstring / commit-notes/10), so this is deliberately minimal,
+        # just enough that a future caller reopening the gripper isn't
+        # left fighting a still-active lock.
+        self._stop_kinematic_lock()
+
+        return {
+            'success': lift_result['success'],
+            'reason': lift_result['reason'],
+            'close_position': state['close_position'],
+            'close_effort': state['close_effort'],
+            'grip_confirmed': state['grip_confirmed'],
+            'kinematic_locked': state['kinematic_locked'],
+            'azimuth': state['azimuth'],
+            'can_height_before': state['can_height_before'],
+            'can_height_after': lift_result['can_height_after'],
+            'height_gain': lift_result['height_gain'],
+            'fullness': lift_result['fullness'],
         }
 
 
