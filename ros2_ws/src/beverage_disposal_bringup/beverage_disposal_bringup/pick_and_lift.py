@@ -144,6 +144,14 @@ GRIPPER_CLOSE_CONFIRM_TIMEOUT_SEC = 4.0
 # whatever the can does once it's no longer held (a fall, a bounce, a
 # roll), not a guess.
 DISPOSAL_SETTLE_SEC = 2.0
+# EXPERIMENT (see commit-notes/12): how long to wait, with the kinematic
+# lock still active, after canceling the squeeze and sending the OPEN
+# goal, before stopping the lock -- gives any contact-force correction
+# from releasing an interpenetrating squeeze somewhere harmless (still
+# overridden every tick) instead of handing it straight to unconstrained
+# physics. Short because gripper_action_server.py's _stop_effort() fires
+# promptly on cancel, not tuned beyond that.
+RELEASE_SQUEEZE_CANCEL_SETTLE_SEC = 0.4
 
 # "Did a set-aside can actually land back near where it was picked up"
 # bounds, measured against the can's own *original* measured pose (not a
@@ -615,12 +623,30 @@ class PickAndLiftDemo(Node):
                 'returned_home': returned_home,
             }
 
-        # Release ordering: stop the lock *before* opening, so real
-        # physics (gravity, contact) governs the fall from here, not a
-        # lingering pose correction fighting it every tick.
-        self._stop_kinematic_lock()
+        # EXPERIMENT (see commit-notes/12): release ordering reversed from
+        # an earlier version of this method. The previous order stopped
+        # the kinematic lock *before* canceling the squeeze -- meaning
+        # real physics resumed while gripper_action_server.py was still
+        # actively commanding contact_hold_effort against the can. If the
+        # jaw has any real interpenetration into the can at that instant
+        # (plausible under a sustained rigid squeeze -- this project's own
+        # SDF has no contact softness anywhere), the sudden transition
+        # from "kinematically locked, interpenetration ignored" to "free
+        # rigid body still being squeezed" is exactly the class of
+        # artifact this project already diagnosed once before, in an
+        # early OpenManipulator-X session, for the identical fling
+        # signature (can flung meters away, z settling at exactly its
+        # radius): "a well-known artifact when rigid bodies are driven
+        # through each other quickly." Canceling the squeeze *first*, with
+        # the lock still active, means any resulting contact-force
+        # correction only displaces the can within the still-locked
+        # frame -- harmlessly overridden back at the very next
+        # KINEMATIC_LOCK_PERIOD_SEC tick -- rather than being handed
+        # straight to unconstrained physics.
         self._cancel_gripper_goal(state['close_goal_handle'])
         send_gripper_goal(self, GRIPPER_OPEN)
+        self._spin_for(RELEASE_SQUEEZE_CANCEL_SETTLE_SEC)
+        self._stop_kinematic_lock()
         self._spin_for(DISPOSAL_SETTLE_SEC)
 
         can_final_pose = self.can_pose
