@@ -55,6 +55,22 @@ BIN_HOVER_HEIGHT_M = BIN_WALL_TOP_Z + 0.03
 # at a limit.
 BIN_RELEASE_HEIGHT_M = 0.17
 
+# "Did the can actually land in the bin" bounds, in world coordinates.
+# The bin's real interior clear span (from its 5-box shell geometry in the
+# world file: floor 0.25x0.25 box, four 0.01m-thick walls at local
+# x=+-0.12/y=+-0.12, so the inner wall faces sit at +-0.115) is
+# x in [-0.185, 0.055], y in [-0.435, -0.205] around the bin's model pose --
+# inset here by the can's own radius (0.033m, so its *center* can't be
+# within one radius of a wall) plus a 0.01m settle/measurement margin.
+BIN_SUCCESS_X_RANGE = (-0.142, 0.012)
+BIN_SUCCESS_Y_RANGE = (-0.392, -0.248)
+# Floor top is at z=0.01; 0.02 excludes "still clipped at floor level" (a
+# can resting on its side sits at z~0.043, standing at z~0.071, both well
+# clear of this). 0.20 is well below the wall top (0.30) while generous
+# enough to tolerate a real bounce/roll, without being tuned so tight it
+# flags a normal resting pose as failure.
+BIN_SUCCESS_Z_RANGE = (0.02, 0.20)
+
 
 def bin_hover_joint_targets(wrist_roll=WRIST_ROLL, elbow_up=False, clamp_near_limits=0.0):
     """(shoulder_lift, elbow_flex, wrist_flex) for the hover pose above the

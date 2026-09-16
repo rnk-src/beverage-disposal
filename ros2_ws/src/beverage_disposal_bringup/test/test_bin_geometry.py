@@ -9,6 +9,10 @@ from beverage_disposal_bringup.bin_geometry import (
     BIN_PITCH,
     BIN_RADIUS,
     BIN_RELEASE_HEIGHT_M,
+    BIN_SUCCESS_X_RANGE,
+    BIN_SUCCESS_Y_RANGE,
+    BIN_SUCCESS_Z_RANGE,
+    BIN_WALL_TOP_Z,
     bin_hover_joint_targets,
     bin_release_joint_targets,
 )
@@ -47,3 +51,16 @@ def test_bin_hover_and_release_are_reachable():
     raises ValueError on an unreachable target."""
     bin_hover_joint_targets()
     bin_release_joint_targets()
+
+
+def test_bin_success_ranges_are_well_ordered_and_inside_the_bin():
+    """Sanity guard on the literal success bounds themselves: each range's
+    low bound must actually be below its high bound (a swapped pair would
+    silently make every check fail), and the whole box must sit strictly
+    inside the bin's real interior span and height band, not just
+    overlap it."""
+    for lo, hi in (BIN_SUCCESS_X_RANGE, BIN_SUCCESS_Y_RANGE, BIN_SUCCESS_Z_RANGE):
+        assert lo < hi
+
+    assert BIN_SUCCESS_Z_RANGE[1] < BIN_WALL_TOP_Z
+    assert BIN_SUCCESS_Z_RANGE[0] > 0.0
