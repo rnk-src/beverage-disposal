@@ -5,9 +5,9 @@ import importlib.metadata
 import shutil
 import subprocess
 import sys
-import tomllib
 from pathlib import Path
 
+import lockversions
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -26,8 +26,7 @@ PINNED = ["mujoco", "numpy", "gymnasium", "pytest", "hypothesis"]
 
 
 def locked_versions():
-    lock = tomllib.loads((ROOT / "uv.lock").read_text())
-    return {package["name"]: package["version"] for package in lock["package"]}
+    return lockversions.locked_versions((ROOT / "uv.lock").read_text())
 
 
 @pytest.mark.parametrize("name", PINNED)
