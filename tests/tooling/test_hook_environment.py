@@ -4,11 +4,9 @@ import os
 import shutil
 import subprocess
 import sys
-from pathlib import Path
 
 import pytest
-
-TESTS = Path(__file__).resolve().parent
+from support.paths import ROOT
 
 pytestmark = pytest.mark.skipif(shutil.which("git") is None, reason="git is not installed")
 
@@ -33,7 +31,7 @@ def test_a_commit_hook_environment_does_not_reach_plain_git_calls_in_tests(tmp_p
     hostile_index.parent.mkdir()
     inner = tmp_path / "inner"
     inner.mkdir()
-    shutil.copy(TESTS / "conftest.py", inner / "conftest.py")
+    shutil.copy(ROOT / "tests" / "conftest.py", inner / "conftest.py")
     (inner / "test_plain_git.py").write_text(PLAIN_GIT_TEST)
     result = subprocess.run(
         [sys.executable, "-m", "pytest", "-p", "no:cacheprovider", "--color=no", "-q"],

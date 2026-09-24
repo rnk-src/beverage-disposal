@@ -1,15 +1,12 @@
 """The scanner for home paths and emails still reads the vendored files."""
 
 import shutil
-from pathlib import Path
 
 import pytest
-from gitenv import needs_git_work_tree, publishable_files
-from scanning import find_leaks_in_files
 from so101 import SO101, URDF
-from test_docs_stay_generic import SCANNER_SAMPLE_DATA
-
-ROOT = Path(__file__).resolve().parents[1]
+from support.gitenv import needs_git_work_tree, publishable_files
+from support.paths import ROOT
+from support.scanning import SCANNER_SAMPLE_DATA, find_leaks_in_files
 
 
 @pytest.mark.parametrize(

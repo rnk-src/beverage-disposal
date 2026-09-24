@@ -4,13 +4,12 @@ import os
 import shutil
 import subprocess
 import sys
-from pathlib import Path
 
 import pytest
 from so101 import SO101
+from support.paths import ROOT
 
-ROOT = Path(__file__).resolve().parents[1]
-MODEL_TESTS = "tests/test_so101_model.py"
+MODEL_TESTS = "tests/model/test_so101_model.py"
 
 
 def edit(folder, name, old, new):

@@ -203,6 +203,7 @@ uv sync                      # create .venv from uv.lock (exact, reproducible ve
 uv run pytest                # default run: fast + medium tiers (slow is excluded)
 uv run pytest -m fast        # quick loop, run on every change (about 45 s today)
 uv run pytest -m slow        # slow tier only (for example training runs)
+uv run pytest tests/tooling  # one area of the tests
 uv lock --check              # is uv.lock consistent with pyproject.toml?
 uv run ruff check .          # lint (reports only; nothing is auto-fixed)
 uv run ruff format .         # format
@@ -224,7 +225,13 @@ rewrites files and stops the commit so you re-stage them.
 
 ```
 src/beverage_disposal/   Python package (placeholder name; ROS-free core arrives here)
-tests/                   pytest tests (fast/medium/slow tiers from 0.2)
+tests/                   pytest tests (fast/medium/slow tiers), one folder per area:
+  repo/                    what git publishes: ignore rules, top-level allowlist, no private text
+  environment/             Python pin, dependencies, lockfile, third-party libraries
+  tooling/                 pytest tiers, ruff, pre-commit hooks
+  model/                   the vendored SO-101 model (MJCF/URDF consistency arrives in 1.1)
+  support/                 shared helpers only (paths, git, scanning); no tests
+  conftest.py              tier hook and shared fixtures
 assets/                  vendored third-party files with provenance (the SO-101 model)
 configs/                 YAML configs (task, training)
 scripts/                 helper scripts (viewer, generators)
@@ -234,8 +241,10 @@ README.md  CLAUDE.md  LICENSE  .gitignore
 ```
 
 A test allows only known top-level entries to be published (`PROJECT_TOP_LEVEL` in
-`tests/test_publishable_set.py`). When a legitimate new top-level file or folder appears, add it
-there in the same change.
+`tests/repo/test_publishable_set.py`). When a legitimate new top-level file or folder appears, add
+it there in the same change. Likewise only approved folders may sit directly in `tests/`
+(`ALLOWED_IN_TESTS` in `tests/repo/test_tests_layout.py`): a new area of the project gets its own
+folder and one line there, and shared helpers go in `tests/support/`, never loose in `tests/`.
 
 Ignored by the published ignore file: `.venv`, `runs/`, caches, editor and OS files. Owner-only
 files (study notes, private context file, unpublished tests) are ignored through the clone's

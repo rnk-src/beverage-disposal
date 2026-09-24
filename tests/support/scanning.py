@@ -3,6 +3,9 @@
 import re
 from pathlib import Path
 
+# These files hold fake paths and addresses on purpose, as sample data for the scanner tests.
+SCANNER_SAMPLE_DATA = ["tests/repo/test_docs_stay_generic.py", "tests/model/test_so101_leaks.py"]
+
 HOME_PATH = r"/(?:Users|home)/[^/\s]+|[A-Za-z]:\\Users\\[^\\\s]+"
 # The lookahead skips SSH remotes (user@host:owner/repo and ssh://user@host/owner/repo). It also
 # stops the domain from backtracking to a shorter one: without that, the last letter of the

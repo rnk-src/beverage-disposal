@@ -1,10 +1,9 @@
 """Only known top-level entries may be publishable, so a stray private folder cannot slip out."""
 
-from pathlib import Path
-
 import pytest
-from gitenv import needs_git_work_tree, publishable_files
-from layout import explain_unexpected, unexpected_top_level
+from support.gitenv import needs_git_work_tree, publishable_files
+from support.layout import explain_unexpected, unexpected_top_level
+from support.paths import ROOT
 
 ALLOWED = ["README.md", "src", "tests"]
 
@@ -46,8 +45,6 @@ def test_the_message_names_the_entry_and_both_remedies():
     assert "allowlist" in message
     assert "exclude" in message
 
-
-ROOT = Path(__file__).resolve().parents[1]
 
 # Top-level entries that belong to the project. Add a new one here when the project grows.
 PROJECT_TOP_LEVEL = [

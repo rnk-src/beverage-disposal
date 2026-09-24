@@ -3,9 +3,9 @@
 import importlib
 import subprocess
 
-import gitenv
 import pytest
-from gitenv import ignored_by_published_file, is_git_work_tree
+from support import gitenv
+from support.gitenv import ignored_by_published_file, is_git_work_tree
 
 
 def test_a_rule_in_the_published_ignore_file_counts(repo):

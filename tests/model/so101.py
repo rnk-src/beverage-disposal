@@ -8,11 +8,10 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import mujoco
+from support.paths import ROOT
 
 # SO101_DIR lets a test run the model tests against a damaged copy, to prove they can fail.
-SO101 = Path(
-    os.environ.get("SO101_DIR") or Path(__file__).resolve().parents[1] / "assets" / "so101"
-)
+SO101 = Path(os.environ.get("SO101_DIR") or ROOT / "assets" / "so101")
 MJCF = "so101_new_calib.xml"
 URDF = "so101_new_calib.urdf"
 

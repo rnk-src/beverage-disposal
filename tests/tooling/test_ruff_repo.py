@@ -1,6 +1,6 @@
 """The repository as a whole satisfies its own lint and format rules."""
 
-from ruffrun import ruff
+from support.ruffrun import ruff
 
 
 def test_the_repository_has_no_lint_findings():

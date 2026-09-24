@@ -1,11 +1,8 @@
 """CLAUDE.md states the locked versions; they must not drift from uv.lock."""
 
-from pathlib import Path
-
-import lockversions as versions
 import pytest
-
-ROOT = Path(__file__).resolve().parents[1]
+from support import lockversions as versions
+from support.paths import ROOT
 
 LOCK = """
 [[package]]
