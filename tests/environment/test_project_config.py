@@ -10,7 +10,7 @@ PYPROJECT = tomllib.loads((ROOT / "pyproject.toml").read_text())
 
 RUNTIME = {"mujoco", "numpy", "gymnasium"}
 # packaging is what test_python_pin.py uses to compare versions; declared so it is not borrowed.
-DEV = {"pytest", "hypothesis", "packaging", "ruff", "pre-commit"}
+DEV = {"pytest", "hypothesis", "packaging", "ruff", "pre-commit", "pillow"}
 
 
 def package_name(spec):

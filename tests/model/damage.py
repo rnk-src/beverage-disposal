@@ -1,0 +1,61 @@
+"""Runs a test module against a damaged copy of the vendored model, to prove the tests can fail."""
+
+import os
+import shutil
+import subprocess
+import sys
+
+from so101 import SO101
+from support.paths import ROOT
+
+
+def edit(folder, name, old, new):
+    path = folder / name
+    text = path.read_text()
+    assert old in text, f"{old!r} not found in {name}: the fault would not change anything"
+    path.write_text(text.replace(old, new))
+
+
+def run_on_damaged_copy(tmp_path, test_module, fault):
+    """Copy the model, apply `fault(copy)`, run `test_module` against it, return pytest's result.
+
+    Runs from the scratch folder: MuJoCo appends its warnings to MUJOCO_LOG.TXT in the current
+    directory, and a damaged model can make it warn.
+    """
+    copy = tmp_path / "so101"
+    shutil.copytree(SO101, copy)
+    fault(copy)
+    return subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            str(ROOT / test_module),
+            "-q",
+            "--tb=no",
+            "-p",
+            "no:cacheprovider",
+            "-o",
+            "addopts=",
+        ],
+        cwd=tmp_path,
+        env={**os.environ, "SO101_DIR": str(copy), "PYTHONDONTWRITEBYTECODE": "1"},
+        capture_output=True,
+        text=True,
+    )
+
+
+def failed_ids(result):
+    """Test IDs pytest reported as FAILED. Their path is relative to the directory pytest ran in."""
+    return [
+        line.removeprefix("FAILED ").split(" - ")[0]
+        for line in result.stdout.splitlines()
+        if line.startswith("FAILED ")
+    ]
+
+
+def assert_the_test_failed(result, test_module, failing_test):
+    wanted = f"{test_module}::{failing_test}"
+    assert any(id.endswith(wanted) for id in failed_ids(result)), (
+        f"{wanted} did not fail on the damaged copy:\n{result.stdout}"
+    )

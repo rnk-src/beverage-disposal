@@ -16,12 +16,12 @@ def test_tests_run_on_python_3_12():
     assert sys.version_info[:2] == (3, 12)
 
 
-@pytest.mark.parametrize("module", ["mujoco", "numpy", "gymnasium", "hypothesis"])
+@pytest.mark.parametrize("module", ["mujoco", "numpy", "gymnasium", "hypothesis", "PIL"])
 def test_project_dependencies_import(module):
     importlib.import_module(module)
 
 
-PINNED = ["mujoco", "numpy", "gymnasium", "pytest", "hypothesis"]
+PINNED = ["mujoco", "numpy", "gymnasium", "pytest", "hypothesis", "pillow"]
 
 
 def locked_versions():

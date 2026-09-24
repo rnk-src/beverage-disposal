@@ -1,22 +1,9 @@
 """The model tests are run against damaged copies of the model and must notice the damage."""
 
-import os
-import shutil
-import subprocess
-import sys
-
 import pytest
-from so101 import SO101
-from support.paths import ROOT
+from damage import assert_the_test_failed, edit, run_on_damaged_copy
 
 MODEL_TESTS = "tests/model/test_so101_model.py"
-
-
-def edit(folder, name, old, new):
-    path = folder / name
-    text = path.read_text()
-    assert old in text, f"{old!r} not found in {name}: the fault would not change anything"
-    path.write_text(text.replace(old, new))
 
 
 def rename_joint_in_mjcf(folder):
@@ -136,26 +123,5 @@ FAULTS = [
 
 @pytest.mark.parametrize(("fault", "failing_test"), FAULTS, ids=[f.__name__ for f, _ in FAULTS])
 def test_the_model_tests_fail_on_a_damaged_copy(tmp_path, fault, failing_test):
-    copy = tmp_path / "so101"
-    shutil.copytree(SO101, copy)
-    fault(copy)
-    result = subprocess.run(
-        [
-            sys.executable,
-            "-m",
-            "pytest",
-            MODEL_TESTS,
-            "-q",
-            "--tb=no",
-            "-p",
-            "no:cacheprovider",
-            "-o",
-            "addopts=",
-        ],
-        cwd=ROOT,
-        env={**os.environ, "SO101_DIR": str(copy), "PYTHONDONTWRITEBYTECODE": "1"},
-        capture_output=True,
-        text=True,
-    )
-    assert result.returncode != 0, "the model tests passed on a damaged copy"
-    assert f"FAILED {MODEL_TESTS}::{failing_test}" in result.stdout, result.stdout
+    result = run_on_damaged_copy(tmp_path, MODEL_TESTS, fault)
+    assert_the_test_failed(result, MODEL_TESTS, failing_test)
