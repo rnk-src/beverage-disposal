@@ -8,8 +8,8 @@ from scanning import find_leaks_in_files, find_private_looking_text
 
 ROOT = Path(__file__).resolve().parents[1]
 
-# This file holds fake paths and addresses on purpose, as sample data for the scanner tests.
-SCANNER_SAMPLE_DATA = ["tests/test_docs_stay_generic.py"]
+# These files hold fake paths and addresses on purpose, as sample data for the scanner tests.
+SCANNER_SAMPLE_DATA = ["tests/test_docs_stay_generic.py", "tests/test_so101_leaks.py"]
 
 
 @pytest.mark.parametrize(
