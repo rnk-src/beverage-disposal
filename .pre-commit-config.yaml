@@ -1,0 +1,20 @@
+# Local hooks that call ruff through uv, so the version is the one locked in uv.lock and nothing
+# is cloned from the network.
+repos:
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff check
+        entry: uv run --frozen ruff check
+        language: system
+        types: [python]
+      - id: ruff-format
+        name: ruff format
+        entry: uv run --frozen ruff format
+        language: system
+        types: [python]
+      - id: fast-tests
+        name: fast tests
+        entry: uv run --frozen pytest -m fast -q
+        language: system
+        pass_filenames: false

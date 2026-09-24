@@ -37,9 +37,7 @@ def test_installed_version_matches_the_lockfile(name):
 
 @pytest.mark.skipif(shutil.which("uv") is None, reason="uv is not on PATH")
 def test_lockfile_is_up_to_date_with_pyproject():
-    result = subprocess.run(
-        ["uv", "lock", "--check"], cwd=ROOT, capture_output=True, text=True
-    )
+    result = subprocess.run(["uv", "lock", "--check"], cwd=ROOT, capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
 
 

@@ -13,6 +13,8 @@ dev = [
     "pytest>=9.1,<10",
     "hypothesis>=6.168,<7",
     "packaging>=26,<27",
+    "ruff>=0.16,<0.17",
+    "pre-commit>=4.6,<5",
 ]
 
 [build-system]
@@ -26,3 +28,9 @@ markers = [
     "medium: runs in minutes, before finishing a sub-iteration",
     "slow: runs in hours, on a rented GPU when needed; excluded from the default run",
 ]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]

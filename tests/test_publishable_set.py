@@ -52,6 +52,7 @@ ROOT = Path(__file__).resolve().parents[1]
 # Top-level entries that belong to the project. Add a new one here when the project grows.
 PROJECT_TOP_LEVEL = [
     ".gitignore",
+    ".pre-commit-config.yaml",
     ".python-version",
     "CLAUDE.md",
     "LICENSE",

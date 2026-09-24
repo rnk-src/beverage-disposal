@@ -9,8 +9,10 @@ from pathlib import Path
 import pytest
 
 # Git reads nothing outside the repo, so a rule in someone's global ignore cannot change the answer.
+# Git also sets GIT_INDEX_FILE and friends for a hook that runs during a commit; inherited here they
+# would point these tests at the real repository instead of the one they were given.
 ISOLATED_GIT = {
-    **os.environ,
+    **{name: value for name, value in os.environ.items() if not name.startswith("GIT_")},
     "GIT_CONFIG_GLOBAL": os.devnull,
     "GIT_CONFIG_NOSYSTEM": "1",
     "XDG_CONFIG_HOME": os.devnull,

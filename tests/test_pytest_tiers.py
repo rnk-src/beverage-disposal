@@ -121,7 +121,10 @@ def collected(tmp_path, source, *args):
         (["-m", "slow"], {"test_slow"}),
         (["-m", "medium"], {"test_medium"}),
         (["-m", "fast"], {"test_fast", "test_unmarked"}),
-        (["-m", "fast or medium or slow"], {"test_fast", "test_medium", "test_slow", "test_unmarked"}),
+        (
+            ["-m", "fast or medium or slow"],
+            {"test_fast", "test_medium", "test_slow", "test_unmarked"},
+        ),
         (["-m", "not fast"], {"test_medium", "test_slow"}),
     ],
 )

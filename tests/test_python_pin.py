@@ -18,11 +18,14 @@ def test_the_pinned_python_satisfies_the_allowed_range():
     assert pinned in REQUIRES_PYTHON
 
 
-@pytest.mark.parametrize(("version", "allowed"), [
-    ("3.11.9", False),
-    ("3.12.0", True),
-    ("3.12.13", True),
-    ("3.13.0", False),
-])
+@pytest.mark.parametrize(
+    ("version", "allowed"),
+    [
+        ("3.11.9", False),
+        ("3.12.0", True),
+        ("3.12.13", True),
+        ("3.13.0", False),
+    ],
+)
 def test_only_python_3_12_is_allowed(version, allowed):
     assert (Version(version) in REQUIRES_PYTHON) is allowed
