@@ -12,3 +12,6 @@ __pycache__
 
 # Per-machine Claude Code settings
 .claude/settings.local.json
+
+# MuJoCo appends its warnings to this file in the current directory
+MUJOCO_LOG.TXT

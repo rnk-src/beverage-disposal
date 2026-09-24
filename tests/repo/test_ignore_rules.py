@@ -16,6 +16,8 @@ IGNORED = [
     ".idea/workspace.xml",
     ".vscode/settings.json",
     ".claude/settings.local.json",
+    "MUJOCO_LOG.TXT",
+    "scripts/MUJOCO_LOG.TXT",
 ]
 
 # Real project files that must stay visible to git, including a source package that happens to

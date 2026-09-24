@@ -22,8 +22,8 @@ goes into a bin, a full can goes to a set-aside region on the table.
   ruff and pre-commit, living docs and staleness tests, vendored SO-101 model) are built
   test-first, with red output recorded before each piece of code; `main` is that history. The
   earlier first build, written without a red-first record, is kept on the branch `first-build`.
-  The tests are organized into topic folders. Next: 0.6 (step and render smoke test). 0.7 (Gazebo
-  rendering spike) is deferred until requested.
+  The tests are organized into topic folders. 0.6 (step and render smoke test, with a viewer
+  script) is built the same way. 0.7 (Gazebo rendering spike) is deferred until requested.
 - Iterations 1 to 8 are planned in detail down to sub-iterations (see Roadmap) and not started.
 - Last updated: 2026-09-24. Update this section in the same change as every sub-iteration.
 
@@ -50,8 +50,12 @@ Each label is a stable name; the owner's private decision journal uses the same 
   vendored untouched under `assets/so101/` with a provenance file (upstream commit
   `5f6d2b876a53a4872e405b991dd925556c9e38a4`, file checksums) and a NOTICE. Those files stay under
   their own Apache-2.0 license, so the repository is not purely public domain. Our own top-level
-  MJCF includes them and adds the tip site and actuator settings. MJCF is primary for training; URDF is for Gazebo; a consistency
-  test compares them.
+  MJCF includes them and adds the tip site and actuator settings. MJCF is primary for training;
+  URDF is for Gazebo; a consistency test compares them. Facts about the vendored model, all
+  tested: it has no floor, light or camera and uses MuJoCo's defaults (timestep 0.002 s); the
+  joint stops hold; the gripper touches the shoulder when the elbow folds to about 1.5 rad, so the
+  elbow's upper range limit (1.69 rad) is not reachable; and a fresh `MjData` renders blank until
+  `mj_forward` (or a step) has computed the body positions.
 - **Observations:** state-based first, designed so a camera can be added later. Measured joints,
   velocities, commanded joint targets, noisy joint load, tip position (our FK), can position
   relative to the tip, vector to the current destination, destination flag, previous action,
@@ -217,10 +221,13 @@ uv lock --check              # is uv.lock consistent with pyproject.toml?
 uv run ruff check .          # lint (reports only; nothing is auto-fixed)
 uv run ruff format .         # format
 uv run pre-commit install    # once per clone: run ruff and the fast tier before every commit
+uv run python scripts/view_so101.py                   # interactive viewer of the SO-101
+uv run python scripts/view_so101.py --snapshot a.png  # picture of the arm, no window
 ```
 
 Dependencies: ranges in `pyproject.toml`, exact versions in `uv.lock`. Runtime: `mujoco`,
-`numpy`, `gymnasium`. Dev group: `pytest`, `hypothesis`, `packaging`, `ruff`, `pre-commit`. A test
+`numpy`, `gymnasium`. Dev group: `pytest`, `hypothesis`, `packaging`, `ruff`, `pre-commit`,
+`pillow`. A test
 fails if the installed environment drifts from `uv.lock`, and another fails if the "Versions
 locked" sentence above disagrees with it, so update both together when a dependency changes. To add or upgrade a dependency, edit `pyproject.toml`, run
 `uv lock` then `uv sync`, and commit both files.
@@ -238,12 +245,13 @@ tests/                   pytest tests (fast/medium/slow tiers), one folder per a
   repo/                    what git publishes: ignore rules, top-level allowlist, no private text
   environment/             Python pin, dependencies, lockfile, third-party libraries
   tooling/                 pytest tiers, ruff, pre-commit hooks
-  model/                   the vendored SO-101 model (MJCF/URDF consistency arrives in 1.1)
+  model/                   the vendored SO-101 model: files, stepping, joint stops, rendering,
+                           viewer script (MJCF/URDF consistency arrives in 1.1)
   support/                 shared helpers only (paths, git, scanning); no tests
   conftest.py              tier hook and shared fixtures
 assets/                  vendored third-party files with provenance (the SO-101 model)
 configs/                 YAML configs (task, training)
-scripts/                 helper scripts (viewer, generators)
+scripts/                 helper scripts (view_so101.py; generators later)
 pyproject.toml  uv.lock  .python-version   uv project, exact lockfile, pinned Python
 .pre-commit-config.yaml                    git hooks (ruff, fast tests)
 README.md  CLAUDE.md  LICENSE  .gitignore
