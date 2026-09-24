@@ -2,8 +2,8 @@
 
 from pathlib import Path
 
-import pytest
 import lockversions as versions
+import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -19,7 +19,10 @@ version = "2.5.3"
 
 
 def claude_md(sentence):
-    return f"# T\n\n- **Tooling:** Python 3.12 pinned, uv 0.11 used.\n  {sentence}\n- **Next:** numpy 9.9.9 is unrelated.\n"
+    return (
+        "# T\n\n- **Tooling:** Python 3.12 pinned, uv 0.11 used.\n"
+        f"  {sentence}\n- **Next:** numpy 9.9.9 is unrelated.\n"
+    )
 
 
 def test_versions_are_read_from_the_locked_versions_sentence_only():

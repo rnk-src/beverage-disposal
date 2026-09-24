@@ -18,11 +18,11 @@ goes into a bin, a full can goes to a set-aside region on the table.
 
 ## Current status
 
-- **Iteration 0 (foundations):** 0.1 (repo skeleton) and 0.2 (uv environment and pytest tiers)
-  are built test-first (red output recorded before each piece of code). 0.3 (ruff and
-  pre-commit), 0.4 (living docs and staleness tests) and 0.5 (vendored SO-101 model) exist as
-  first builds written without a strict red-first record; they are being redone test-first, in
-  parallel. 0.6 starts after that. 0.7 (Gazebo rendering spike) is deferred until requested.
+- **Iteration 0 (foundations):** 0.1 to 0.5 (repo skeleton, uv environment and pytest tiers,
+  ruff and pre-commit, living docs and staleness tests, vendored SO-101 model) are built
+  test-first, with red output recorded before each piece of code, and merged on an integration
+  branch awaiting owner review. The tests are then to be reorganized into subfolders. 0.6 starts
+  after that. 0.7 (Gazebo rendering spike) is deferred until requested.
 - Iterations 1 to 8 are planned in detail down to sub-iterations (see Roadmap) and not started.
 - Last updated: 2026-09-24. Update this section in the same change as every sub-iteration.
 
@@ -42,11 +42,14 @@ Each label is a stable name; the owner's private decision journal uses the same 
 - **Platform (validation):** Ubuntu 24.04, ROS 2 Jazzy, Gazebo Harmonic.
 - **Tooling:** Python 3.12 (pinned `>=3.12,<3.13`), `uv` (ranges in `pyproject.toml`, exact
   versions in `uv.lock`, hatchling build backend, src layout), pytest with fast/medium/slow
-  tiers, hypothesis, ruff and pre-commit (from 0.3). Versions locked 2026-09-24: mujoco 3.14.0,
-  numpy 2.5.3, gymnasium 1.3.0, pytest 9.1.1, hypothesis 6.168.1.
+  tiers, hypothesis, ruff (rules E, F, I, UP, B; 100 columns) and pre-commit.
+  Versions locked 2026-09-24: mujoco 3.14.0, numpy 2.5.3, gymnasium 1.3.0, pytest 9.1.1,
+  hypothesis 6.168.1, ruff 0.16.9, pre-commit 4.6.2.
 - **Arm model:** official SO-101 MJCF/URDF (TheRobotStudio/SO-ARM100, "new" calibration),
-  vendored untouched with a provenance file; our own top-level MJCF includes it and adds the tip
-  site and actuator settings. MJCF is primary for training; URDF is for Gazebo; a consistency
+  vendored untouched under `assets/so101/` with a provenance file (upstream commit
+  `5f6d2b876a53a4872e405b991dd925556c9e38a4`, file checksums) and a NOTICE. Those files stay under
+  their own Apache-2.0 license, so the repository is not purely public domain. Our own top-level
+  MJCF includes them and adds the tip site and actuator settings. MJCF is primary for training; URDF is for Gazebo; a consistency
   test compares them.
 - **Observations:** state-based first, designed so a camera can be added later. Measured joints,
   velocities, commanded joint targets, noisy joint load, tip position (our FK), can position
@@ -198,28 +201,35 @@ Requires [`uv`](https://docs.astral.sh/uv/) and a Python 3.12 (uv will find or f
 ```bash
 uv sync                      # create .venv from uv.lock (exact, reproducible versions)
 uv run pytest                # default run: fast + medium tiers (slow is excluded)
-uv run pytest -m fast        # quick loop: seconds, run on every change
+uv run pytest -m fast        # quick loop, run on every change (about 45 s today)
 uv run pytest -m slow        # slow tier only (for example training runs)
 uv lock --check              # is uv.lock consistent with pyproject.toml?
+uv run ruff check .          # lint (reports only; nothing is auto-fixed)
+uv run ruff format .         # format
+uv run pre-commit install    # once per clone: run ruff and the fast tier before every commit
 ```
 
 Dependencies: ranges in `pyproject.toml`, exact versions in `uv.lock`. Runtime: `mujoco`,
-`numpy`, `gymnasium`. Dev group: `pytest`, `hypothesis`, `packaging`. A test fails if the installed
-environment drifts from `uv.lock`. To add or upgrade a dependency, edit `pyproject.toml`, run
+`numpy`, `gymnasium`. Dev group: `pytest`, `hypothesis`, `packaging`, `ruff`, `pre-commit`. A test
+fails if the installed environment drifts from `uv.lock`, and another fails if the "Versions
+locked" sentence above disagrees with it, so update both together when a dependency changes. To add or upgrade a dependency, edit `pyproject.toml`, run
 `uv lock` then `uv sync`, and commit both files.
 
 Test tiers: an unmarked test is `fast`; a test may carry at most one of `fast`, `medium`,
-`slow`; misspelled markers are errors. Ruff and pre-commit arrive in 0.3.
+`slow`; misspelled markers are errors. The pre-commit hooks run ruff check, ruff format and the
+fast tier (an unmarked test counts as fast, so that is most of the suite). The format hook
+rewrites files and stops the commit so you re-stage them.
 
 ## Layout
 
 ```
 src/beverage_disposal/   Python package (placeholder name; ROS-free core arrives here)
 tests/                   pytest tests (fast/medium/slow tiers from 0.2)
-assets/                  vendored third-party model files with provenance (from 0.5)
+assets/                  vendored third-party files with provenance (the SO-101 model)
 configs/                 YAML configs (task, training)
 scripts/                 helper scripts (viewer, generators)
 pyproject.toml  uv.lock  .python-version   uv project, exact lockfile, pinned Python
+.pre-commit-config.yaml                    git hooks (ruff, fast tests)
 README.md  CLAUDE.md  LICENSE  .gitignore
 ```
 
@@ -262,7 +272,12 @@ update docs.
 
 - Jazzy's system Python version (expected 3.12); arm64 apt packages for `ros_gz` and
   `gz_ros2_control` on Jazzy; whether Gazebo cameras and lidar render in a Mac VM.
-- STS3215 servo parameters in the official files; real can dimensions (about 66 mm by 122 mm).
+- STS3215 servo parameters: the vendored MJCF uses kp 998.22, kv 2.731 and a +-3.35 N*m force
+  limit (its class default says +-2.94, each actuator overrides it), while the upstream
+  `joints_properties.xml` says kp 17.8 and kv 0. Their origin is a third-party README and is
+  unverified; MuJoCo uses the MJCF values. Also unverified: real can dimensions (about 66 mm by
+  122 mm), the joint ranges (two artifacts from one CAD export, not a measurement of a real arm),
+  and the licenses of the tools behind the upstream model files.
 - Stable-Baselines3 default hyperparameters and CPU-vs-GPU guidance (recalled, not re-read).
 - Steps per second on the development Mac (measured in 3.5).
 - Verified 2026-09-24 against the official Claude Code docs: a private, untracked project context
