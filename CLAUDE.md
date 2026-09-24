@@ -20,9 +20,10 @@ goes into a bin, a full can goes to a set-aside region on the table.
 
 - **Iteration 0 (foundations):** 0.1 to 0.5 (repo skeleton, uv environment and pytest tiers,
   ruff and pre-commit, living docs and staleness tests, vendored SO-101 model) are built
-  test-first, with red output recorded before each piece of code, and merged on an integration
-  branch awaiting owner review. The tests are then to be reorganized into subfolders. 0.6 starts
-  after that. 0.7 (Gazebo rendering spike) is deferred until requested.
+  test-first, with red output recorded before each piece of code; `main` is that history. The
+  earlier first build, written without a red-first record, is kept on the branch `first-build`.
+  The tests are organized into topic folders. Next: 0.6 (step and render smoke test). 0.7 (Gazebo
+  rendering spike) is deferred until requested.
 - Iterations 1 to 8 are planned in detail down to sub-iterations (see Roadmap) and not started.
 - Last updated: 2026-09-24. Update this section in the same change as every sub-iteration.
 
@@ -186,6 +187,14 @@ Decisions and ideas to reopen at a specific point:
 - Regression suite of fixed seeded scenarios: iterations 2 to 5.
 - Whether to use TdRL on top of SAC: iteration 6. Reopen the SAC choice (PPO fallback) only if
   SAC cannot be made to learn in iteration 4.
+- Distributional critic (TQC or Distributional SAC): train plain SAC first as the baseline. If 4.3
+  or 4.4 shows unstable Q-values or large seed-to-seed variance, run a distributional variant as
+  a controlled A/B against that baseline. Not started before then: the RL-algorithm-selection
+  paper (arXiv 2407.20917) ranks distributional methods low priority when risk estimation is not
+  needed. Whether SB3 or `sb3-contrib` provides a usable one is unverified.
+- Two open points from the same paper, to check at 4.1: n-step returns instead of one-step TD
+  (favored for sparse rewards or a violated Markov assumption), and seeding the replay buffer
+  with scripted-controller demonstrations (the paper warns this can hurt without care).
 - Sim-to-sim test protocol (none published; ours to define): iteration 7.
 - Failure search and metamorphic testing: after iteration 5.
 - Bridge choice (thin node over standard controllers vs a ros2_control controller plugin;
