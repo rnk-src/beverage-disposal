@@ -1,0 +1,19 @@
+Third-party files in this folder
+
+Every file here except NOTICE and PROVENANCE.toml is an unmodified copy of a file from the
+SO-ARM100 project, folder Simulation/SO101:
+
+  repository: https://github.com/TheRobotStudio/SO-ARM100
+  commit:     5f6d2b876a53a4872e405b991dd925556c9e38a4
+  license:    Apache-2.0 (SPDX identifier)
+
+The full text of the Apache License, Version 2.0 is in the LICENSE file next to this one. The
+upstream project publishes no NOTICE file and its LICENSE names no copyright holder.
+
+The rest of this repository is under The Unlicense. This folder is not: the copied files stay under
+the Apache License, Version 2.0. PROVENANCE.toml records the commit and a SHA-256 for every copied
+file, and the tests fail if any of them changes.
+
+The upstream README says the model files were generated with onshape-to-robot from a CAD model in
+Onshape, and that the motor parameters were adapted from the Open Duck Mini project. The licenses
+of those two sources have not been checked.
