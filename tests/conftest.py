@@ -1,11 +1,17 @@
 """Puts this folder on sys.path so shared helper modules import from any subfolder run alone."""
 
+import os
 import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
+
+# git sets GIT_INDEX_FILE and other GIT_* variables for a commit hook. A test that runs git and
+# inherits them would stage into the real repository, so drop them before any test module loads.
+for _name in [name for name in os.environ if name.startswith("GIT_")]:
+    del os.environ[_name]
 
 HERE = str(Path(__file__).resolve().parent)
 if HERE not in sys.path:
