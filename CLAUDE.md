@@ -19,9 +19,10 @@ goes into a bin, a full can goes to a set-aside region on the table.
 ## Current status
 
 - **Iteration 0 (foundations):** 0.1 (repo skeleton) and 0.2 (uv environment and pytest tiers)
-  are committed. 0.3 (ruff and pre-commit), 0.4 (living docs and staleness tests) and 0.5
-  (vendored SO-101 model) are being built in parallel, 0.3 and 0.5 in their own git worktrees.
-  0.6 starts after 0.5 is merged. 0.7 (Gazebo rendering spike) is deferred until requested.
+  are built test-first (red output recorded before each piece of code). 0.3 (ruff and
+  pre-commit), 0.4 (living docs and staleness tests) and 0.5 (vendored SO-101 model) exist as
+  first builds written without a strict red-first record; they are being redone test-first, in
+  parallel. 0.6 starts after that. 0.7 (Gazebo rendering spike) is deferred until requested.
 - Iterations 1 to 8 are planned in detail down to sub-iterations (see Roadmap) and not started.
 - Last updated: 2026-09-24. Update this section in the same change as every sub-iteration.
 
@@ -203,7 +204,7 @@ uv lock --check              # is uv.lock consistent with pyproject.toml?
 ```
 
 Dependencies: ranges in `pyproject.toml`, exact versions in `uv.lock`. Runtime: `mujoco`,
-`numpy`, `gymnasium`. Dev group: `pytest`, `hypothesis`. A test fails if the installed
+`numpy`, `gymnasium`. Dev group: `pytest`, `hypothesis`, `packaging`. A test fails if the installed
 environment drifts from `uv.lock`. To add or upgrade a dependency, edit `pyproject.toml`, run
 `uv lock` then `uv sync`, and commit both files.
 
@@ -218,8 +219,13 @@ tests/                   pytest tests (fast/medium/slow tiers from 0.2)
 assets/                  vendored third-party model files with provenance (from 0.5)
 configs/                 YAML configs (task, training)
 scripts/                 helper scripts (viewer, generators)
+pyproject.toml  uv.lock  .python-version   uv project, exact lockfile, pinned Python
 README.md  CLAUDE.md  LICENSE  .gitignore
 ```
+
+A test allows only known top-level entries to be published (`PROJECT_TOP_LEVEL` in
+`tests/test_publishable_set.py`). When a legitimate new top-level file or folder appears, add it
+there in the same change.
 
 Ignored by the published ignore file: `.venv`, `runs/`, caches, editor and OS files. Owner-only
 files (study notes, private context file, unpublished tests) are ignored through the clone's

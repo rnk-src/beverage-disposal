@@ -18,3 +18,15 @@ def repo(tmp_path):
         pytest.skip("git is not installed")
     subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
     return tmp_path
+
+
+TIERS = ("fast", "medium", "slow")
+
+
+def pytest_collection_modifyitems(items):
+    for item in items:
+        tiers = [tier for tier in TIERS if item.get_closest_marker(tier)]
+        if len(tiers) > 1:
+            raise pytest.UsageError(f"{item.nodeid} has more than one tier marker: {tiers}")
+        if not tiers:
+            item.add_marker(pytest.mark.fast)
