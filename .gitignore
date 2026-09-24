@@ -1,0 +1,14 @@
+.venv
+__pycache__
+.pytest_cache
+
+# Training output
+/runs
+
+# Editor and OS files
+.DS_Store
+.idea
+.vscode
+
+# Per-machine Claude Code settings
+.claude/settings.local.json
