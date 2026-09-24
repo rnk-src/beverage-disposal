@@ -1,13 +1,12 @@
 """The Python version the project allows and pins."""
 
 import tomllib
-from pathlib import Path
 
 import pytest
 from packaging.specifiers import SpecifierSet
 from packaging.version import Version
+from support.paths import ROOT
 
-ROOT = Path(__file__).resolve().parents[1]
 REQUIRES_PYTHON = SpecifierSet(
     tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]["requires-python"]
 )

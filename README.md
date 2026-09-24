@@ -16,13 +16,14 @@ by feel, and dispose of it: empty cans go in a bin, full cans go to a set-aside 
 ## Running the checks
 
 ```bash
-python3 -m pytest tests/test_repo_hygiene.py -q
+uv sync         # reproducible environment from uv.lock (Python 3.12)
+uv run pytest   # fast and medium tiers
 ```
 
-A reproducible Python environment (`uv`, Python 3.12) arrives in the next sub-iteration;
-this section will then become `uv sync && uv run pytest`.
+`uv run pre-commit install` (once per clone) makes every commit run ruff and the fast tests.
+`make check` runs every gate.
 
 ## License
 
-[The Unlicense](LICENSE) (public domain). Third-party model files, when added, keep their
-own licenses and are listed with their provenance.
+[The Unlicense](LICENSE) (public domain). The vendored SO-101 model files under
+`assets/so101/` keep their own license (Apache-2.0); their provenance is recorded there.

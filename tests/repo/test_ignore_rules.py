@@ -1,11 +1,8 @@
 """What the published ignore file does, checked through git itself."""
 
-from pathlib import Path
-
 import pytest
-from gitenv import ignored_by_published_file, is_ignored, needs_git_work_tree
-
-ROOT = Path(__file__).resolve().parents[1]
+from support.gitenv import ignored_by_published_file, is_ignored, needs_git_work_tree
+from support.paths import ROOT
 
 pytestmark = needs_git_work_tree
 

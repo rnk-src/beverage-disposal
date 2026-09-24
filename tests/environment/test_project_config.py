@@ -2,11 +2,10 @@
 
 import re
 import tomllib
-from pathlib import Path
 
 import pytest
+from support.paths import ROOT
 
-ROOT = Path(__file__).resolve().parents[1]
 PYPROJECT = tomllib.loads((ROOT / "pyproject.toml").read_text())
 
 RUNTIME = {"mujoco", "numpy", "gymnasium"}

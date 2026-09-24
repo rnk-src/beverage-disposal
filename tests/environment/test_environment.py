@@ -7,10 +7,9 @@ import subprocess
 import sys
 from pathlib import Path
 
-import lockversions
 import pytest
-
-ROOT = Path(__file__).resolve().parents[1]
+from support import lockversions
+from support.paths import ROOT
 
 
 def test_tests_run_on_python_3_12():

@@ -3,11 +3,10 @@
 import hashlib
 import re
 import tomllib
-from pathlib import Path
 
 from so101 import referenced_meshes
+from support.paths import ROOT
 
-ROOT = Path(__file__).resolve().parents[1]
 SO101 = ROOT / "assets" / "so101"
 
 

@@ -4,9 +4,10 @@ import os
 import re
 import shutil
 import subprocess
-from pathlib import Path
 
 import pytest
+
+from support.paths import ROOT
 
 # Git reads nothing outside the repo, so a rule in someone's global ignore cannot change the answer.
 # Git also sets GIT_INDEX_FILE and friends for a hook that runs during a commit; inherited here they
@@ -72,6 +73,6 @@ def is_git_work_tree(path):
 
 # Tests that ask git questions about this repo are skipped on an exported copy with no .git.
 needs_git_work_tree = pytest.mark.skipif(
-    not is_git_work_tree(Path(__file__).resolve().parents[1]),
+    not is_git_work_tree(ROOT),
     reason="not inside a git work tree",
 )

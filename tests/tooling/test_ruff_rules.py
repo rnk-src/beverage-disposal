@@ -1,7 +1,7 @@
 """What the configured lint rules catch, checked on tiny one-defect snippets."""
 
 import pytest
-from ruffrun import lint_codes
+from support.ruffrun import lint_codes
 
 # 100 characters wide, and 101: the line-length limit is 100.
 LINE_100 = 'x = "' + "a" * 94 + '"\n'

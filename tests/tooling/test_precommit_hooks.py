@@ -3,12 +3,10 @@
 import shutil
 import subprocess
 import sys
-from pathlib import Path
 
 import pytest
-from gitenv import ISOLATED_GIT
-
-ROOT = Path(__file__).resolve().parents[1]
+from support.gitenv import ISOLATED_GIT
+from support.paths import ROOT
 
 # The hooks call git and uv, so without either there is nothing to run them against.
 pytestmark = pytest.mark.skipif(

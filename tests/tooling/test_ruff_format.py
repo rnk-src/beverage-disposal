@@ -1,7 +1,7 @@
 """What the configured formatter does, checked on tiny snippets."""
 
 import pytest
-from ruffrun import formatted
+from support.ruffrun import formatted
 
 
 def call_of_width(columns):

@@ -1,15 +1,13 @@
 """Published docs must not carry anything that identifies a person or a machine."""
 
-from pathlib import Path
-
 import pytest
-from gitenv import needs_git_work_tree, publishable_files
-from scanning import find_leaks_in_files, find_private_looking_text
-
-ROOT = Path(__file__).resolve().parents[1]
-
-# These files hold fake paths and addresses on purpose, as sample data for the scanner tests.
-SCANNER_SAMPLE_DATA = ["tests/test_docs_stay_generic.py", "tests/test_so101_leaks.py"]
+from support.gitenv import needs_git_work_tree, publishable_files
+from support.paths import ROOT
+from support.scanning import (
+    SCANNER_SAMPLE_DATA,
+    find_leaks_in_files,
+    find_private_looking_text,
+)
 
 
 @pytest.mark.parametrize(

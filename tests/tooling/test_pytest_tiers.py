@@ -4,18 +4,15 @@ import shutil
 import subprocess
 import sys
 import textwrap
-from pathlib import Path
 
 import pytest
-
-TESTS = Path(__file__).resolve().parent
-ROOT = TESTS.parent
+from support.paths import ROOT
 
 
 def run_inner_pytest(tmp_path, test_source, *args):
     """Run pytest in a scratch folder that uses this project's real pyproject.toml and conftest."""
     shutil.copy(ROOT / "pyproject.toml", tmp_path / "pyproject.toml")
-    shutil.copy(TESTS / "conftest.py", tmp_path / "conftest.py")
+    shutil.copy(ROOT / "tests" / "conftest.py", tmp_path / "conftest.py")
     (tmp_path / "test_inner.py").write_text(textwrap.dedent(test_source))
     return subprocess.run(
         [sys.executable, "-m", "pytest", "-p", "no:cacheprovider", "--color=no", *args],
