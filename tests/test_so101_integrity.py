@@ -108,7 +108,9 @@ def test_a_missing_notice_is_reported(folder):
         ("license", "spdx", "GPL-3.0"),
     ],
 )
-def test_a_notice_that_no_longer_matches_the_provenance_is_reported(folder, section, field, other_value):
+def test_a_notice_that_no_longer_matches_the_provenance_is_reported(
+    folder, section, field, other_value
+):
     provenance = folder / "PROVENANCE.toml"
     text = provenance.read_text()
     old = re.search(rf'{field} = "([^"]+)"', text).group(1)
@@ -117,7 +119,9 @@ def test_a_notice_that_no_longer_matches_the_provenance_is_reported(folder, sect
 
 
 def test_a_license_file_that_is_not_the_recorded_license_is_reported(folder):
-    (folder / "LICENSE").write_text("MIT License\n\nPermission is hereby granted, free of charge.\n")
+    (folder / "LICENSE").write_text(
+        "MIT License\n\nPermission is hereby granted, free of charge.\n"
+    )
     digest = hashlib.sha256((folder / "LICENSE").read_bytes()).hexdigest()
     provenance = folder / "PROVENANCE.toml"
     text = provenance.read_text()

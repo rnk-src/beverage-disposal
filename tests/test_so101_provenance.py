@@ -28,7 +28,8 @@ def test_provenance_names_the_upstream_source_license_and_calibration():
     assert record["model"]["urdf"] == "so101_new_calib.urdf"
 
 
-# Deliberately not the checker's own hashing helper: this test is the independent second opinion on it.
+# Deliberately not the checker's own hashing helper: this test is the independent second
+# opinion on it.
 def sha256(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 

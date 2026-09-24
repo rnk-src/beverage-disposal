@@ -10,7 +10,9 @@ from pathlib import Path
 import mujoco
 
 # SO101_DIR lets a test run the model tests against a damaged copy, to prove they can fail.
-SO101 = Path(os.environ.get("SO101_DIR") or Path(__file__).resolve().parents[1] / "assets" / "so101")
+SO101 = Path(
+    os.environ.get("SO101_DIR") or Path(__file__).resolve().parents[1] / "assets" / "so101"
+)
 MJCF = "so101_new_calib.xml"
 URDF = "so101_new_calib.urdf"
 
@@ -46,7 +48,10 @@ def urdf_facts(root):
         "revolute": [j.get("name") for j in revolute],
         "fixed": [j.get("name") for j in joints if j.get("type") == "fixed"],
         "limits": {
-            j.get("name"): (float(j.find("limit").get("lower")), float(j.find("limit").get("upper")))
+            j.get("name"): (
+                float(j.find("limit").get("lower")),
+                float(j.find("limit").get("upper")),
+            )
             for j in revolute
         },
     }
@@ -114,7 +119,11 @@ def integrity_problems(root):
     if not notice.is_file():
         problems.append("NOTICE is missing")
     else:
-        for section, key in [("upstream", "repository"), ("upstream", "commit"), ("license", "spdx")]:
+        for section, key in [
+            ("upstream", "repository"),
+            ("upstream", "commit"),
+            ("license", "spdx"),
+        ]:
             value = record.get(section, {}).get(key)
             if value is not None and str(value) not in notice.read_text():
                 problems.append(f"NOTICE does not mention {section}.{key}")
