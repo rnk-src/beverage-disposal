@@ -28,10 +28,11 @@ goes into a bin, a full can goes to a set-aside region on the table.
   `docker/gazebo/Dockerfile` (base image pinned by digest, installed package versions recorded), and
   a falling ball steps in Gazebo to the same 0.0495405 m drop at 0.1 s as in MuJoCo. A ball landing on the
   ground and a block on a slope also agree with physics formulas and with MuJoCo, and the measured differences
-  between the engines (impact, friction combination, static friction) are kept for 7.5. Next: iteration 1, only
-  when the owner names it.
-- Iterations 1 to 8 are planned in detail down to sub-iterations (see Roadmap) and not started.
-- Last updated: 2026-09-24. Update this section in the same change as every sub-iteration.
+  between the engines (impact, friction combination, static friction) are kept for 7.5.
+- **Iteration 1 (kinematics and end-effector control):** named by the owner on 2026-09-25 and built
+  one sub-iteration per session, each on its own branch (rule 9), starting with 1.1.
+- Iterations 2 to 8 are planned in detail down to sub-iterations (see Roadmap) and not started.
+- Last updated: 2026-09-25. Update this section in the same change as every sub-iteration.
 
 ## Locked decisions
 
@@ -154,6 +155,13 @@ Each label is a stable name; the owner's private decision journal uses the same 
 8. **Comments read like a person wrote them.** Explain why, not what: a reason, a gotcha, a unit
    or a source. Skip comments that restate the code, skip essays, and skip banner decoration.
    One or two natural sentences is usually enough, and plenty of code needs none.
+9. **Branches, never `main`.** No direct work on `main`. Each sub-iteration is a branch cut from
+   `main` and named `iter<N>/<N.M>-<slug>` (`docs/`, `fix/` or `chore/` for other work), worked in
+   the main checkout; worktrees are for parallel tasks only (rule 7). The owner merges into `main`
+   with a merge commit (`git merge --no-ff`) so a sub-iteration stays one visible unit. A local
+   `no-commit-to-branch` pre-commit hook refuses commits on `main`; it only takes effect after
+   `uv run pre-commit install`, and it does not block the owner's merge commits (a merge uses a
+   different git hook, tested).
 
 ### Testing layers
 
@@ -250,8 +258,8 @@ locked" sentence above disagrees with it, so update both together when a depende
 `uv lock` then `uv sync`, and commit both files.
 
 Test tiers: an unmarked test is `fast`; a test may carry at most one of `fast`, `medium`,
-`slow`; misspelled markers are errors. The pre-commit hooks run ruff check, ruff format and the
-fast tier (an unmarked test counts as fast, so that is most of the suite). The format hook
+`slow`; misspelled markers are errors. The pre-commit hooks run ruff check, ruff format, the
+fast tier (an unmarked test counts as fast, so that is most of the suite) and the `main` guard. The format hook
 rewrites files and stops the commit so you re-stage them.
 
 ## Layout

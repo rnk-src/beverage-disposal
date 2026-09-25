@@ -69,7 +69,9 @@ def base_repo(tmp_path_factory, hook_env):
 
 
 def reset(repo):
-    git(repo, "reset", "-q", "--hard")
+    # Back to the root commit, not HEAD: a test that commits would otherwise move the base.
+    root = git(repo, "rev-list", "--max-parents=0", "HEAD").stdout.strip()
+    git(repo, "reset", "-q", "--hard", root)
     git(repo, "clean", "-fdq")
 
 
@@ -164,3 +166,60 @@ def test_an_installed_hook_blocks_a_bad_commit_and_lets_a_clean_one_through(repo
         assert git(repo, "rev-list", "--count", "HEAD").stdout.strip() == "2"
     finally:
         pre_commit(repo, hook_env, "uninstall")
+
+
+def current_branch(repo):
+    return git(repo, "branch", "--show-current").stdout.strip()
+
+
+def test_the_branch_hook_refuses_to_commit_on_main(repo, hook_env):
+    original = current_branch(repo)
+    try:
+        assert git(repo, "switch", "-q", "-C", "main").returncode == 0
+        result = pre_commit(repo, hook_env, "run", "no-commit-to-branch")
+        # A missing hook id also exits 1, so insist the hook ran and reported a failure.
+        assert "No hook with id" not in output(result), output(result)
+        assert "Failed" in output(result), output(result)
+        assert result.returncode == 1, output(result)
+    finally:
+        git(repo, "switch", "-q", original)
+
+
+def test_the_branch_hook_allows_other_branches_even_with_main_in_the_name(repo, hook_env):
+    original = current_branch(repo)
+    try:
+        assert git(repo, "switch", "-q", "-c", "docs/main-notes").returncode == 0
+        result = pre_commit(repo, hook_env, "run", "no-commit-to-branch")
+        assert "Passed" in output(result), output(result)
+        assert result.returncode == 0, output(result)
+    finally:
+        git(repo, "switch", "-q", original)
+        git(repo, "branch", "-q", "-D", "docs/main-notes")
+
+
+def test_an_installed_hook_still_lets_a_no_ff_merge_into_main_through(repo, hook_env):
+    original = current_branch(repo)
+    assert pre_commit(repo, hook_env, "install").returncode == 0
+    try:
+        assert git(repo, "switch", "-q", "-C", "main").returncode == 0
+        assert git(repo, "switch", "-q", "-c", "iter/work").returncode == 0
+        # A passing test is staged so the fast tests hook cannot be what blocks the commit.
+        (repo / "tests" / "test_on_branch.py").write_text("def test_it():\n    pass\n")
+        git(repo, "add", "tests/test_on_branch.py")
+        committed = git(repo, "commit", "-q", "-m", "work", env=hook_env)
+        assert committed.returncode == 0, output(committed)
+        git(repo, "switch", "-q", "main")
+        merged = git(repo, "merge", "--no-ff", "-q", "-m", "merge", "iter/work", env=hook_env)
+        assert merged.returncode == 0, output(merged)
+        assert len(git(repo, "log", "-1", "--format=%p").stdout.split()) == 2  # two parents
+    finally:
+        pre_commit(repo, hook_env, "uninstall")
+        git(repo, "switch", "-q", original)
+        git(repo, "branch", "-q", "-D", "iter/work")
+        git(repo, "branch", "-q", "-D", "main")
+
+
+def test_every_test_starts_from_the_single_base_commit(repo):
+    # Runs after the tests that commit into the shared repo, so it fails if they leak.
+    assert git(repo, "rev-list", "--count", "HEAD").stdout.strip() == "1"
+    assert not (repo / "tests" / "test_ok.py").exists()
