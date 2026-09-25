@@ -2,8 +2,8 @@
 
 import mujoco
 import numpy as np
-from so101 import MJCF, SO101
 from support.images import foreground_fraction
+from support.so101 import MJCF, SO101
 
 WIDTH, HEIGHT = 320, 240
 

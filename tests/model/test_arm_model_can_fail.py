@@ -1,7 +1,7 @@
 """The arm model tests are run against mutated copies of our package and must notice."""
 
 import pytest
-from damage import assert_the_test_failed, edit, run_on_mutated_package
+from support.damage import assert_the_test_failed, edit, run_on_mutated_package
 
 ARM_TESTS = "tests/model/test_arm_model.py"
 ARM = "sim/arm.py"

@@ -1,0 +1,126 @@
+"""The kinematics tests must notice a mutated package or a damaged model, one fault at a time."""
+
+import pytest
+from support.damage import (
+    assert_the_test_failed,
+    edit,
+    run_on_damaged_copy,
+    run_on_mutated_package,
+)
+from support.so101 import MJCF
+
+FK_TESTS = "tests/kinematics/test_forward_kinematics.py"
+CHAIN_TESTS = "tests/kinematics/test_chain_file.py"
+CORE_TESTS = "tests/kinematics/test_core_needs_no_mujoco.py"
+CHAIN_FILE = "core/so101_chain.json"
+KINEMATICS = "core/kinematics.py"
+
+TCP_OFFSET = '"offset": [\n      0.0,\n      0.0,\n      -0.0981274\n    ]'
+TCP_ROTATION = (
+    '"rotation": [\n      [\n        1.0,\n        0.0,\n        0.0\n      ],\n'
+    "      [\n        0.0,\n        -1.0,\n        0.0\n      ],\n"
+    "      [\n        0.0,\n        0.0,\n        -1.0\n      ]\n    ]"
+)
+
+
+def put_the_tcp_on_gripperframe(package):
+    # Upstream's frame on the fixed pad, 7.9 mm off the roll axis: the TCP moves 7.9 mm everywhere.
+    edit(
+        package,
+        CHAIN_FILE,
+        TCP_OFFSET,
+        TCP_OFFSET.replace("0.0,\n      0.0,", "-0.0079,\n      -0.000218121,"),
+    )
+
+
+def leave_the_tcp_frame_unturned(package):
+    # Identity instead of the half turn about x: the TCP's frame is wrong but its origin is not.
+    edit(package, CHAIN_FILE, TCP_ROTATION, TCP_ROTATION.replace("-1.0", "1.0"))
+
+
+def point_home_straight_up(package):
+    edit(package, CHAIN_FILE, "1.5707963267948966", "-1.5707963267948966")
+
+
+def turn_every_joint_the_wrong_way(package):
+    edit(package, KINEMATICS, "link @ _turn_about_z(angle)", "link @ _turn_about_z(-angle)")
+
+
+def import_mujoco_in_the_core(package):
+    edit(
+        package,
+        KINEMATICS,
+        "import numpy as np\n",
+        "import mujoco  # noqa: F401\nimport numpy as np\n",
+    )
+
+
+MUTANTS = [
+    (
+        put_the_tcp_on_gripperframe,
+        FK_TESTS,
+        "test_fk_puts_the_tcp_where_mujoco_does_over_random_in_limit_poses",
+    ),
+    (
+        leave_the_tcp_frame_unturned,
+        FK_TESTS,
+        "test_fk_turns_the_tcp_frame_the_way_mujoco_does_over_random_in_limit_poses",
+    ),
+    (
+        point_home_straight_up,
+        FK_TESTS,
+        "test_the_home_pose_holds_the_tcp_under_the_wrist_pointing_straight_down",
+    ),
+    (
+        turn_every_joint_the_wrong_way,
+        FK_TESTS,
+        "test_turning_the_pan_joint_turns_the_tcp_by_the_same_angle_about_the_pan_axis",
+    ),
+    (put_the_tcp_on_gripperframe, FK_TESTS, "test_rolling_the_wrist_leaves_the_tcp_where_it_is"),
+    (
+        import_mujoco_in_the_core,
+        CORE_TESTS,
+        "test_forward_kinematics_imports_and_runs_with_mujoco_unavailable",
+    ),
+]
+
+
+@pytest.mark.parametrize(
+    ("fault", "test_module", "failing_test"),
+    MUTANTS,
+    ids=[f"{f.__name__}-{t[5:40]}" for f, _, t in MUTANTS],
+)
+def test_the_kinematics_tests_fail_on_a_mutated_package(tmp_path, fault, test_module, failing_test):
+    result = run_on_mutated_package(tmp_path, test_module, fault)
+    assert_the_test_failed(result, test_module, failing_test)
+
+
+def narrow_the_elbow_range(folder):
+    edit(
+        folder,
+        MJCF,
+        'name="elbow_flex" type="hinge" range="-1.69 1.69"',
+        'name="elbow_flex" type="hinge" range="-1.5 1.5"',
+    )
+
+
+def move_the_shoulder_one_millimetre(folder):
+    # What an upstream model update looks like to the frozen file.
+    edit(folder, MJCF, 'pos="0.0388353 -8.97657e-09 0.0624"', 'pos="0.0398353 -8.97657e-09 0.0624"')
+
+
+DAMAGES = [
+    (narrow_the_elbow_range, "test_the_chain_lists_the_five_arm_joints_in_order_with_their_limits"),
+    (
+        move_the_shoulder_one_millimetre,
+        "test_the_committed_chain_file_is_what_the_generator_writes_from_the_model_today",
+    ),
+]
+
+
+@pytest.mark.parametrize(
+    ("fault", "failing_test"), DAMAGES, ids=[f"{f.__name__}-{t[5:40]}" for f, t in DAMAGES]
+)
+def test_the_chain_file_tests_fail_on_a_damaged_model(tmp_path, fault, failing_test):
+    result = run_on_damaged_copy(tmp_path, CHAIN_TESTS, fault)
+    assert_the_test_failed(result, CHAIN_TESTS, failing_test)

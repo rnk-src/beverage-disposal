@@ -1,6 +1,7 @@
 """Reads facts out of the vendored SO-101 files, so tests can also point it at a damaged copy."""
 
 import hashlib
+import math
 import os
 import re
 import tomllib
@@ -8,12 +9,25 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import mujoco
+
 from support.paths import ROOT
 
 # SO101_DIR lets a test run the model tests against a damaged copy, to prove they can fail.
 SO101 = Path(os.environ.get("SO101_DIR") or ROOT / "assets" / "so101")
 MJCF = "so101_new_calib.xml"
 URDF = "so101_new_calib.urdf"
+
+JOINTS = ["shoulder_pan", "shoulder_lift", "elbow_flex", "wrist_flex", "wrist_roll", "gripper"]
+
+# Radians. Transcribed from the upstream URDF <limit> elements; see the log for the caveat.
+EXPECTED_RANGES = {
+    "shoulder_pan": (-math.radians(110), math.radians(110)),
+    "shoulder_lift": (-math.radians(100), math.radians(100)),
+    "elbow_flex": (-1.69, 1.69),
+    "wrist_flex": (-math.radians(95), math.radians(95)),
+    "wrist_roll": (-2.74385, 2.84121),
+    "gripper": (-math.radians(10), math.radians(100)),
+}
 
 
 def model_facts(root):

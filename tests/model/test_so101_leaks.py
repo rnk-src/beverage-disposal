@@ -3,10 +3,10 @@
 import shutil
 
 import pytest
-from so101 import SO101, URDF
 from support.gitenv import needs_git_work_tree, publishable_files
 from support.paths import ROOT
 from support.scanning import SCANNER_SAMPLE_DATA, find_leaks_in_files
+from support.so101 import SO101, URDF
 
 
 @pytest.mark.parametrize(

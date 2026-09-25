@@ -5,7 +5,7 @@ import re
 import shutil
 
 import pytest
-from so101 import SO101, integrity_problems
+from support.so101 import SO101, integrity_problems
 
 MESH = "assets/base_so101_v2.stl"
 

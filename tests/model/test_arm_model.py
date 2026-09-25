@@ -3,7 +3,7 @@
 import mujoco
 import numpy as np
 import pytest
-from so101 import MJCF, SO101
+from support.so101 import MJCF, SO101
 
 from beverage_disposal.sim.arm import load_arm
 
