@@ -220,10 +220,16 @@ Decisions and ideas to reopen at a specific point:
   or 4.4 shows unstable Q-values or large seed-to-seed variance, run a distributional variant as
   a controlled A/B against that baseline. Not started before then: the RL-algorithm-selection
   paper (arXiv 2407.20917) ranks distributional methods low priority when risk estimation is not
-  needed. Whether SB3 or `sb3-contrib` provides a usable one is unverified.
+  needed. Whether SB3 or `sb3-contrib` provides a usable one is unverified. Squint (below) is a second
+  source: a C51 distributional critic was one of its most useful changes on this exact arm.
 - Two open points from the same paper, to check at 4.1: n-step returns instead of one-step TD
   (favored for sparse rewards or a violated Markov assumption), and seeding the replay buffer
   with scripted-controller demonstrations (the paper warns this can hurt without care).
+- Squint (arXiv 2602.21203, 2026: SAC with a distributional critic, trained in ManiSkill3, zero-shot on
+  the real SO-101 in 73 of 80 trials, with cans among its tasks). The owner wants its techniques used where
+  possible. The owner's local research note (location in the private context file) maps each insight to
+  the sub-iteration it affects; read that row before planning 2.1, 2.3, 3.1, 3.2, 3.4, 3.5, 4.1, 4.3, 4.4,
+  5.2, 5.3, 5.4, 6.1, 7.2 to 7.9, and iteration 8. Code: https://github.com/aalmuzairee/squint (MIT).
 - Range or ultrasound fullness sensor for varied containers (glass bottle, plastic bottle, metal flask,
   can): an idea the owner is interested in pursuing, perhaps in parallel with the main line, as a
   fallback when the joint-load signal is not enough to tell how much liquid a container holds. Parked,
