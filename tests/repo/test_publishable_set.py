@@ -56,6 +56,7 @@ PROJECT_TOP_LEVEL = [
     "README.md",
     "assets",
     "configs",
+    "docker",
     "pyproject.toml",
     "scripts",
     "src",
