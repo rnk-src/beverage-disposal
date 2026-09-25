@@ -69,7 +69,9 @@ def base_repo(tmp_path_factory, hook_env):
 
 
 def reset(repo):
-    git(repo, "reset", "-q", "--hard")
+    # Back to the root commit, not HEAD: a test that commits would otherwise move the base.
+    root = git(repo, "rev-list", "--max-parents=0", "HEAD").stdout.strip()
+    git(repo, "reset", "-q", "--hard", root)
     git(repo, "clean", "-fdq")
 
 
@@ -215,3 +217,9 @@ def test_an_installed_hook_still_lets_a_no_ff_merge_into_main_through(repo, hook
         git(repo, "switch", "-q", original)
         git(repo, "branch", "-q", "-D", "iter/work")
         git(repo, "branch", "-q", "-D", "main")
+
+
+def test_every_test_starts_from_the_single_base_commit(repo):
+    # Runs after the tests that commit into the shared repo, so it fails if they leak.
+    assert git(repo, "rev-list", "--count", "HEAD").stdout.strip() == "1"
+    assert not (repo / "tests" / "test_ok.py").exists()
