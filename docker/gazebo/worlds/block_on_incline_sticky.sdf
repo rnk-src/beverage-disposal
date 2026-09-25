@@ -1,0 +1,38 @@
+<?xml version="1.0"?>
+<sdf version="1.9">
+  <world name="block_on_incline_sticky">
+    <physics name="fixed_step" type="dart">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>0</real_time_factor>
+    </physics>
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+    <gravity>0 0 -9.81</gravity>
+    <!-- The slab's top surface passes through the origin, tilted 30 degrees about y (downhill is
+         +x). Slab centre = origin - 0.1 * normal; the block sits on the surface, centre 0.05 along
+         the normal. Both surfaces share one friction coefficient, so any combination rule gives it. -->
+    <model name="slope">
+      <static>true</static>
+      <pose>-0.0500000 0 -0.0866025 0 0.5235988 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>10 10 0.2</size></box></geometry>
+          <surface><friction><ode><mu>0.7</mu><mu2>0.7</mu2></ode></friction></surface>
+        </collision>
+      </link>
+    </model>
+    <model name="block">
+      <pose>0.0250000 0 0.0433013 0 0.5235988 0</pose>
+      <link name="link">
+        <inertial>
+          <mass>1</mass>
+          <inertia><ixx>0.0042</ixx><iyy>0.0042</iyy><izz>0.0067</izz></inertia>
+        </inertial>
+        <collision name="collision">
+          <geometry><box><size>0.2 0.2 0.1</size></box></geometry>
+          <surface><friction><ode><mu>0.7</mu><mu2>0.7</mu2></ode></friction></surface>
+        </collision>
+      </link>
+    </model>
+  </world>
+</sdf>

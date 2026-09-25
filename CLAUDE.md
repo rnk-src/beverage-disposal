@@ -23,8 +23,13 @@ goes into a bin, a full can goes to a set-aside region on the table.
   test-first, with red output recorded before each piece of code; `main` is that history. The
   earlier first build, written without a red-first record, is kept on the branch `first-build`.
   The tests are organized into topic folders. 0.6 (step and render smoke test, with a viewer
-  script) is built the same way. Next: a narrow 0.7 (does headless Gazebo run in a Docker container on the
-  development Mac) before iteration 1.
+  script) is built the same way. The narrow 0.7 (headless Gazebo Harmonic in a Docker container on the
+  development Mac) is built test-first and awaits the owner's review: the image builds from
+  `docker/gazebo/Dockerfile` (base image pinned by digest, installed package versions recorded), and
+  a falling ball steps in Gazebo to the same 0.0495405 m drop at 0.1 s as in MuJoCo. A ball landing on the
+  ground and a block on a slope also agree with physics formulas and with MuJoCo, and the measured differences
+  between the engines (impact, friction combination, static friction) are kept for 7.5. Next: iteration 1, only
+  when the owner names it.
 - Iterations 1 to 8 are planned in detail down to sub-iterations (see Roadmap) and not started.
 - Last updated: 2026-09-24. Update this section in the same change as every sub-iteration.
 
@@ -234,6 +239,7 @@ uv run ruff format .         # format
 uv run pre-commit install    # once per clone: run ruff and the fast tier before every commit
 uv run python scripts/view_so101.py                   # interactive viewer of the SO-101
 uv run python scripts/view_so101.py --snapshot a.png  # picture of the arm, no window
+uv run pytest tests/gazebo   # Gazebo image tests: need a running Docker daemon, else they skip
 ```
 
 Dependencies: ranges in `pyproject.toml`, exact versions in `uv.lock`. Runtime: `mujoco`,
@@ -252,10 +258,15 @@ rewrites files and stops the commit so you re-stage them.
 
 ```
 src/beverage_disposal/   Python package (placeholder name; ROS-free core arrives here)
+docker/gazebo/           headless Gazebo validation image: Dockerfile, worlds/, step_world.py,
+                         apt-versions.txt (recorded package versions, arm64)
 tests/                   pytest tests (fast/medium/slow tiers), one folder per area:
   repo/                    what git publishes: ignore rules, top-level allowlist, no private text
   environment/             Python pin, dependencies, lockfile, third-party libraries
   tooling/                 pytest tiers, ruff, pre-commit hooks
+  gazebo/                  the Docker image (builds, platform, pinned and recorded versions), the
+                           falling ball, ground and slope checks against physics formulas and MuJoCo,
+                           and proofs the tests can fail (medium tier)
   model/                   the vendored SO-101 model: files, stepping, joint stops, rendering,
                            viewer script (MJCF/URDF consistency arrives in 1.1)
   support/                 shared helpers only (paths, git, scanning); no tests
@@ -285,7 +296,7 @@ update docs.
 
 - **0 Foundations.** 0.1 repo skeleton; 0.2 uv env + pytest tiers; 0.3 ruff + pre-commit;
   0.4 living docs and staleness tests; 0.5 vendored SO-101 model + provenance; 0.6 step and
-  render smoke test; 0.7 Gazebo platform spike (narrow, next).
+  render smoke test; 0.7 Gazebo platform spike (narrow, built).
 - **1 Kinematics and end-effector control.** 1.1 model tests + tip site; 1.2 FK; 1.3 Jacobian;
   1.4 numerical IK; 1.5 EE-delta controller; 1.6 closed loop through PD actuators.
 - **2 World and task tests.** 2.1 scene; 2.2 trajectory recorder + pass-fail/indicative tests;
@@ -307,8 +318,12 @@ update docs.
 
 ## Unverified or open
 
-- Jazzy's system Python version (expected 3.12); arm64 apt packages for `ros_gz` and
-  `gz_ros2_control` on Jazzy; whether Gazebo cameras and lidar render in the container (software rendering; optional).
+- Whether Gazebo cameras and lidar render in the container (software rendering; optional; not
+  tried in 0.7). The base image is pinned by digest and every installed package version is
+  recorded in `docker/gazebo/apt-versions.txt`, which a test compares against the image; the
+  record is for arm64, so an amd64 machine needs its own, and a rebuild that pulls newer packages fails that test until the record is regenerated.
+  Settled by 0.7 on this Mac: Jazzy's system Python is 3.12.3, and `ros-jazzy-ros-gz-sim`,
+  `ros-jazzy-ros-gz-bridge` and `ros-jazzy-gz-ros2-control` install as arm64 binaries (Gazebo Sim 8.15.0).
 - STS3215 servo parameters: the vendored MJCF uses kp 998.22, kv 2.731 and a +-3.35 N*m force
   limit (its class default says +-2.94, each actuator overrides it), while the upstream
   `joints_properties.xml` says kp 17.8 and kv 0. Their origin is a third-party README and is

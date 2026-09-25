@@ -7,7 +7,7 @@ from support.paths import ROOT
 pytestmark = needs_git_work_tree
 
 # Add a folder here when a new area of the project gets its own tests.
-ALLOWED_IN_TESTS = ["conftest.py", "support", "repo", "environment", "tooling", "model"]
+ALLOWED_IN_TESTS = ["conftest.py", "support", "repo", "environment", "tooling", "model", "gazebo"]
 
 
 def test_only_approved_entries_sit_directly_in_the_tests_folder():
