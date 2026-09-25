@@ -6,11 +6,11 @@ import subprocess
 import sys
 
 import numpy as np
-from damage import edit
 from PIL import Image
-from so101 import SO101
+from support.damage import edit
 from support.images import foreground_fraction
 from support.paths import ROOT
+from support.so101 import SO101
 
 SCRIPT = ROOT / "scripts" / "view_so101.py"
 

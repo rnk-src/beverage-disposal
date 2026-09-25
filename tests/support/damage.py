@@ -5,8 +5,8 @@ import shutil
 import subprocess
 import sys
 
-from so101 import SO101
 from support.paths import ROOT
+from support.so101 import SO101
 
 
 def edit(folder, name, old, new):

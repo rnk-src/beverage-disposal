@@ -1,7 +1,7 @@
 """The model tests are run against damaged copies of the model and must notice the damage."""
 
 import pytest
-from damage import assert_the_test_failed, edit, run_on_damaged_copy
+from support.damage import assert_the_test_failed, edit, run_on_damaged_copy
 
 MODEL_TESTS = "tests/model/test_so101_model.py"
 

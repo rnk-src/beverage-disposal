@@ -32,7 +32,9 @@ goes into a bin, a full can goes to a set-aside region on the table.
 - **Iteration 1 (kinematics and end-effector control):** named by the owner on 2026-09-25 and built
   one sub-iteration per session, each on its own branch (rule 9). 1.1 (model tests and the TCP site) is
   built test-first and merged into `main`: a loader adds the TCP site to the vendored model, and MJCF and
-  URDF are tested to agree on link poses and masses. 1.2 (forward kinematics) is next.
+  URDF are tested to agree on link poses and masses. 1.2 (forward kinematics) is built test-first on
+  `iter1/1.2-forward-kinematics` and awaits the owner's review: pure-NumPy FK from a generated,
+  frozen chain file, matching MuJoCo's TCP pose to 1e-9 over 1000 random poses. 1.3 (Jacobian) is next.
 - Iterations 2 to 8 are planned in detail down to sub-iterations (see Roadmap) and not started.
 - Last updated: 2026-09-25. Update this section in the same change as every sub-iteration.
 
@@ -70,7 +72,9 @@ Each label is a stable name; the owner's private decision journal uses the same 
   folds to about 1.5 rad, so the elbow's upper range limit (1.69 rad) is not reachable; and a fresh
   `MjData` renders blank until `mj_forward` (or a step) has computed the body positions. Upstream's
   `gripperframe` site sits on the fixed jaw's inner face, 7.9 mm off the wrist-roll axis; at gripper
-  angle 0 the moving jaw's face mirrors it, so the jaws are 15.8 mm apart there.
+  angle 0 the moving jaw's face mirrors it, so the jaws are 15.8 mm apart there. Every arm joint turns
+  about its own body's z axis, and the shoulder-pan axis points straight down in the base frame, so a
+  positive pan angle turns the arm clockwise seen from above.
 - **Observations:** state-based first, designed so a camera can be added later. Measured joints,
   velocities, commanded joint targets, noisy joint load, tip position (our FK), can position
   relative to the tip, vector to the current destination, destination flag, previous action,
@@ -88,7 +92,12 @@ Each label is a stable name; the owner's private decision journal uses the same 
   finger pads at gripper angle 0: on the wrist-roll axis, at the depth of upstream's `gripperframe`
   (98.1 mm from the gripper body origin), fixed to the gripper body; its z axis points out of the tool
   towards the fingertips and its x axis towards the moving jaw. A closed-form planar IK and the `mink`
-  library exist in tests only, as oracles.
+  library exist in tests only, as oracles. The geometry reaches the NumPy side as a frozen JSON chain
+  file (the robot spec: per-joint offsets, rotations and limits, the TCP, the home pose), generated
+  from MuJoCo by a script and checked for staleness; the generator refuses any joint that is not a
+  hinge about its body's z axis through the body origin. FK works in the arm's base frame and returns
+  the full 4x4 TCP pose. Home pose: every joint 0 except wrist flex at +90 degrees, which holds the TCP
+  at about (0.232, 0.000, 0.075) m, pointing straight down.
 - **Actuators:** start from the servo data in the official files, verify by step-response tests
   (rise time, overshoot, settling, steady-state error), store the reference numbers so Gazebo can
   be matched to them.
@@ -264,6 +273,7 @@ uv run ruff format .         # format
 uv run pre-commit install    # once per clone: run ruff and the fast tier before every commit
 uv run python scripts/view_so101.py                   # interactive viewer of the SO-101
 uv run python scripts/view_so101.py --snapshot a.png  # picture of the arm, no window
+uv run python scripts/generate_so101_chain.py        # rewrite the frozen chain file after a model change
 uv run pytest tests/gazebo   # Gazebo image tests: need a running Docker daemon, else they skip
 ```
 
@@ -282,7 +292,9 @@ rewrites files and stops the commit so you re-stage them.
 ## Layout
 
 ```
-src/beverage_disposal/   Python package (placeholder name; ROS-free core arrives here)
+src/beverage_disposal/   Python package (placeholder name)
+  core/                    the ROS-free core (no MuJoCo): kinematics.py (FK) and so101_chain.json,
+                           the generated, frozen robot spec it reads
   sim/                     the MuJoCo side: arm.py loads the vendored arm and adds the TCP site
 docker/gazebo/           headless Gazebo validation image: Dockerfile, worlds/, step_world.py,
                          apt-versions.txt (recorded package versions, arm64)
@@ -294,13 +306,15 @@ tests/                   pytest tests (fast/medium/slow tiers), one folder per a
                            falling ball, ground and slope checks against physics formulas and MuJoCo,
                            and proofs the tests can fail (medium tier)
   model/                   the vendored SO-101 model: files, stepping, joint stops, rendering,
-                           viewer script, MJCF/URDF agreement; our arm model and its TCP site;
-                           damaged-copy and mutated-package harnesses that prove the tests can fail
-  support/                 shared helpers only (paths, git, scanning); no tests
+                           viewer script, MJCF/URDF agreement; our arm model and its TCP site
+  kinematics/              FK against MuJoCo, the home pose, pan and roll properties, the core without
+                           MuJoCo, the chain file's generator and staleness, and their can-fail proofs
+  support/                 shared helpers only (paths, git, scanning, the SO-101 facts and the
+                           damaged-copy and mutated-package harnesses); no tests
   conftest.py              tier hook and shared fixtures
 assets/                  vendored third-party files with provenance (the SO-101 model)
 configs/                 YAML configs (task, training)
-scripts/                 helper scripts (view_so101.py; generators later)
+scripts/                 helper scripts (view_so101.py, generate_so101_chain.py)
 pyproject.toml  uv.lock  .python-version   uv project, exact lockfile, pinned Python
 .pre-commit-config.yaml                    git hooks (ruff, fast tests)
 README.md  CLAUDE.md  LICENSE  .gitignore

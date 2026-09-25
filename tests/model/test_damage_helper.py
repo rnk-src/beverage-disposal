@@ -1,7 +1,7 @@
 """The damaged-copy harness must not pass when the damage is missing or the wrong test fails."""
 
 import pytest
-from damage import assert_the_test_failed, edit, run_on_damaged_copy, run_on_mutated_package
+from support.damage import assert_the_test_failed, edit, run_on_damaged_copy, run_on_mutated_package
 
 STEP_TESTS = "tests/model/test_so101_steps.py"
 POSE_TEST = "test_the_arm_holds_its_rest_pose_under_gravity"
