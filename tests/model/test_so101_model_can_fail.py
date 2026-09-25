@@ -85,6 +85,28 @@ def give_the_base_a_collision_mesh(folder):
     )
 
 
+def flip_the_elbow_axis_in_the_urdf(folder):
+    edit(
+        folder,
+        "so101_new_calib.urdf",
+        '<child link="lower_arm_link"/>\n    <axis xyz="0 0 1"/>',
+        '<child link="lower_arm_link"/>\n    <axis xyz="0 0 -1"/>',
+    )
+
+
+def move_the_elbow_origin_in_the_urdf_by_a_millimetre(folder):
+    edit(
+        folder,
+        "so101_new_calib.urdf",
+        'xyz="-0.11257 -0.028 1.73763e-16"',
+        'xyz="-0.11357 -0.028 1.73763e-16"',
+    )
+
+
+def change_a_link_mass_in_the_urdf(folder):
+    edit(folder, "so101_new_calib.urdf", '<mass value="0.104"/>', '<mass value="0.204"/>')
+
+
 FAULTS = [
     (
         rename_joint_in_mjcf,
@@ -118,6 +140,12 @@ FAULTS = [
     ),
     (remove_the_gripper_frame_site, "test_the_named_frames_exist[gripperframe]"),
     (give_the_base_a_collision_mesh, "test_only_the_base_has_no_colliding_geometry"),
+    (flip_the_elbow_axis_in_the_urdf, "test_the_urdf_puts_every_link_where_the_mjcf_does"),
+    (
+        move_the_elbow_origin_in_the_urdf_by_a_millimetre,
+        "test_the_urdf_puts_every_link_where_the_mjcf_does",
+    ),
+    (change_a_link_mass_in_the_urdf, "test_every_link_has_the_same_mass_in_the_mjcf_and_the_urdf"),
 ]
 
 
