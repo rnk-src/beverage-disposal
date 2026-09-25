@@ -79,7 +79,8 @@ Each label is a stable name; the owner's private decision journal uses the same 
   against MuJoCo. Damped least-squares with a null-space projector and strict task priority:
   tip position first, top-down pitch second, wrist roll locked. Pitch is the angle of the grasp
   axis below horizontal, positive down (top-down = +90 degrees). TCP is the midpoint between the
-  finger pads on the grasp axis. A closed-form planar IK exists in tests only, as an oracle.
+  finger pads on the grasp axis. A closed-form planar IK and the `mink`
+  library exist in tests only, as oracles.
 - **Actuators:** start from the servo data in the official files, verify by step-response tests
   (rise time, overshoot, settling, steady-state error), store the reference numbers so Gazebo can
   be matched to them.
@@ -227,7 +228,9 @@ Decisions and ideas to reopen at a specific point:
 - Failure search and metamorphic testing: after iteration 5.
 - Bridge choice (thin node over standard controllers vs a ros2_control controller plugin;
   `mujoco_ros2_control` only as the 7.4 integration test): decide at 7.3.
-- `mink` library instead of our own IK: only if joint-limit or singularity problems appear.
+- `mink` library instead of our own IK: only if joint-limit or singularity problems appear. Until then
+  mink is a test oracle only (added as a dev dependency in 1.4, test-first); it needs MuJoCo at runtime, so
+  it cannot live in the ROS-free core.
 - Hydra / Weights & Biases: when sweeping many runs.
 - Scripted-controller demonstrations for imitation-assisted RL: only if the grasp stage stalls.
 
