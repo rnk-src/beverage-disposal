@@ -18,3 +18,13 @@ repos:
         entry: uv run --frozen pytest -m fast -q
         language: system
         pass_filenames: false
+      # Local rather than the pre-commit-hooks repo's version, so nothing is cloned. Commits go on
+      # a branch; merge commits use a different git hook and are not affected.
+      - id: no-commit-to-branch
+        name: no commit to main
+        entry: >-
+          sh -c 'test "$(git branch --show-current)" != main
+          || { echo "on main, switch to a branch"; exit 1; }'
+        language: system
+        always_run: true
+        pass_filenames: false
