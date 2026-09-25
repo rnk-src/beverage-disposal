@@ -6,7 +6,7 @@ import xml.etree.ElementTree as ET
 import mujoco
 import numpy as np
 import pytest
-from so101 import MJCF, SO101, model_facts, referenced_meshes, urdf_facts
+from so101 import MJCF, SO101, URDF, model_facts, referenced_meshes, urdf_facts
 
 JOINTS = ["shoulder_pan", "shoulder_lift", "elbow_flex", "wrist_flex", "wrist_roll", "gripper"]
 
@@ -96,3 +96,43 @@ def test_only_the_base_has_no_colliding_geometry(model):
     }
     links = {mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_BODY, i) for i in range(1, model.nbody)}
     assert with_collider == links - {"base"}
+
+
+# MJCF body names; the URDF calls each one "<name>_link". The URDF's base fuses into MuJoCo's world.
+LINKS = ["shoulder", "upper_arm", "lower_arm", "wrist", "gripper", "moving_jaw_so101_v1"]
+POSES = 200
+# The URDF writes angles to 5 decimals (up to 2.65e-6 rad each); over five joints and a 0.4 m arm
+# that is a few micrometres. Measured worst: 2.8e-6 m and 1.6e-5.
+LINK_POSITION_TOLERANCE = 1e-5
+LINK_ROTATION_TOLERANCE = 1e-4
+
+
+def test_the_urdf_puts_every_link_where_the_mjcf_does():
+    # Gazebo simulates the URDF, so an origin or axis that differs from the MJCF would move or
+    # mirror the arm there while the name and limit checks above stay green.
+    mjcf = mujoco.MjModel.from_xml_path(str(SO101 / MJCF))
+    urdf = mujoco.MjModel.from_xml_path(str(SO101 / URDF))
+    assert [urdf.joint(i).name for i in range(urdf.njnt)] == JOINTS
+    from_mjcf, from_urdf = mujoco.MjData(mjcf), mujoco.MjData(urdf)
+    rng = np.random.default_rng(0)
+    for _ in range(POSES):
+        from_mjcf.qpos[:] = from_urdf.qpos[:] = rng.uniform(*mjcf.jnt_range.T)
+        mujoco.mj_kinematics(mjcf, from_mjcf)
+        mujoco.mj_kinematics(urdf, from_urdf)
+        for link in LINKS:
+            a, b = from_mjcf.body(link), from_urdf.body(f"{link}_link")
+            assert np.linalg.norm(a.xpos - b.xpos) < LINK_POSITION_TOLERANCE, link
+            assert np.abs(a.xmat - b.xmat).max() < LINK_ROTATION_TOLERANCE, link
+
+
+def test_every_link_has_the_same_mass_in_the_mjcf_and_the_urdf(model):
+    # Read as plain XML, not through MuJoCo: a mass that differs would make the arm sag and load its
+    # joints differently in Gazebo.
+    links = ET.parse(SO101 / URDF).getroot().iter("link")
+    written = {
+        link.get("name"): float(link.find("inertial/mass").get("value"))
+        for link in links
+        if link.find("inertial") is not None
+    }
+    for link in ["base", *LINKS]:
+        assert model.body(link).mass[0] == pytest.approx(written[f"{link}_link"], abs=1e-9), link

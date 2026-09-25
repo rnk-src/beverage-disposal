@@ -30,7 +30,9 @@ goes into a bin, a full can goes to a set-aside region on the table.
   ground and a block on a slope also agree with physics formulas and with MuJoCo, and the measured differences
   between the engines (impact, friction combination, static friction) are kept for 7.5.
 - **Iteration 1 (kinematics and end-effector control):** named by the owner on 2026-09-25 and built
-  one sub-iteration per session, each on its own branch (rule 9), starting with 1.1.
+  one sub-iteration per session, each on its own branch (rule 9). 1.1 (model tests and the TCP site) is
+  built test-first and merged into `main`: a loader adds the TCP site to the vendored model, and MJCF and
+  URDF are tested to agree on link poses and masses. 1.2 (forward kinematics) is next.
 - Iterations 2 to 8 are planned in detail down to sub-iterations (see Roadmap) and not started.
 - Last updated: 2026-09-25. Update this section in the same change as every sub-iteration.
 
@@ -58,13 +60,17 @@ Each label is a stable name; the owner's private decision journal uses the same 
 - **Arm model:** official SO-101 MJCF/URDF (TheRobotStudio/SO-ARM100, "new" calibration),
   vendored untouched under `assets/so101/` with a provenance file (upstream commit
   `5f6d2b876a53a4872e405b991dd925556c9e38a4`, file checksums) and a NOTICE. Those files stay under
-  their own Apache-2.0 license, so the repository is not purely public domain. Our own top-level
-  MJCF includes them and adds the tip site and actuator settings. MJCF is primary for training;
-  URDF is for Gazebo; a consistency test compares them. Facts about the vendored model, all
-  tested: it has no floor, light or camera and uses MuJoCo's defaults (timestep 0.002 s); the
-  joint stops hold; the gripper touches the shoulder when the elbow folds to about 1.5 rad, so the
-  elbow's upper range limit (1.69 rad) is not reachable; and a fresh `MjData` renders blank until
-  `mj_forward` (or a step) has computed the body positions.
+  their own Apache-2.0 license, so the repository is not purely public domain. Our loader
+  (`beverage_disposal.sim.arm.load_arm`) reads the MJCF through MuJoCo's `MjSpec` editing API and adds
+  what is missing (the TCP site in 1.1): plain MJCF cannot add a child to a body defined in an included
+  file, and the vendored files are never edited. MJCF is primary for training; URDF is for Gazebo;
+  consistency tests compare names, limits, link poses (within 10 um over random poses) and link masses.
+  Facts about the vendored model, all tested: it has no floor, light or camera and uses MuJoCo's
+  defaults (timestep 0.002 s); the joint stops hold; the gripper touches the shoulder when the elbow
+  folds to about 1.5 rad, so the elbow's upper range limit (1.69 rad) is not reachable; and a fresh
+  `MjData` renders blank until `mj_forward` (or a step) has computed the body positions. Upstream's
+  `gripperframe` site sits on the fixed jaw's inner face, 7.9 mm off the wrist-roll axis; at gripper
+  angle 0 the moving jaw's face mirrors it, so the jaws are 15.8 mm apart there.
 - **Observations:** state-based first, designed so a camera can be added later. Measured joints,
   velocities, commanded joint targets, noisy joint load, tip position (our FK), can position
   relative to the tip, vector to the current destination, destination flag, previous action,
@@ -79,7 +85,9 @@ Each label is a stable name; the owner's private decision journal uses the same 
   against MuJoCo. Damped least-squares with a null-space projector and strict task priority:
   tip position first, top-down pitch second, wrist roll locked. Pitch is the angle of the grasp
   axis below horizontal, positive down (top-down = +90 degrees). TCP is the midpoint between the
-  finger pads on the grasp axis. A closed-form planar IK and the `mink`
+  finger pads at gripper angle 0: on the wrist-roll axis, at the depth of upstream's `gripperframe`
+  (98.1 mm from the gripper body origin), fixed to the gripper body; its z axis points out of the tool
+  towards the fingertips and its x axis towards the moving jaw. A closed-form planar IK and the `mink`
   library exist in tests only, as oracles.
 - **Actuators:** start from the servo data in the official files, verify by step-response tests
   (rise time, overshoot, settling, steady-state error), store the reference numbers so Gazebo can
@@ -269,6 +277,7 @@ rewrites files and stops the commit so you re-stage them.
 
 ```
 src/beverage_disposal/   Python package (placeholder name; ROS-free core arrives here)
+  sim/                     the MuJoCo side: arm.py loads the vendored arm and adds the TCP site
 docker/gazebo/           headless Gazebo validation image: Dockerfile, worlds/, step_world.py,
                          apt-versions.txt (recorded package versions, arm64)
 tests/                   pytest tests (fast/medium/slow tiers), one folder per area:
@@ -279,7 +288,8 @@ tests/                   pytest tests (fast/medium/slow tiers), one folder per a
                            falling ball, ground and slope checks against physics formulas and MuJoCo,
                            and proofs the tests can fail (medium tier)
   model/                   the vendored SO-101 model: files, stepping, joint stops, rendering,
-                           viewer script (MJCF/URDF consistency arrives in 1.1)
+                           viewer script, MJCF/URDF agreement; our arm model and its TCP site;
+                           damaged-copy and mutated-package harnesses that prove the tests can fail
   support/                 shared helpers only (paths, git, scanning); no tests
   conftest.py              tier hook and shared fixtures
 assets/                  vendored third-party files with provenance (the SO-101 model)
