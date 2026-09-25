@@ -23,7 +23,8 @@ goes into a bin, a full can goes to a set-aside region on the table.
   test-first, with red output recorded before each piece of code; `main` is that history. The
   earlier first build, written without a red-first record, is kept on the branch `first-build`.
   The tests are organized into topic folders. 0.6 (step and render smoke test, with a viewer
-  script) is built the same way. 0.7 (Gazebo rendering spike) is deferred until requested.
+  script) is built the same way. Next: a narrow 0.7 (does headless Gazebo run in a Docker container on the
+  development Mac) before iteration 1.
 - Iterations 1 to 8 are planned in detail down to sub-iterations (see Roadmap) and not started.
 - Last updated: 2026-09-24. Update this section in the same change as every sub-iteration.
 
@@ -40,7 +41,9 @@ Each label is a stable name; the owner's private decision journal uses the same 
   policy node, so they cannot drift apart. ROS is only an adapter at validation time.
 - **Training hardware:** develop and debug on an Apple Silicon Mac (CPU); rent a cloud GPU for
   long runs once the environment is stable.
-- **Platform (validation):** Ubuntu 24.04, ROS 2 Jazzy, Gazebo Harmonic.
+- **Platform (validation):** Ubuntu 24.04, ROS 2 Jazzy, Gazebo Harmonic, run headless in a Docker
+  container (arm64 on the development Mac, reproducible from a Dockerfile). No VM and no Gazebo GUI:
+  MuJoCo is where the arm is watched, and Gazebo is judged by numbers.
 - **Tooling:** Python 3.12 (pinned `>=3.12,<3.13`), `uv` (ranges in `pyproject.toml`, exact
   versions in `uv.lock`, hatchling build backend, src layout), pytest with fast/medium/slow
   tiers, hypothesis, ruff (rules E, F, I, UP, B; 100 columns) and pre-commit.
@@ -199,6 +202,14 @@ Decisions and ideas to reopen at a specific point:
 - Two open points from the same paper, to check at 4.1: n-step returns instead of one-step TD
   (favored for sparse rewards or a violated Markov assumption), and seeding the replay buffer
   with scripted-controller demonstrations (the paper warns this can hurt without care).
+- Range or ultrasound fullness sensor for varied containers (glass bottle, plastic bottle, metal flask,
+  can): an idea the owner is interested in pursuing, perhaps in parallel with the main line, as a
+  fallback when the joint-load signal is not enough to tell how much liquid a container holds. Parked,
+  not started. MuJoCo (`rangefinder`, checked in 3.14) and Gazebo both only ray-cast, so the sensor
+  model would live in the ROS-free core like the weight signal, with MuJoCo as the natural place to
+  train it. Real ultrasound is the hard part to model: beam cone, container opening, foam,
+  through-wall coupling, and level versus volume for unknown container shapes. Natural homes: 2.5
+  (fullness signal) or after iteration 8.
 - Sim-to-sim test protocol (none published; ours to define): iteration 7.
 - Failure search and metamorphic testing: after iteration 5.
 - Bridge choice (thin node over standard controllers vs a ros2_control controller plugin;
@@ -274,7 +285,7 @@ update docs.
 
 - **0 Foundations.** 0.1 repo skeleton; 0.2 uv env + pytest tiers; 0.3 ruff + pre-commit;
   0.4 living docs and staleness tests; 0.5 vendored SO-101 model + provenance; 0.6 step and
-  render smoke test; 0.7 Gazebo rendering spike (deferred).
+  render smoke test; 0.7 Gazebo platform spike (narrow, next).
 - **1 Kinematics and end-effector control.** 1.1 model tests + tip site; 1.2 FK; 1.3 Jacobian;
   1.4 numerical IK; 1.5 EE-delta controller; 1.6 closed loop through PD actuators.
 - **2 World and task tests.** 2.1 scene; 2.2 trajectory recorder + pass-fail/indicative tests;
@@ -297,7 +308,7 @@ update docs.
 ## Unverified or open
 
 - Jazzy's system Python version (expected 3.12); arm64 apt packages for `ros_gz` and
-  `gz_ros2_control` on Jazzy; whether Gazebo cameras and lidar render in a Mac VM.
+  `gz_ros2_control` on Jazzy; whether Gazebo cameras and lidar render in the container (software rendering; optional).
 - STS3215 servo parameters: the vendored MJCF uses kp 998.22, kv 2.731 and a +-3.35 N*m force
   limit (its class default says +-2.94, each actuator overrides it), while the upstream
   `joints_properties.xml` says kp 17.8 and kv 0. Their origin is a third-party README and is
