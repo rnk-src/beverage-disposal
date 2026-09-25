@@ -1,7 +1,7 @@
 """The step and render tests are run against damaged copies of the model and must notice."""
 
 import pytest
-from damage import assert_the_test_failed, edit, run_on_damaged_copy
+from support.damage import assert_the_test_failed, edit, run_on_damaged_copy
 
 STEP_TESTS = "tests/model/test_so101_steps.py"
 

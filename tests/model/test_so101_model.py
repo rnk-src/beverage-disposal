@@ -1,24 +1,21 @@
 """The vendored SO-101 model is the follower arm with the new calibration, as expected."""
 
-import math
 import xml.etree.ElementTree as ET
 
 import mujoco
 import numpy as np
 import pytest
-from so101 import MJCF, SO101, URDF, model_facts, referenced_meshes, urdf_facts
+from support.so101 import (
+    EXPECTED_RANGES,
+    JOINTS,
+    MJCF,
+    SO101,
+    URDF,
+    model_facts,
+    referenced_meshes,
+    urdf_facts,
+)
 
-JOINTS = ["shoulder_pan", "shoulder_lift", "elbow_flex", "wrist_flex", "wrist_roll", "gripper"]
-
-# Radians. Transcribed from the upstream URDF <limit> elements; see the log for the caveat.
-EXPECTED_RANGES = {
-    "shoulder_pan": (-math.radians(110), math.radians(110)),
-    "shoulder_lift": (-math.radians(100), math.radians(100)),
-    "elbow_flex": (-1.69, 1.69),
-    "wrist_flex": (-math.radians(95), math.radians(95)),
-    "wrist_roll": (-2.74385, 2.84121),
-    "gripper": (-math.radians(10), math.radians(100)),
-}
 TOLERANCE = 1e-4
 
 

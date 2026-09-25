@@ -4,8 +4,8 @@ import hashlib
 import re
 import tomllib
 
-from so101 import referenced_meshes
 from support.paths import ROOT
+from support.so101 import referenced_meshes
 
 SO101 = ROOT / "assets" / "so101"
 

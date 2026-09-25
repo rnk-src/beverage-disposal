@@ -1,0 +1,19 @@
+"""The kinematics core runs without MuJoCo, as the ROS policy node will run it."""
+
+import subprocess
+import sys
+
+# A module set to None in sys.modules fails every later import, as if it were not installed.
+WITHOUT_MUJOCO = """
+import sys
+sys.modules["mujoco"] = None
+from beverage_disposal.core.kinematics import HOME, fk
+print(fk(HOME)[2, 3])
+"""
+
+
+def test_forward_kinematics_imports_and_runs_with_mujoco_unavailable():
+    # Locked decision "ROS-free core": the ROS side gets NumPy and the chain file, not a simulator.
+    result = subprocess.run([sys.executable, "-c", WITHOUT_MUJOCO], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    assert float(result.stdout) > 0
