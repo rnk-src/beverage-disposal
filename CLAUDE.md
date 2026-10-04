@@ -24,7 +24,7 @@ goes into a bin, a full can goes to a set-aside region on the table.
   earlier first build, written without a red-first record, is kept on the branch `first-build`.
   The tests are organized into topic folders. 0.6 (step and render smoke test, with a viewer
   script) is built the same way. The narrow 0.7 (headless Gazebo Harmonic in a Docker container on the
-  development Mac) is built test-first and awaits the owner's review: the image builds from
+  development Mac) is built test-first and merged: the image builds from
   `docker/gazebo/Dockerfile` (base image pinned by digest, installed package versions recorded), and
   a falling ball steps in Gazebo to the same 0.0495405 m drop at 0.1 s as in MuJoCo. A ball landing on the
   ground and a block on a slope also agree with physics formulas and with MuJoCo, and the measured differences
@@ -32,11 +32,19 @@ goes into a bin, a full can goes to a set-aside region on the table.
 - **Iteration 1 (kinematics and end-effector control):** named by the owner on 2026-09-25 and built
   one sub-iteration per session, each on its own branch (rule 9). 1.1 (model tests and the TCP site) is
   built test-first and merged into `main`: a loader adds the TCP site to the vendored model, and MJCF and
-  URDF are tested to agree on link poses and masses. 1.2 (forward kinematics) is built test-first on
-  `iter1/1.2-forward-kinematics` and awaits the owner's review: pure-NumPy FK from a generated,
-  frozen chain file, matching MuJoCo's TCP pose to 1e-9 over 1000 random poses. 1.3 (Jacobian) is next.
+  URDF are tested to agree on link poses and masses. 1.2 (forward kinematics) is built test-first and
+  merged into `main`: `beverage_disposal.core.kinematics.fk` turns the five arm joint angles into the
+  4x4 TCP pose with NumPy alone, reading the generated, frozen chain file `core/so101_chain.json`; it
+  matches MuJoCo's TCP pose to 1e-9 over 1000 random poses. The kinematics tests live in
+  `tests/kinematics/`.
+- **Next: 1.3 (Jacobian)**, on a branch `iter1/1.3-<slug>` cut from `main`. Its tests are planned in the
+  Roadmap entry and the Kinematics decision: a finite-difference check of every column, agreement with
+  MuJoCo's `mj_jacSite`, a zero roll column, and the pitch row. It needs each joint's world position and
+  axis along the chain, which come from the same product `fk` already computes (every arm joint turns
+  about its own body's z axis through the body origin, so joint i's axis is the z column of the frame
+  just before its turn). Pitch is read from the TCP z axis, positive down as the Kinematics decision says.
 - Iterations 2 to 8 are planned in detail down to sub-iterations (see Roadmap) and not started.
-- Last updated: 2026-09-25. Update this section in the same change as every sub-iteration.
+- Last updated: 2026-10-01. Update this section in the same change as every sub-iteration.
 
 ## Locked decisions
 
@@ -373,5 +381,10 @@ update docs.
   and the licenses of the tools behind the upstream model files.
 - Stable-Baselines3 default hyperparameters and CPU-vs-GPU guidance (recalled, not re-read).
 - Steps per second on the development Mac (measured in 3.5).
+- Whether `core/so101_chain.json` ships in a built wheel (hatchling): the editable install finds it, but no
+  wheel has been built. Check before the ROS node (7.2, 7.3) installs the package.
+- Known test-helper gap: tests that list files with `git ls-files --cached` (the published-text scan and an
+  owner-only wiring test) crash on a file deleted but not yet staged, instead of skipping it. They pass once
+  the deletion is staged. Not fixed; a `fix/` branch if it gets in the way.
 - Verified 2026-09-24 against the official Claude Code docs: a private, untracked project context
   file is loaded alongside this one and should not be committed.
