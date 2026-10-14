@@ -282,6 +282,7 @@ uv run pre-commit install    # once per clone: run ruff and the fast tier before
 uv run python scripts/view_so101.py                   # interactive viewer of the SO-101
 uv run python scripts/view_so101.py --snapshot a.png  # picture of the arm, no window
 uv run python scripts/generate_so101_chain.py        # rewrite the frozen chain file after a model change
+uv run python scripts/measure_actuators.py         # re-measure the servo step responses (configs/actuator_step_response.json)
 uv run pytest tests/gazebo   # Gazebo image tests: need a running Docker daemon, else they skip
 ```
 
