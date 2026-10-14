@@ -80,7 +80,7 @@ Each label is a stable name; the owner's private decision journal uses the same 
   versions in `uv.lock`, hatchling build backend, src layout), pytest with fast/medium/slow
   tiers, hypothesis, ruff (rules E, F, I, UP, B; 100 columns) and pre-commit.
   Versions locked 2026-09-24: mujoco 3.14.0, numpy 2.5.3, gymnasium 1.3.0, pytest 9.1.1,
-  hypothesis 6.168.1, ruff 0.16.9, pre-commit 4.6.2.
+  hypothesis 6.168.1, ruff 0.16.9, pre-commit 4.6.2; mink 1.3.0 added in 1.4.
 - **Arm model:** official SO-101 MJCF/URDF (TheRobotStudio/SO-ARM100, "new" calibration),
   vendored untouched under `assets/so101/` with a provenance file (upstream commit
   `5f6d2b876a53a4872e405b991dd925556c9e38a4`, file checksums) and a NOTICE. Those files stay under
@@ -343,7 +343,7 @@ uv run pytest tests/gazebo   # Gazebo image tests: need a running Docker daemon,
 
 Dependencies: ranges in `pyproject.toml`, exact versions in `uv.lock`. Runtime: `mujoco`,
 `numpy`, `gymnasium`. Dev group: `pytest`, `hypothesis`, `packaging`, `ruff`, `pre-commit`,
-`pillow`. A test
+`pillow`, `mink` (the IK oracle of 1.4; it pulls in `qpsolvers`, `daqp` and `scipy`). A test
 fails if the installed environment drifts from `uv.lock`, and another fails if the "Versions
 locked" sentence above disagrees with it, so update both together when a dependency changes. To add or upgrade a dependency, edit `pyproject.toml`, run
 `uv lock` then `uv sync`, and commit both files.
