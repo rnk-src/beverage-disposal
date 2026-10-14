@@ -36,3 +36,23 @@ def test_inverse_kinematics_imports_and_runs_with_mujoco_unavailable():
     )
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip() == "True"
+
+
+WITHOUT_MUJOCO_CONTROLLER = """
+import sys
+sys.modules["mujoco"] = None
+import numpy as np
+from beverage_disposal.core.controller import EEDeltaController
+from beverage_disposal.core.kinematics import HOME
+controller = EEDeltaController()
+controller.reset(HOME, 0.5)
+print(controller.step(np.array([1.0, 0, 0, 0]), HOME, 0.5).ik_ok)
+"""
+
+
+def test_the_controller_imports_and_runs_with_mujoco_unavailable():
+    result = subprocess.run(
+        [sys.executable, "-c", WITHOUT_MUJOCO_CONTROLLER], capture_output=True, text=True
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "True"

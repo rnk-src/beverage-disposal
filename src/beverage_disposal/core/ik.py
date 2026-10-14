@@ -15,6 +15,9 @@ PITCH_TOLERANCE = 1e-3
 MAX_ITERATIONS = 100
 # Singular values below this count as zero when finding the motions that leave the tip in place.
 RANK_TOLERANCE = 1e-6
+# An iteration that moves no joint further than this has nothing left to give: a stationary point,
+# such as the best pitch the arm can manage when the asked-for one is out of reach.
+STALL_STEP = 1e-8
 _LOW, _HIGH = np.array([joint["range"] for joint in load_chain()["joints"]]).T[:, :IK_JOINTS]
 
 
@@ -132,11 +135,14 @@ def solve_ik(
         if np.linalg.norm(position_error) < position_tolerance and pitch_ok:
             break
         iterations += 1
+        before = angles.copy()
         advance(with_pitch=target_pitch is not None)
         if target_pitch is not None:
             # A pitch step only keeps the tip in place to first order; a position-only step after it
             # takes out the second-order drift, so every iteration ends with the position on target.
             advance(with_pitch=False)
+        if np.max(np.abs(angles - before)) < STALL_STEP:
+            break
     position_error, pitch_error = errors()
     position_error = float(np.linalg.norm(position_error))
     pitch_error = 0.0 if pitch_error is None else float(abs(pitch_error))
