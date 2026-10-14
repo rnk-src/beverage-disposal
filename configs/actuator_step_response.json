@@ -1,0 +1,114 @@
+{
+  "protocol": {
+    "timestep": 0.002,
+    "control_period": 0.05,
+    "start_pose": [
+      0.0,
+      0.0,
+      0.0,
+      1.5707963267948966,
+      0.0
+    ],
+    "gripper_start": 0.5,
+    "step_size": 0.2,
+    "settle_seconds": 2.0,
+    "record_seconds": 1.5,
+    "servo": {
+      "shoulder_pan": {
+        "kp": 998.22,
+        "kv": 2.731,
+        "force_limit": 3.35
+      },
+      "shoulder_lift": {
+        "kp": 998.22,
+        "kv": 2.731,
+        "force_limit": 3.35
+      },
+      "elbow_flex": {
+        "kp": 998.22,
+        "kv": 2.731,
+        "force_limit": 3.35
+      },
+      "wrist_flex": {
+        "kp": 998.22,
+        "kv": 2.731,
+        "force_limit": 3.35
+      },
+      "wrist_roll": {
+        "kp": 998.22,
+        "kv": 2.731,
+        "force_limit": 3.35
+      },
+      "gripper": {
+        "kp": 998.22,
+        "kv": 2.731,
+        "force_limit": 3.35
+      }
+    }
+  },
+  "generated_with": {
+    "mujoco": "3.14.0"
+  },
+  "joints": {
+    "shoulder_pan": {
+      "start": 0.0,
+      "target": 0.2,
+      "metrics": {
+        "rise_time": 0.05599999999999383,
+        "overshoot_percent": 24.63356345405032,
+        "settling_time": 0.20999999999997687,
+        "steady_state_error": 6.117328865684613e-14
+      }
+    },
+    "shoulder_lift": {
+      "start": 0.0,
+      "target": 0.2,
+      "metrics": {
+        "rise_time": 0.04999999999999449,
+        "overshoot_percent": 32.950369548367384,
+        "settling_time": 0.22199999999997555,
+        "steady_state_error": 0.00047731060273401016
+      }
+    },
+    "elbow_flex": {
+      "start": 0.0,
+      "target": -0.2,
+      "metrics": {
+        "rise_time": 0.05599999999999383,
+        "overshoot_percent": 18.183933672183205,
+        "settling_time": 0.17199999999998106,
+        "steady_state_error": 0.000354340907026518
+      }
+    },
+    "wrist_flex": {
+      "start": 1.5707963267948966,
+      "target": 1.3707963267948966,
+      "metrics": {
+        "rise_time": 0.04999999999999449,
+        "overshoot_percent": 19.967014193064124,
+        "settling_time": 0.15599999999998282,
+        "steady_state_error": 2.7230679379153244e-05
+      }
+    },
+    "wrist_roll": {
+      "start": 0.0,
+      "target": 0.2,
+      "metrics": {
+        "rise_time": 0.04999999999999449,
+        "overshoot_percent": 20.39149910708895,
+        "settling_time": 0.15199999999998326,
+        "steady_state_error": 5.932798696761665e-10
+      }
+    },
+    "gripper": {
+      "start": 0.5,
+      "target": 0.7,
+      "metrics": {
+        "rise_time": 0.04999999999999449,
+        "overshoot_percent": 20.3355776645896,
+        "settling_time": 0.15199999999998326,
+        "steady_state_error": 2.1367836354757586e-06
+      }
+    }
+  }
+}
