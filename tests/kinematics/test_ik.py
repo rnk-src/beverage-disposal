@@ -234,3 +234,13 @@ def test_the_iteration_count_stops_at_the_cap_when_the_target_cannot_be_reached(
     result = solve_ik(np.array([1.0, 0.0, 0.2]), target_pitch=None, max_iterations=7)
     assert not result.converged
     assert result.iterations == 7
+
+
+def test_a_pitch_the_arm_cannot_reach_ends_the_solve_early_with_the_position_met():
+    # Found in 1.5: the controller solves every 50 ms, and a solve that keeps iterating to its cap
+    # for a pitch that cannot be had would take the whole control period. At this height the tool
+    # cannot point straight down (see the 1.5 log); the best pitch is a stationary point.
+    result = solve_ik(np.array([0.2, 0.0, 0.15]), start=HOME)
+    assert result.position_error < POSITION_TOLERANCE
+    assert not result.converged
+    assert result.iterations < 20

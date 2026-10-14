@@ -317,6 +317,7 @@ tests/                   pytest tests (fast/medium/slow tiers), one folder per a
                            viewer script, MJCF/URDF agreement; our arm model and its TCP site
   kinematics/              FK against MuJoCo, the home pose, pan and roll properties, the core without
                            MuJoCo, the chain file's generator and staleness, and their can-fail proofs
+  control/                 the end-effector delta controller and the closed loop through the PD actuators
   support/                 shared helpers only (paths, git, scanning, the SO-101 facts and the
                            damaged-copy and mutated-package harnesses); no tests
   conftest.py              tier hook and shared fixtures

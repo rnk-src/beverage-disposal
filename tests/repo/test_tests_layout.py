@@ -16,6 +16,7 @@ ALLOWED_IN_TESTS = [
     "model",
     "gazebo",
     "kinematics",
+    "control",
 ]
 
 
