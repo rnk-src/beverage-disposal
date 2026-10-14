@@ -5,9 +5,13 @@ public, and must stay accurate: see "Maintenance rules".
 
 ## Purpose
 
-A simulated SO-101 arm learns, with reinforcement learning (RL), to pick a soda can off a
-table, tell whether it is full or empty by feel (joint load), and dispose of it: an empty can
-goes into a bin, a full can goes to a set-aside region on the table.
+A simulated SO-101 arm learns, with reinforcement learning (RL), to pick up a beverage container and
+move it from A to B. A coded sequencer around that learned skill decides where a container goes: a
+practically empty one (under 30 mL) goes into a bin, anything else, or anything unsure, goes to a
+separate set-aside area on the table. The fullness decision is a tested rule, not learned: a weighing
+pad plus a database of empty weights for known container types, and a CoinFT tilt test for unknown
+ones. Containers: the 12 fl oz can first, then the 16.9 fl oz (500 mL) PET bottle. Tiers: 1 =
+simulation with statistics, 2 = a real arm, 3 = wider containers and more sensors.
 
 - **MuJoCo** simulates the physics and is where all training happens.
 - **Gazebo + ROS 2** validates the trained policy on a *different* physics engine (a real
@@ -37,14 +41,24 @@ goes into a bin, a full can goes to a set-aside region on the table.
   4x4 TCP pose with NumPy alone, reading the generated, frozen chain file `core/so101_chain.json`; it
   matches MuJoCo's TCP pose to 1e-9 over 1000 random poses. The kinematics tests live in
   `tests/kinematics/`.
-- **Next: 1.3 (Jacobian)**, on a branch `iter1/1.3-<slug>` cut from `main`. Its tests are planned in the
-  Roadmap entry and the Kinematics decision: a finite-difference check of every column, agreement with
-  MuJoCo's `mj_jacSite`, a zero roll column, and the pitch row. It needs each joint's world position and
-  axis along the chain, which come from the same product `fk` already computes (every arm joint turns
-  about its own body's z axis through the body origin, so joint i's axis is the z column of the frame
-  just before its turn). Pitch is read from the TCP z axis, positive down as the Kinematics decision says.
-- Iterations 2 to 8 are planned in detail down to sub-iterations (see Roadmap) and not started.
-- Last updated: 2026-10-01. Update this section in the same change as every sub-iteration.
+- **Iteration 1, 1.3 to 1.6: built test-first on four stacked branches, awaiting the owner's review and
+  merge** (merge in order with `--no-ff`; each branch is cut from the previous one): `iter1/1.3-jacobian`
+  (a 4x5 `jacobian` over the five arm joints, rows x, y, z, pitch; pitch is the signed in-plane angle of the
+  TCP z axis), `iter1/1.4-numerical-ik` (`core/ik.py`: damped least squares, tip position first, pitch in
+  the exact null space, joints parked on their limits; `mink` and a closed-form planar solution as test
+  oracles), `iter1/1.5-ee-delta-controller` (`core/controller.py`), `iter1/1.6-closed-loop-pd` (a 20 Hz
+  MuJoCo loop, step-response metrics and a stored reference file for matching Gazebo later). Fast and medium
+  tiers pass on the last branch (459 tests; the Gazebo tier was not run). Found on the way: straight-down
+  pitch together with a tip position is reachable only below about z = 0.09 m, so a can cannot be grasped
+  top-down at its middle.
+- **Next: iteration 2** (world, containers and the decision), starting with 2.1 (the scene), after the
+  iteration 1 branches are merged.
+- **Plan review closed (2026-10-13).** Every decision was re-examined against the real alternatives. The
+  fullness decision became a coded rule (weighing pad and database, CoinFT tilt for unknown containers, a
+  30 mL promise), RL narrowed to one pick-and-place skill, the bottle was added after the can, and a real-arm
+  tier (iteration 9) and headline metrics were added. The Locked decisions and Roadmap below are the result.
+- Iterations 2 to 9 are planned in detail down to sub-iterations (see Roadmap) and not started.
+- Last updated: 2026-10-14. Update this section in the same change as every sub-iteration.
 
 ## Locked decisions
 
@@ -83,10 +97,11 @@ Each label is a stable name; the owner's private decision journal uses the same 
   angle 0 the moving jaw's face mirrors it, so the jaws are 15.8 mm apart there. Every arm joint turns
   about its own body's z axis, and the shoulder-pan axis points straight down in the base frame, so a
   positive pan angle turns the arm clockwise seen from above.
-- **Observations:** state-based first, designed so a camera can be added later. Measured joints,
-  velocities, commanded joint targets, noisy joint load, tip position (our FK), can position
-  relative to the tip, vector to the current destination, destination flag, previous action,
-  time remaining, and a short frame-stacked history of load/gripper/previous action. Fixed
+- **Observations (for the pick-and-place skill):** state-based first, designed so a camera can be added
+  later. Measured joint positions (no velocities, which are too noisy on the real servos), commanded
+  joint targets, tip position (our FK), container position relative to the tip, the vector to the goal B
+  (an input), previous action, time remaining, and a short frame-stacked history of positions and the
+  previous action. No joint load and no destination flag: the skill never decides the destination. Fixed
   physical-range scaling (no running statistics).
 - **Action space:** `Box(-1, 1, (4,))` = end-effector delta `[dx, dy, dz]` plus gripper. Deltas
   scale to about 1.5 cm per step (tunable) and add to the *previous commanded target*, with a
@@ -111,16 +126,50 @@ Each label is a stable name; the owner's private decision journal uses the same 
   be matched to them.
 - **Grasp:** physical only. Tune pads, friction and solver settings within plausible physics;
   no weld or teleport fallback.
-- **Task and fullness:** the destination depends on a hidden variable (can mass). Staged: early
-  curriculum stages give a destination flag, later stages hide it. Tests always know the truth.
-  Set-aside destination is a marked region on the table. Can is a rigid cylinder (no sloshing);
-  masses about 0.014 kg empty and 0.37 kg full.
-- **Weight signal:** joint load (actuator force) through a sensor model (noise, quantization,
-  per-episode offset), plus commanded targets so position sag is visible. A wrist force-torque
-  sensor is a test oracle only. Sensor ranges come from an envelope test.
-- **Reward:** sparse success bonus plus potential-based progress shaping, small regularizers,
-  failure penalties, early termination on clear failures. Adversarial-policy tests (hover, wave,
-  push the can off, drop it, do nothing) must all score below the scripted controller.
+- **Sequencer and skill:** RL learns one skill, "pick at A, place at B" (B is an input), through its
+  motion under contact. A plain, tested sequencer calls it twice (container to the weighing pad, then pad
+  to the bin or the set-aside area) around the fullness rule. RL never decides the destination.
+- **Fullness (task rule):** bin only if confident the container holds under 30 mL; if unsure, set aside;
+  no capacity estimate. For every volume from 30 mL up, the container is binned at most 1 % of the time
+  (a worst-case promise per volume; brimful containers are left to the weight check). A container of a
+  known type is decided by its weight on the pad against the type's lightest plausible empty weight
+  (bin only if the weight above it is under 30 g minus the scale's error margin). An unknown container
+  heavier than a material-dependent limit is set aside; otherwise a coded CoinFT tilt test runs with
+  the opening on the high side and the same strict threshold applies, and the robot asks the owner to
+  enrol the type. The tilt routine is coded, not learned; RL only brings the container to its start pose.
+  The set-aside area is separate from the pad. Tests always know the true volume.
+- **Containers:** the 12 fl oz can first, then the 16.9 fl oz PET bottle (right after the can works). A
+  container type is data in a registry (dimensions, lightest empty weight, grasp height and width, cap and
+  tab rules); no logic branches on a specific container. One enrolled type covers every container of
+  that type. For a bottle the camera must confirm the cap is on, else it is set aside.
+- **Safety supervisor:** coded and tested; refuses or stops on a container that is too wide or too heavy,
+  a failed test lift, or a force limit, and reports by light, sound and message.
+- **Perception:** markerless camera: detect the container, recognise its type, find the tab, check a
+  bottle's cap. Simulation uses ground truth plus a noise model (position noise, bias, delay,
+  dropouts). Material and cap recognition for other containers is Tier 3.
+- **Weight and tilt signals (replace servo-load weighing, which a study showed fails):** a weighing pad
+  (a MuJoCo force sensor with noise and drift) and CoinFT force/torque pads on the gripper. Servo
+  load is not an observation.
+- **Container model:** rigid body plus a precomputed statics "liquid wrench" for the tilt test, checked
+  occasionally against OpenFOAM. Container mass is a randomized range, not two classes.
+- **Reward:** sparse success bonus (container released at B, upright, within tolerance, not spilled) plus
+  potential-based progress shaping, small regularizers (weights tuned in 4.3), failure penalties (drop,
+  tip-over, off the table, hard joint or table contact), early termination on those failures and on
+  timeout. Adversarial-policy tests (hover, wave, push the container off, drop it, do nothing) must all
+  score below the scripted controller.
+- **Acceptance ("done") and metrics:** Tier 1: at least 300 trials per volume so that zero binned
+  containers of 30 mL or more shows the 1 % promise at 95 % confidence (rule of three), and a pick-and-place
+  success lower bound of 90 % over at least 5 seeds. Tier 2 (real arm): 30 trials per container type with
+  a Wilson interval, no hard pass bar. The evaluation harness writes a results file (commit and seeds
+  recorded) holding the headline metrics: pick-and-place success with a bootstrap lower bound, binned
+  30 mL+ containers per volume, empties correctly binned, the MuJoCo-to-Gazebo gap, steps to 90 %
+  success, success under the widest passing randomization, engineering numbers (tests, mutants killed,
+  FK error, steps per second) and, if reached, the real-arm trials.
+- **Architecture and code standards:** modules for perception, sequencer, the RL skill, the fullness
+  rule and the safety supervisor; interfaces and data contracts (typed dataclasses and Protocols) are
+  fixed first and their internals built test-first; core code is ROS-free and MuJoCo-free; mypy on
+  `core/` only, ruff everywhere; no magic numbers (named constants or YAML); comments only where the
+  code is complex or has a reason.
 - **TdRL later:** pass-fail and indicative test functions define the task and drive a
   hand-shaped reward first. The learned-reward method (Test-driven RL, AAAI-26) is a later
   comparison against that baseline.
@@ -133,18 +182,20 @@ Each label is a stable name; the owner's private decision journal uses the same 
   ROS policy node (no PyTorch on the ROS side); tests compare PyTorch and ONNX outputs. How the
   node reaches the simulator (thin node over standard ros2_control controllers vs a controller
   plugin) is decided at 7.3. The TdRL integration path is decided at 6.1.
-- **Curriculum:** stages S0 to S5, promoted automatically when the lower confidence bound of
-  evaluation success passes a threshold (unit-tested scheduler).
+- **Curriculum:** stages S0 reach, S1 grasp and lift, S2 place at a fixed B, S3 random B plus physics,
+  then the randomization stages (S4, S5), promoted automatically when the lower confidence bound of
+  evaluation success passes a threshold (unit-tested scheduler). Demonstrations or DORAEMON only if a
+  stage stalls. The 4.3 run: SAC, at least 5 seeds, bootstrap intervals.
 - **Tracking:** dataclass + YAML configs and TensorBoard. Hydra and Weights & Biases are noted
   alternatives to revisit when sweeping.
 - **Robustness (iteration 5, aimed at the Gazebo sim-to-sim test):** match what can be measured
   in Gazebo (for example actuator step responses) and randomize the residual uncertainty.
   Randomization ranges start narrow and widen automatically under the same confidence-bound
-  promotion rule as the curriculum (stage S5). Mass is randomized as two classes (empty, full),
-  each a continuous range, with a guaranteed gap so the correct destination is never ambiguous.
-  Physics randomization covers friction, can mass and size, joint damping/friction/armature,
-  actuator gains, gripper force limit and contact softness; sensor and timing randomization
-  covers load noise/offset/quantization, encoder resolution and observation/action delay. Ranges
+  promotion rule as the curriculum (stage S5). Container mass is a continuous range and the liquid
+  amount is continuous (no two-class gap). Physics randomization covers friction, container mass and
+  size, joint damping/friction/armature, actuator gains, gripper force limit and contact softness;
+  sensor and timing randomization covers pad and CoinFT noise/drift, perception noise/bias/delay,
+  encoder resolution and observation/action delay. Ranges
   come from a sensitivity study, and a "sim-to-sim gap budget" doc lists each MuJoCo/Gazebo
   difference and whether it is randomized, matched or accepted.
 - **License:** The Unlicense. Vendored third-party files keep their own licenses.
@@ -249,12 +300,17 @@ Decisions and ideas to reopen at a specific point:
   5.2, 5.3, 5.4, 6.1, 7.2 to 7.9, and iteration 8. Code: https://github.com/aalmuzairee/squint (MIT).
 - Range or ultrasound fullness sensor for varied containers (glass bottle, plastic bottle, metal flask,
   can): an idea the owner is interested in pursuing, perhaps in parallel with the main line, as a
-  fallback when the joint-load signal is not enough to tell how much liquid a container holds. Parked,
-  not started. MuJoCo (`rangefinder`, checked in 3.14) and Gazebo both only ray-cast, so the sensor
-  model would live in the ROS-free core like the weight signal, with MuJoCo as the natural place to
-  train it. Real ultrasound is the hard part to model: beam cone, container opening, foam,
-  through-wall coupling, and level versus volume for unknown container shapes. Natural homes: 2.5
-  (fullness signal) or after iteration 8.
+  fallback if the weighing pad and the CoinFT tilt test are not enough to tell how much liquid a
+  container holds. Parked, not started (the HC-SR04 veto is Tier 3). MuJoCo (`rangefinder`, checked in
+  3.14) and Gazebo both only ray-cast, so the sensor model would live in the ROS-free core like the pad
+  model, with MuJoCo as the natural place to train it. Real ultrasound is the hard part to model: beam
+  cone, container opening, foam, through-wall coupling, and level versus volume for unknown container
+  shapes. Natural homes: 2.6 (fullness) or after iteration 8.
+- Asymmetric critic (the critic sees the true container mass during training): no longer needed for the
+  decision; kept as an optional experiment for the grasp, for iteration 6 or after 4.4.
+- CoinFT bench test (a soft gate): CoinFT is built in parallel with the main line. If it fails, fall back
+  to the weighing pad alone. Revisit the 1 % promise only if the bench shows about 0.3 to 0.5 mN m of
+  stop-to-stop error (a 5 % promise would then roughly halve the empties set aside).
 - Sim-to-sim test protocol (none published; ours to define): iteration 7.
 - Failure search and metamorphic testing: after iteration 5.
 - Bridge choice (thin node over standard controllers vs a ros2_control controller plugin;
@@ -328,6 +384,14 @@ pyproject.toml  uv.lock  .python-version   uv project, exact lockfile, pinned Py
 README.md  CLAUDE.md  LICENSE  .gitignore
 ```
 
+Planned modules, not built yet (the tree above is what exists): `core/` gains the IK and controller
+(iteration 1), `containers.py` (type registry, empty-weight database, enrolment), `fullness.py` (the rule),
+`tilt.py` (the coded tilt routine and the statics model), `sequencer.py`, `supervisor.py`, `observation.py`
+and `interfaces.py` (the Protocols and dataclasses that fix every boundary first); `sim/` gains the scene,
+pad and CoinFT sensor models and the simulated perception; then `env/` (the Gymnasium environment for the
+skill), `train/` (SAC configs, curriculum scheduler, evaluation harness, metrics writer), `ros/` (adapter
+only: policy node, Gazebo bridge) and `hardware/` (Tier 2 drivers implementing the same Protocols).
+
 A test allows only known top-level entries to be published (`PROJECT_TOP_LEVEL` in
 `tests/repo/test_publishable_set.py`). When a legitimate new top-level file or folder appears, add
 it there in the same change. Likewise only approved folders may sit directly in `tests/`
@@ -348,13 +412,20 @@ update docs.
   render smoke test; 0.7 Gazebo platform spike (narrow, built).
 - **1 Kinematics and end-effector control.** 1.1 model tests + tip site; 1.2 FK; 1.3 Jacobian;
   1.4 numerical IK; 1.5 EE-delta controller; 1.6 closed loop through PD actuators.
-- **2 World and task tests.** 2.1 scene; 2.2 trajectory recorder + pass-fail/indicative tests;
-  2.3 grasp physics; 2.4 scripted controller; 2.5 fullness signal; 2.6 acceptance harness.
-- **3 Gymnasium environment.** 3.1 observations; 3.2 action layer; 3.3 env core; 3.4 reward;
-  3.5 wrappers and vectorization; 3.6 contract and baseline tests.
+- **2 World, containers and the decision (no RL yet).** 2.1 scene (table, weighing pad, bin, separate
+  set-aside area); 2.2 container registry, empty-weight database and enrolment logic; 2.3 trajectory
+  recorder + pass-fail/indicative tests; 2.4 grasp physics (can); 2.5 scripted pick-and-place controller;
+  2.6 fullness (statics liquid wrench, pad sensor model, weight rule, coded tilt routine and verdict);
+  2.7 safety supervisor; 2.8 sequencer + acceptance harness + metrics file.
+- **3 Gymnasium environment for the skill.** 3.1 observations (with the simulated perception noise);
+  3.2 action layer; 3.3 env core (goal B as input); 3.4 reward and termination; 3.5 wrappers and
+  vectorization; 3.6 contract and baseline tests.
 - **4 First learning.** 4.1 training scaffold + probe environments; 4.2 overfit one config;
-  4.3 reach with randomization (SAC seeds and hyperparameter sensitivity); 4.4 grasp and lift; 4.5 full task;
-  4.6 hidden destination flag.
+  4.3 reach with randomization (SAC seeds and hyperparameter sensitivity); 4.4 grasp and lift;
+  4.5 pick and place to B with the can. (The hidden destination flag, old 4.6, is removed.)
+- **4B Bottle (after 4.5).** 4.7 bottle model, registry entry and grasp physics (a rigid simulated bottle;
+  the real bottle flexes); 4.8 bottle in the scripted controller, the fullness entries and the cap check;
+  4.9 the bottle skill (fine-tune, or one skill with the container type as an observation: decide at 4.7).
 - **5 Robustness.** 5.1 randomization framework; 5.2 physics parameter set; 5.3 sensor and timing
   set; 5.4 sensitivity study; 5.5 train under randomization; 5.6 held-out perturbations.
 - **6 TdRL comparison.** 6.1 read and choose the integration path; 6.2 map our tests to TdRL's;
@@ -363,7 +434,11 @@ update docs.
 - **7 Gazebo validation.** 7.1 platform; 7.2 policy export; 7.3 ROS policy node; 7.4 node against
   MuJoCo; 7.5 Gazebo world and model; 7.6 actuator matching; 7.7 Gazebo sensors; 7.8 sim-to-sim
   acceptance; 7.9 the gap loop.
-- **8 Stretch.** Camera observations.
+- **8 Stretch.** Camera observations (end-to-end vision), optional.
+- **9 Real arm (Tier 2, behind a soft gate).** 9.1 bring-up and calibration; 9.2 weighing pad, scale and
+  database enrolment; 9.3 camera perception (detect, type, tab, cap; no tags on containers); 9.4 CoinFT
+  bench and tilt on hardware (parallel track; the bench test is the gate); 9.5 the supervisor on
+  hardware; 9.6 end-to-end trials; 9.7 results and write-up.
 
 ## Unverified or open
 
@@ -379,6 +454,14 @@ update docs.
   unverified; MuJoCo uses the MJCF values. Also unverified: real can dimensions (about 66 mm by
   122 mm), the joint ranges (two artifacts from one CAD export, not a measurement of a real arm),
   and the licenses of the tools behind the upstream model files.
+- The 16.9 fl oz PET bottle: web figures only, none checked on a real bottle: empty weight about 21 g, or
+  18.5 g in the 2024 lightweight redesign (not confirmed for this size), and a generic 203 mm by 63.5 mm.
+  Weigh and measure the owner's own bottle. Whether an uncapped bottle spills at 30 mL when tilted is not
+  measured (the spill study found about 50 mL at 90 degrees for glass).
+- Unknown-container limits: the weight limit per material, and how reliably a camera recognises material,
+  are unverified (relevant only once the scope goes beyond cans and capped bottles).
+- Whether the cap check should treat a cap that is not confirmed as "set aside": the current rule, to be
+  confirmed with the owner when the bottle work starts.
 - Stable-Baselines3 default hyperparameters and CPU-vs-GPU guidance (recalled, not re-read).
 - Steps per second on the development Mac (measured in 3.5).
 - Whether `core/so101_chain.json` ships in a built wheel (hatchling): the editable install finds it, but no
