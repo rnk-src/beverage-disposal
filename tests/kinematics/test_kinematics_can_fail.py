@@ -12,6 +12,8 @@ from support.so101 import MJCF
 FK_TESTS = "tests/kinematics/test_forward_kinematics.py"
 CHAIN_TESTS = "tests/kinematics/test_chain_file.py"
 CORE_TESTS = "tests/kinematics/test_core_needs_no_mujoco.py"
+JACOBIAN_TESTS = "tests/kinematics/test_jacobian.py"
+PITCH_TESTS = "tests/kinematics/test_pitch.py"
 CHAIN_FILE = "core/so101_chain.json"
 KINEMATICS = "core/kinematics.py"
 
@@ -43,7 +45,7 @@ def point_home_straight_up(package):
 
 
 def turn_every_joint_the_wrong_way(package):
-    edit(package, KINEMATICS, "link @ _turn_about_z(angle)", "link @ _turn_about_z(-angle)")
+    edit(package, KINEMATICS, "frame @ _turn_about_z(angle)", "frame @ _turn_about_z(-angle)")
 
 
 def import_mujoco_in_the_core(package):
@@ -52,6 +54,61 @@ def import_mujoco_in_the_core(package):
         KINEMATICS,
         "import numpy as np\n",
         "import mujoco  # noqa: F401\nimport numpy as np\n",
+    )
+
+
+def reverse_the_cross_product(package):
+    # Tip velocity is axis x lever arm; the other order gives every column the wrong sign.
+    edit(
+        package,
+        KINEMATICS,
+        "np.cross(axis, tcp[:3, 3] - position)",
+        "np.cross(tcp[:3, 3] - position, axis)",
+    )
+
+
+def flip_the_pitch_normal(package):
+    edit(
+        package,
+        KINEMATICS,
+        "normal = np.cross(heading, axes[0])",
+        "normal = np.cross(axes[0], heading)",
+    )
+
+
+def drop_the_pitch_row(package):
+    edit(
+        package,
+        KINEMATICS,
+        "return np.vstack([np.array(linear).T, [axis @ normal for axis in axes]])",
+        "return np.array(linear).T",
+    )
+
+
+def flip_the_pitch_sign(package):
+    edit(
+        package,
+        KINEMATICS,
+        "np.arctan2(-z_axis[2], z_axis @ heading)",
+        "np.arctan2(z_axis[2], z_axis @ heading)",
+    )
+
+
+def ignore_the_pan_in_the_plane_heading(package):
+    edit(
+        package,
+        KINEMATICS,
+        "heading = _plane_heading(frames[0][:3, 2], angles[0])",
+        "heading = np.array([1.0, 0.0, 0.0])",
+    )
+
+
+def use_the_elevation_angle(package):
+    edit(
+        package,
+        KINEMATICS,
+        "np.arctan2(-z_axis[2], z_axis @ heading)",
+        "np.arctan2(-z_axis[2], np.hypot(z_axis[0], z_axis[1]))",
     )
 
 
@@ -77,6 +134,66 @@ MUTANTS = [
         "test_turning_the_pan_joint_turns_the_tcp_by_the_same_angle_about_the_pan_axis",
     ),
     (put_the_tcp_on_gripperframe, FK_TESTS, "test_rolling_the_wrist_leaves_the_tcp_where_it_is"),
+    (
+        reverse_the_cross_product,
+        JACOBIAN_TESTS,
+        "test_the_position_rows_match_central_finite_differences_of_fk_over_random_poses",
+    ),
+    (
+        reverse_the_cross_product,
+        JACOBIAN_TESTS,
+        "test_the_position_rows_match_mujocos_site_jacobian",
+    ),
+    (
+        flip_the_pitch_normal,
+        JACOBIAN_TESTS,
+        "test_the_pitch_row_matches_central_finite_differences_of_pitch_over_random_poses",
+    ),
+    (
+        flip_the_pitch_normal,
+        JACOBIAN_TESTS,
+        "test_the_pitch_row_is_the_turn_rate_about_the_plane_normal_from_mujocos_angular_jacobian",
+    ),
+    (
+        flip_the_pitch_normal,
+        JACOBIAN_TESTS,
+        "test_the_three_parallel_planar_joints_each_add_one_for_one_to_pitch_and_pan_and_roll_add_none",
+    ),
+    (
+        drop_the_pitch_row,
+        JACOBIAN_TESTS,
+        "test_the_jacobian_has_a_row_for_x_y_z_and_pitch_and_a_column_for_each_arm_joint",
+    ),
+    (
+        put_the_tcp_on_gripperframe,
+        JACOBIAN_TESTS,
+        "test_rolling_the_wrist_moves_neither_the_tcp_nor_the_pitch",
+    ),
+    (
+        flip_the_pitch_sign,
+        PITCH_TESTS,
+        "test_home_points_straight_down_so_its_pitch_is_plus_ninety_degrees",
+    ),
+    (
+        flip_the_pitch_sign,
+        PITCH_TESTS,
+        "test_pitch_is_zero_for_a_tool_pointing_straight_out_and_negative_for_one_pointing_up",
+    ),
+    (
+        use_the_elevation_angle,
+        PITCH_TESTS,
+        "test_pitch_keeps_growing_when_the_tool_tilts_back_past_straight_down",
+    ),
+    (
+        ignore_the_pan_in_the_plane_heading,
+        PITCH_TESTS,
+        "test_pitch_is_the_angle_of_mujocos_tcp_z_axis_below_the_arms_plane_heading",
+    ),
+    (
+        ignore_the_pan_in_the_plane_heading,
+        PITCH_TESTS,
+        "test_pitch_is_the_sum_of_the_three_parallel_planar_joint_angles",
+    ),
     (
         import_mujoco_in_the_core,
         CORE_TESTS,
