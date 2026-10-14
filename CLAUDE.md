@@ -41,24 +41,23 @@ simulation with statistics, 2 = a real arm, 3 = wider containers and more sensor
   4x4 TCP pose with NumPy alone, reading the generated, frozen chain file `core/so101_chain.json`; it
   matches MuJoCo's TCP pose to 1e-9 over 1000 random poses. The kinematics tests live in
   `tests/kinematics/`.
-- **Iteration 1, 1.3 to 1.6: built test-first on four stacked branches, awaiting the owner's review and
-  merge** (merge in order with `--no-ff`; each branch is cut from the previous one): `iter1/1.3-jacobian`
+- **Iteration 1, 1.3 to 1.6: built test-first and merged into `main` on 2026-10-14**, one merge commit
+  per branch: `iter1/1.3-jacobian`
   (a 4x5 `jacobian` over the five arm joints, rows x, y, z, pitch; pitch is the signed in-plane angle of the
   TCP z axis), `iter1/1.4-numerical-ik` (`core/ik.py`: damped least squares, tip position first, pitch in
   the exact null space, joints parked on their limits; `mink` and a closed-form planar solution as test
   oracles), `iter1/1.5-ee-delta-controller` (`core/controller.py`), `iter1/1.6-closed-loop-pd` (a 20 Hz
   MuJoCo loop, step-response metrics and a stored reference file for matching Gazebo later). Fast and medium
-  tiers pass on the last branch (459 tests; the Gazebo tier was not run). Found on the way: straight-down
+  tiers pass on the merged result (the Gazebo tier was not run). Found on the way: straight-down
   pitch together with a tip position is reachable only below about z = 0.09 m, so a can cannot be grasped
   top-down at its middle.
-- **Next: iteration 2** (world, containers and the decision), starting with 2.1 (the scene), after the
-  iteration 1 branches are merged.
+- **Next: iteration 2** (world, containers and the decision), starting with 2.1 (the scene).
 - **Plan review closed (2026-10-13).** Every decision was re-examined against the real alternatives. The
   fullness decision became a coded rule (weighing pad and database, CoinFT tilt for unknown containers, a
   30 mL promise), RL narrowed to one pick-and-place skill, the bottle was added after the can, and a real-arm
   tier (iteration 9) and headline metrics were added. The Locked decisions and Roadmap below are the result.
 - Iterations 2 to 9 are planned in detail down to sub-iterations (see Roadmap) and not started.
-- Last updated: 2026-10-14. Update this section in the same change as every sub-iteration.
+- Last updated: 2026-10-14 (after the iteration 1 merges). Update this section in the same change as every sub-iteration.
 
 ## Locked decisions
 
@@ -358,9 +357,11 @@ rewrites files and stops the commit so you re-stage them.
 
 ```
 src/beverage_disposal/   Python package (placeholder name)
-  core/                    the ROS-free core (no MuJoCo): kinematics.py (FK) and so101_chain.json,
-                           the generated, frozen robot spec it reads
-  sim/                     the MuJoCo side: arm.py loads the vendored arm and adds the TCP site
+  core/                    the ROS-free core (no MuJoCo): kinematics.py (FK, Jacobian, pitch) and
+                           so101_chain.json, the generated, frozen robot spec it reads; ik.py (solve_ik);
+                           controller.py (EEDeltaController); step_response.py (rise, overshoot, settling)
+  sim/                     the MuJoCo side: arm.py loads the vendored arm and adds the TCP site; loop.py
+                           (20 Hz closed loop through the PD actuators); actuator_response.py (step tests)
 docker/gazebo/           headless Gazebo validation image: Dockerfile, worlds/, step_world.py,
                          apt-versions.txt (recorded package versions, arm64)
 tests/                   pytest tests (fast/medium/slow tiers), one folder per area:
@@ -379,8 +380,8 @@ tests/                   pytest tests (fast/medium/slow tiers), one folder per a
                            damaged-copy and mutated-package harnesses); no tests
   conftest.py              tier hook and shared fixtures
 assets/                  vendored third-party files with provenance (the SO-101 model)
-configs/                 YAML configs (task, training)
-scripts/                 helper scripts (view_so101.py, generate_so101_chain.py)
+configs/                 configs (task, training) and the stored actuator step-response reference (JSON)
+scripts/                 helper scripts (view_so101.py, generate_so101_chain.py, measure_actuators.py)
 pyproject.toml  uv.lock  .python-version   uv project, exact lockfile, pinned Python
 .pre-commit-config.yaml                    git hooks (ruff, fast tests)
 README.md  CLAUDE.md  LICENSE  .gitignore
