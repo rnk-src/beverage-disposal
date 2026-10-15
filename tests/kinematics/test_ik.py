@@ -10,7 +10,7 @@ from support.so101 import EXPECTED_RANGES, JOINTS
 from beverage_disposal.core.ik import solve_ik
 from beverage_disposal.core.kinematics import HOME, fk, jacobian, pitch
 
-POSITION_TOLERANCE = 1e-4  # CLAUDE.md / iteration-1.md: about 0.1 mm
+POSITION_TOLERANCE = 1e-4  # CLAUDE.md: about 0.1 mm
 PITCH_TOLERANCE = 1e-3  # about 0.06 degrees
 LIMIT_SLACK = 1e-6
 
