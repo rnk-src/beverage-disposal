@@ -70,3 +70,9 @@ def test_an_exempt_file_is_skipped_but_its_neighbours_are_not(tmp_path):
     (tmp_path / "other.py").write_text("PATH = '/Users/alice/x'\n")
     found = find_leaks_in_files(tmp_path, ["samples.py", "other.py"], exempt=["samples.py"])
     assert found == {"other.py": ["/Users/alice"]}
+
+
+def test_a_listed_file_that_is_missing_from_disk_is_skipped_not_a_crash(tmp_path):
+    # git still lists a tracked file that was deleted but not staged, so the file is missing.
+    (tmp_path / "there.py").write_text("path = '/Users/alice/data'\n")
+    assert find_leaks_in_files(tmp_path, ["gone.py", "there.py"]) == {"there.py": ["/Users/alice"]}

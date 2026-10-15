@@ -469,8 +469,5 @@ update docs.
 - Steps per second on the development Mac (measured in 3.5).
 - Whether `core/so101_chain.json` ships in a built wheel (hatchling): the editable install finds it, but no
   wheel has been built. Check before the ROS node (7.2, 7.3) installs the package.
-- Known test-helper gap: tests that list files with `git ls-files --cached` (the published-text scan and an
-  owner-only wiring test) crash on a file deleted but not yet staged, instead of skipping it. They pass once
-  the deletion is staged. Not fixed; a `fix/` branch if it gets in the way.
 - Verified 2026-09-24 against the official Claude Code docs: a private, untracked project context
   file is loaded alongside this one and should not be committed.
