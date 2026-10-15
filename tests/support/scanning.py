@@ -22,7 +22,11 @@ def find_leaks_in_files(root, files, exempt=()):
     for name in files:
         if name in exempt:
             continue
-        data = (Path(root) / name).read_bytes()
+        try:
+            data = (Path(root) / name).read_bytes()
+        except FileNotFoundError:
+            # git still lists a tracked file that was deleted but not staged. Nothing to scan.
+            continue
         if b"\x00" in data[:8000]:
             continue
         found = find_private_looking_text(data.decode(errors="ignore"))
