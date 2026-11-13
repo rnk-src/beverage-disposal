@@ -23,6 +23,7 @@ def test_the_scene_file_describes_a_12_fl_oz_can_with_its_source():
     # 66 mm by 122 mm and 14 g are the figures in the scene config, none checked on a real can.
     can = load_scene_config(SCENE).container
     assert (can.diameter, can.height, can.empty_mass) == (0.066, 0.122, 0.014)
+    assert can.grasp_height == 0.061  # the jaws take the can at its middle
     assert can.provenance.kind == "assumed"
     assert can.provenance.source and can.provenance.date
 
@@ -77,6 +78,7 @@ def test_a_negative_fill_is_rejected():
         diameter=0.05,
         height=0.1,
         empty_mass=0.01,
+        grasp_height=0.05,
         friction=1.0,
         provenance=Provenance(source="test", date="2026-11-13", kind="assumed"),
     )
