@@ -72,12 +72,21 @@ def invert_the_gripper_mapping(package):
     )
 
 
+def ignore_the_given_pitch(package):
+    edit(
+        package,
+        CONTROLLER,
+        "result = solve_ik(target, self._pitch, start=self._joints)",
+        "result = solve_ik(target, np.pi / 2, start=self._joints)",
+    )
+
+
 def nudge_the_roll(package):
     edit(
         package,
         CONTROLLER,
-        "result = solve_ik(target, start=self._joints)",
-        "result = solve_ik(target, start=self._joints + [0, 0, 0, 0, 0.1])",
+        "result = solve_ik(target, self._pitch, start=self._joints)",
+        "result = solve_ik(target, self._pitch, start=self._joints + [0, 0, 0, 0, 0.1])",
     )
 
 
@@ -175,6 +184,11 @@ MUTANTS = [
         invert_the_gripper_mapping,
         CONTROLLER_TESTS,
         "test_the_gripper_action_maps_linearly_onto_the_gripper_range[-1.0--0.17453292519943295]",
+    ),
+    row(
+        ignore_the_given_pitch,
+        CONTROLLER_TESTS,
+        "test_the_controller_holds_the_tool_at_the_pitch_it_was_given",
     ),
     row(
         nudge_the_roll,

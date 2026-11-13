@@ -100,3 +100,11 @@ def test_the_configured_timestep_and_contact_softness_reach_the_model():
     assert model.opt.timestep == 0.001
     for name in ["table", "container", "pad", "bin_floor", "fixed_pad", "moving_pad"]:
         assert model.geom(name).solref == pytest.approx([0.03, 0.8]), name
+
+
+def test_the_pads_resist_twisting_with_the_configured_torsional_friction():
+    model = build_scene(CONFIG, SO101 / MJCF)
+    for name in ["fixed_pad", "moving_pad"]:
+        geom = model.geom(name)
+        assert geom.condim[0] == 4, name
+        assert geom.friction[1] == pytest.approx(CONFIG.gripper_pads.torsional_friction), name
