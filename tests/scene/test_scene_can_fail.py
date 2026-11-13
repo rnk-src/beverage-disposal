@@ -75,7 +75,7 @@ def accept_any_type(package):
     edit(
         package,
         LOADER,
-        "    if not isinstance(value, hint) or isinstance(value, bool):",
+        "    if not isinstance(value, hint) or (isinstance(value, bool) and hint is not bool):",
         "    if False:",
     )
 

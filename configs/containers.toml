@@ -1,0 +1,53 @@
+# The container registry: one table per container type. Lengths in metres, masses in kilograms.
+# A container is data here, not code: adding a type means adding a table (and nothing else).
+# Nothing below is measured on a real container.
+
+[can_12floz]
+material = "aluminium"
+lightest_empty_mass = 0.013  # the lightest plausible empty can, the figure the weight rule trusts
+cap_check_required = false
+has_tab = true
+
+[can_12floz.weight_provenance]
+source = "web figures for a 12 fl oz aluminium can, about 13 to 15 g; lightest taken as 13 g"
+date = "2026-11-13"
+kind = "assumed"
+
+[can_12floz.spec]
+name = "can_12floz"
+diameter = 0.066
+height = 0.122
+empty_mass = 0.014
+grasp_height = 0.10  # near the rim: lower, the jaw housing hits the can (2.4)
+friction = 1.0
+torsional_friction = 0.01
+
+[can_12floz.spec.provenance]
+source = "web figures for a 12 fl oz aluminium can (about 66 mm by 122 mm, about 14 g); the old repo used the same"
+date = "2026-11-13"
+kind = "assumed"
+
+[bottle_500ml]
+material = "PET"
+lightest_empty_mass = 0.0185  # the 2024 lightweight redesign; not confirmed for this size
+cap_check_required = true
+has_tab = false
+
+[bottle_500ml.weight_provenance]
+source = "web figures: about 21 g, or 18.5 g in the 2024 lightweight redesign; weigh your own bottle"
+date = "2026-11-13"
+kind = "cited"
+
+[bottle_500ml.spec]
+name = "bottle_500ml"
+diameter = 0.0635
+height = 0.203
+empty_mass = 0.021
+grasp_height = 0.15
+friction = 1.0
+torsional_friction = 0.01
+
+[bottle_500ml.spec.provenance]
+source = "generic 16.9 fl oz PET bottle, about 63.5 mm by 203 mm (web figures, not checked)"
+date = "2026-11-13"
+kind = "cited"
