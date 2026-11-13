@@ -14,7 +14,7 @@ METRIC_TESTS = "tests/control/test_step_response_metrics.py"
 
 
 def lengthen_the_control_period(package):
-    edit(package, LOOP, "CONTROL_PERIOD = 0.05", "CONTROL_PERIOD = 0.1")
+    edit(package, "core/interfaces.py", "CONTROL_PERIOD = 0.05", "CONTROL_PERIOD = 0.1")
 
 
 def forget_the_gripper_on_reset(package):

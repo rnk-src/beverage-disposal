@@ -77,8 +77,7 @@ simulation with statistics, 2 = a real arm, 3 = wider containers and more sensor
   Computed, not run through MuJoCo. **2.7 (safety supervisor) built the same day** (`core/supervisor.py`, `core/supervised.py`, `core/safety_config.py`, `configs/safety.toml`,
   `tests/safety/`): checks for a too-wide or too-heavy container, an unknown type, a failed test lift, arm force and gripper torque, bad or
   missing observations, timeout and a moved container, all reported by light, sound and message; a check that throws is a stop. Faults injected
-  into a running episode (NaN, dead sensor, no finish, throwing supervisor, NaN action) all end in a safe stop. **Next: 2.8.**
-  Iteration 2 is built continuously from 2026-11-13 with no
+  into a running episode (NaN, dead sensor, no finish, throwing supervisor, NaN action) all end in a safe stop. **2.8 (sequencer, harness, results file, demo) built the same day** (`core/sequencer.py`, `core/acceptance.py`, `sim/skills.py`, `sim/harness.py`, `sim/demo.py`, `scripts/run_acceptance.py`, `scripts/record_demo.py`, `tests/sequencer/`): the sequencer carries a container to the pad, weighs it, decides and carries it on, under the supervisor; the harness runs it over a volume grid with seeded runs and writes a results file (commit, config hash, versions, seeds, counts). First run (can, known type, 381 trials at each of 0, 30, 31 and 35 mL, scripted skill, git cfc6544 plus uncommitted 2.8 files): in simulation, 0 of 381 binned at each of 30, 31 and 35 mL (Wilson 95 % upper bound 0.998 %); 342 of 381 empties binned (the other 39 were set aside or stopped; the summary does not split them yet); pick-and-place completed in 1389 of 1524 runs (lower bound 89.6 %, just under the 90 % target; one found cause: seed 4 at 30 mL times out on the first leg). Not run: the unknown-type (tilt) grid and the bottle. Iteration 2 is built continuously from 2026-11-13 with no
   teaching pauses (the owner studies separately): 2.1a, 2.1b, 2.4, 2.5, 2.3, 2.2, 2.6a, 2.6b, 2.6c, 2.7, 2.8. The
   order comes from the iteration 2 plan review (2026-10-29) and keeps the full scope, tilt routine included.
   2.1 is split into the minimal scene (table, can, one config home for container size and mass) and the layout
@@ -93,7 +92,7 @@ simulation with statistics, 2 = a real arm, 3 = wider containers and more sensor
   30 mL promise), RL narrowed to one pick-and-place skill, the bottle was added after the can, and a real-arm
   tier (iteration 9) and headline metrics were added. The Locked decisions and Roadmap below are the result.
 - Iterations 2 to 9 are planned in detail down to sub-iterations (see Roadmap) and not started.
-- Last updated: 2026-11-13 (2.7 built). Update this section in the same change as every sub-iteration.
+- Last updated: 2026-11-13 (2.8 built; iteration 2 complete). Update this section in the same change as every sub-iteration.
 
 ## Locked decisions
 
@@ -383,6 +382,8 @@ uv run pre-commit install    # once per clone: run ruff and the fast tier before
 uv run python scripts/view_so101.py                   # interactive viewer of the SO-101
 uv run python scripts/view_so101.py --snapshot a.png  # picture of the arm, no window
 uv run python scripts/generate_so101_chain.py        # rewrite the frozen chain file after a model change
+uv run python scripts/run_acceptance.py --trials 381   # sequencer grid in simulation, writes runs/acceptance.json (about 45 min)
+uv run python scripts/record_demo.py                   # GIF of one container through the sequencer, runs/demo.gif
 uv run python scripts/measure_actuators.py         # re-measure the servo step responses (configs/actuator_step_response.json)
 uv run pytest tests/gazebo   # Gazebo image tests: need a running Docker daemon, else they skip
 ```
@@ -403,7 +404,7 @@ rewrites files and stops the commit so you re-stage them.
 
 ```
 src/beverage_disposal/   Python package (placeholder name)
-  core/                    the ROS-free core (no MuJoCo): supervisor.py (safety checks and indicators), supervised.py (a controller
+  core/                    the ROS-free core (no MuJoCo): sequencer.py (pick, weigh, decide, place), acceptance.py (results summary), supervisor.py (safety checks and indicators), supervised.py (a controller
                            under the supervisor), safety_config.py, tilt.py (the tilt verdict and pad-only fallback), coinft.py
                            (torque sensor model), tilt_config.py, statics.py (the liquid wrench of a tilted container), pad.py (weighing pad model), fullness.py (the weight rule),
                            fullness_eval.py (Monte Carlo and sweeps), fullness_config.py, statistics.py (Wilson bounds), registry.py (container types as data, enrolment), trajectory.py and task_tests.py (an episode record and the
@@ -415,7 +416,7 @@ src/beverage_disposal/   Python package (placeholder name)
                            controller.py (EEDeltaController); step_response.py (rise, overshoot, settling)
   sim/                     the MuJoCo side: arm.py loads the vendored arm and adds the TCP site; scene.py (table, bin, pad, set-aside
                            marker, container and the arm in one model); pads.py (the gripper's two collision pads);
-                           grasp.py (prescribed grasp); rollout.py (one judged episode); recorder.py (an episode as a Trajectory); loop.py
+                           grasp.py (prescribed grasp); skills.py (the scripted skill as the sequencer calls it), harness.py (seeded grid and results record), demo.py (GIF frames); rollout.py (one judged episode); recorder.py (an episode as a Trajectory); loop.py
                            (20 Hz closed loop through the PD actuators); actuator_response.py (step tests)
 docker/gazebo/           headless Gazebo validation image: Dockerfile, worlds/, step_world.py,
                          apt-versions.txt (recorded package versions, arm64)
@@ -431,6 +432,7 @@ tests/                   pytest tests (fast/medium/slow tiers), one folder per a
   kinematics/              FK against MuJoCo, the home pose, pan and roll properties, the core without
                            MuJoCo, the chain file's generator and staleness, and their can-fail proofs
   control/                 the end-effector delta controller and the closed loop through the PD actuators
+  sequencer/               the sequencer (ideal and simulated skill), the results summary, the harness and the demo recorder
   safety/                  the supervisor's checks with near-misses, the indicators and faults injected into an episode
   tilt/                    the CoinFT model, the tilt verdict, the volume bound and the pad-only fallback
   statics/                 the liquid wrench: closed-form checks, spill angle and the sensitivity sweep
@@ -446,7 +448,7 @@ tests/                   pytest tests (fast/medium/slow tiers), one folder per a
   conftest.py              tier hook and shared fixtures
 assets/                  vendored third-party files with provenance (the SO-101 model)
 configs/                 configs (scene.toml, containers.toml, fullness.toml, tilt.toml, safety.toml; training later) and the stored actuator step-response reference (JSON)
-scripts/                 helper scripts (view_so101.py, generate_so101_chain.py, measure_actuators.py)
+scripts/                 helper scripts (view_so101.py, generate_so101_chain.py, measure_actuators.py, run_acceptance.py, record_demo.py)
 pyproject.toml  uv.lock  .python-version   uv project, exact lockfile, pinned Python
 .pre-commit-config.yaml                    git hooks (ruff, fast tests)
 README.md  CLAUDE.md  LICENSE  .gitignore
