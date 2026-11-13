@@ -1,0 +1,20 @@
+# The limits of the safety supervisor (2.7). Lengths in metres, masses in kilograms, forces in newtons.
+# None of these is a measured or datasheet number: each says where it came from.
+
+[limits]
+# The widest container the pads can take with room to spare: the stock jaws open to about 79 mm
+# (measured in 2.1a on the vendored model); 75 mm leaves 4 mm. The grasp is designed for 66 mm.
+max_container_diameter = 0.075
+# The heaviest container to lift: a recalled SO-101 payload of about half a kilogram, rounded up
+# (unverified; check against the real arm before 9.1).
+max_container_mass = 0.60
+# The least a test lift must raise the container, as a fraction of the lift asked for.
+min_test_lift_fraction = 0.9
+# The arm may press this hard on the table, bin or pad (assumed, same as the task test).
+max_arm_force = 20.0
+# The gripper servo may be asked for this torque, N m; the scene's squeeze is 0.6.
+max_grip_torque = 1.0
+# An episode longer than this is stopped; the scripted pick-and-place needs about 10 s.
+max_episode_seconds = 20.0
+# The container is "where expected" within this distance of where it was seen first, metres.
+container_position_tolerance = 0.03

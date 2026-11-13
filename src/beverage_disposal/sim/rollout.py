@@ -84,6 +84,11 @@ def run_episode(
         recorder.record(loop, previous)
         step += 1
     finished = bool(getattr(controller, "done", False))
+    stop = getattr(controller, "stop_event", None)
+    if stop is not None:
+        trajectory = recorder.trajectory(False)
+        can = loop.data.body("container").xpos.copy()
+        return Episode(False, f"safe stop: {stop.code}", can, len(trajectory.time), trajectory)
     if finished:
         for _ in range(SETTLE_STEPS):
             loop.step(command.joints[:5], command.gripper)
