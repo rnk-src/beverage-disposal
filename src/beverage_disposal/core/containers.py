@@ -26,6 +26,7 @@ class ContainerSpec:
     empty_mass: float
     grasp_height: float  # TCP height above the container's bottom when the jaws take it, metres
     friction: float
+    torsional_friction: float  # resists twisting on a surface, metres (MuJoCo units)
     provenance: Provenance
 
 

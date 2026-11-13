@@ -33,6 +33,11 @@ class ArmLoop:
                 on_substep()
 
     @property
+    def data(self):
+        """The MuJoCo state, for code that needs more than the arm's own measurements."""
+        return self._data
+
+    @property
     def time(self):
         return self._data.time
 

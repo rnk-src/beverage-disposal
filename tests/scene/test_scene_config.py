@@ -80,6 +80,7 @@ def test_a_negative_fill_is_rejected():
         empty_mass=0.01,
         grasp_height=0.05,
         friction=1.0,
+        torsional_friction=0.01,
         provenance=Provenance(source="test", date="2026-11-13", kind="assumed"),
     )
     with pytest.raises(ValueError, match="fill"):

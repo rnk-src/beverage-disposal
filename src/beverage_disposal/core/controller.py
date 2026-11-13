@@ -42,11 +42,15 @@ class EEDeltaController:
         workspace=WORKSPACE,
         max_tip_lead=MAX_TIP_LEAD,
         max_gripper_step=MAX_GRIPPER_STEP,
+        pitch=np.pi / 2,
     ):
         self._max_delta = max_delta
         self._workspace = workspace
         self._max_tip_lead = max_tip_lead
         self._max_gripper_step = max_gripper_step
+        self._pitch = (
+            pitch  # tool tilt below horizontal, radians; the roll is whatever reset was given
+        )
 
     def reset(self, joints, gripper):
         """Start from the measured arm: the first target is where the tip is."""
@@ -65,7 +69,7 @@ class EEDeltaController:
         if distance > self._max_tip_lead:
             target = target - lead * (1 - self._max_tip_lead / distance)
         # The tip comes first; if the pitch cannot be had there, that is not a failure.
-        result = solve_ik(target, start=self._joints)
+        result = solve_ik(target, self._pitch, start=self._joints)
         ik_ok = result.position_error < POSITION_TOLERANCE
         if ik_ok:
             self._joints, self._target = result.angles, target

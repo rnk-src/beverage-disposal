@@ -5,7 +5,7 @@ import pytest
 from support.so101 import EXPECTED_RANGES
 
 from beverage_disposal.core.controller import MAX_DELTA, MAX_GRIPPER_STEP, EEDeltaController
-from beverage_disposal.core.kinematics import HOME, fk
+from beverage_disposal.core.kinematics import HOME, fk, pitch
 
 GRIPPER_START = 0.5
 POSITION_TOLERANCE = 1e-4
@@ -198,3 +198,17 @@ def test_the_joint_targets_stay_inside_the_joint_limits_over_a_long_random_run()
     for command in follow(fresh_controller(), rng.uniform(-1, 1, size=(300, 4))):
         assert np.all(command.joints >= low - 1e-6) and np.all(command.joints <= high + 1e-6)
         assert np.all(np.isfinite(command.joints))
+
+
+def test_the_controller_holds_the_tool_at_the_pitch_it_was_given():
+    # 60 degrees below horizontal: reachable at this height and distance, so the pitch is met.
+    wanted = np.radians(60.0)
+    controller = EEDeltaController(pitch=wanted)
+    start = HOME.copy()
+    start[4] = np.pi / 2
+    controller.reset(start, GRIPPER_START)
+    command = controller.step(np.array([0.0, 0.0, 1.0, 0.0]), start, GRIPPER_START)
+    for _ in range(60):
+        command = controller.step(np.zeros(4), command.joints, GRIPPER_START)
+    assert pitch(command.joints) == pytest.approx(wanted, abs=1e-3)
+    assert command.joints[4] == pytest.approx(np.pi / 2)  # the roll is left as it was

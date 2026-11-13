@@ -1,5 +1,7 @@
 """Where the bin, the pad, the set-aside area and the spawn box stand, and what counts as inside."""
 
+from dataclasses import dataclass
+
 import numpy as np
 
 from beverage_disposal.core.config import SceneConfig
@@ -53,3 +55,45 @@ def in_set_aside(config: SceneConfig, x: float, y: float) -> bool:
     return abs(x - area.center_x) <= area.half_x - radius and abs(y - area.center_y) <= (
         area.half_y - radius
     )
+
+
+@dataclass(frozen=True)
+class Goal:
+    """A place a container can be put; lengths in metres in the arm's base frame."""
+
+    name: str
+    center_x: float
+    center_y: float
+    half_x: float
+    half_y: float
+    release_z: float  # the container's bottom is lowered to here before it is let go
+    rest_z: float  # the surface it ends up resting on
+
+    def holds(self, x: float, y: float, radius: float) -> bool:
+        """Whether a container of this radius centred at (x, y) lies wholly inside the goal."""
+        return abs(x - self.center_x) <= self.half_x - radius and abs(y - self.center_y) <= (
+            self.half_y - radius
+        )
+
+
+def goals(config: SceneConfig) -> dict[str, Goal]:
+    """The pad, the bin and the set-aside area as places to put a container."""
+    bin_, pad, area = config.bin, config.pad, config.set_aside
+    return {
+        "pad": Goal(
+            "pad", pad.center_x, pad.center_y, pad.half_x, pad.half_y, pad.height, pad.height
+        ),
+        # Dropped from just above the wall, so the release height is the wall's top plus a margin.
+        "bin": Goal(
+            "bin",
+            bin_.center_x,
+            bin_.center_y,
+            bin_.inner_x / 2,
+            bin_.inner_y / 2,
+            bin_.height + config.reach.release_clearance,
+            bin_.floor,
+        ),
+        "set_aside": Goal(
+            "set_aside", area.center_x, area.center_y, area.half_x, area.half_y, 0.0, 0.0
+        ),
+    }
