@@ -69,7 +69,9 @@ simulation with statistics, 2 = a real arm, 3 = wider containers and more sensor
   types are data tables with provenance, the scene names one, and an unknown type is met with a request to enrol it. **2.6a (pad and weight rule) built the same day** (`core/pad.py`, `core/fullness.py`, `core/fullness_eval.py`,
   `core/statistics.py`, `configs/fullness.toml`, `tests/fullness/`): a pad model, a rule that bins under 26.5 g net (30 mL at 0.95 g/mL
   less a 2 g margin), Wilson bounds, and a Monte Carlo: in simulation, 0 of 100 000 binned at 30, 31 and 35 mL of the lightest
-  drink (bound 3.8e-5); the sweep breaks at about four times the nominal noise. **Next: 2.6b.**
+  drink (bound 3.8e-5); the sweep breaks at about four times the nominal noise. **2.6b (statics wrench) built the same day** (`core/statics.py`, `tests/statics/`): the liquid's torque on a tilted grasp from a
+  rigid-cylinder model with closed-form checks; at 60 degrees about 0.6 mN m per mL, and the plausible parameter errors move 30 mL's
+  torque by about 4 mL's worth (model M, unvalidated). **Next: 2.6c.**
   Iteration 2 is built continuously from 2026-11-13 with no
   teaching pauses (the owner studies separately): 2.1a, 2.1b, 2.4, 2.5, 2.3, 2.2, 2.6a, 2.6b, 2.6c, 2.7, 2.8. The
   order comes from the iteration 2 plan review (2026-10-29) and keeps the full scope, tilt routine included.
@@ -85,7 +87,7 @@ simulation with statistics, 2 = a real arm, 3 = wider containers and more sensor
   30 mL promise), RL narrowed to one pick-and-place skill, the bottle was added after the can, and a real-arm
   tier (iteration 9) and headline metrics were added. The Locked decisions and Roadmap below are the result.
 - Iterations 2 to 9 are planned in detail down to sub-iterations (see Roadmap) and not started.
-- Last updated: 2026-11-13 (2.6a built). Update this section in the same change as every sub-iteration.
+- Last updated: 2026-11-13 (2.6b built). Update this section in the same change as every sub-iteration.
 
 ## Locked decisions
 
@@ -395,7 +397,7 @@ rewrites files and stops the commit so you re-stage them.
 
 ```
 src/beverage_disposal/   Python package (placeholder name)
-  core/                    the ROS-free core (no MuJoCo): pad.py (weighing pad model), fullness.py (the weight rule),
+  core/                    the ROS-free core (no MuJoCo): statics.py (the liquid wrench of a tilted container), pad.py (weighing pad model), fullness.py (the weight rule),
                            fullness_eval.py (Monte Carlo and sweeps), fullness_config.py, statistics.py (Wilson bounds), registry.py (container types as data, enrolment), trajectory.py and task_tests.py (an episode record and the
                            task's pass-fail and indicative functions), interfaces.py (Observation, Controller, noise), scripted.py
                            (the scripted pick-and-place), baselines.py (random policy); config.py (frozen scene dataclasses read from TOML),
@@ -421,6 +423,7 @@ tests/                   pytest tests (fast/medium/slow tiers), one folder per a
   kinematics/              FK against MuJoCo, the home pose, pan and roll properties, the core without
                            MuJoCo, the chain file's generator and staleness, and their can-fail proofs
   control/                 the end-effector delta controller and the closed loop through the PD actuators
+  statics/                 the liquid wrench: closed-form checks, spill angle and the sensitivity sweep
   fullness/                the pad model, the weight rule, the Wilson bound and the false-bin Monte Carlo
   containers/              the registry, its weights with sources and the enrolment of unknown types
   tasktests/               the recorder and the task's pass-fail and indicative functions
