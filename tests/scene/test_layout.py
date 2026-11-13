@@ -59,9 +59,9 @@ def test_everything_stands_on_the_table():
         assert top[0] <= xmin and xmax <= top[1] and top[2] <= ymin and ymax <= top[3], name
 
 
-# The spawn box straight from the file's numbers (centre 0.30, 0.0 and half width 0.06), so these
+# The spawn box straight from the file's numbers (centre 0.29, 0.0 and half width 0.04), so these
 # tests do not lean on the footprints function they sit beside.
-SPAWN_BOX = (0.24, 0.36, -0.06, 0.06)
+SPAWN_BOX = (0.25, 0.33, -0.04, 0.04)
 
 
 def test_the_nominal_can_position_is_inside_the_spawn_box():

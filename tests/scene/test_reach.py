@@ -9,7 +9,7 @@ from beverage_disposal.core.config import load_scene_config
 from beverage_disposal.core.reach import reach_report
 
 CONFIG = load_scene_config(ROOT / "configs" / "scene.toml")
-GRASP_Z = 0.061  # half the can's height, worked by hand: the jaws take it at its middle
+GRASP_Z = 0.10  # where the pads take the can, near the rim (2.4)
 
 
 def test_every_pose_of_the_pick_and_place_is_reachable_within_the_allowed_tilt():

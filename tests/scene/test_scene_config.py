@@ -23,7 +23,7 @@ def test_the_scene_file_describes_a_12_fl_oz_can_with_its_source():
     # 66 mm by 122 mm and 14 g are the figures in CLAUDE.md, none checked on a real can.
     can = load_scene_config(SCENE).container
     assert (can.diameter, can.height, can.empty_mass) == (0.066, 0.122, 0.014)
-    assert can.grasp_height == 0.061  # the jaws take the can at its middle
+    assert can.grasp_height == 0.10  # the pads take the can near its rim
     assert can.provenance.kind == "assumed"
     assert can.provenance.source and can.provenance.date
 

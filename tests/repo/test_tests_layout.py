@@ -18,6 +18,7 @@ ALLOWED_IN_TESTS = [
     "kinematics",
     "control",
     "scene",
+    "grasp",
 ]
 
 
