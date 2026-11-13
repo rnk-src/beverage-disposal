@@ -11,7 +11,7 @@ from beverage_disposal.core.baselines import RandomController
 from beverage_disposal.core.config import load_scene_config
 from beverage_disposal.core.interfaces import PositionNoise
 from beverage_disposal.core.layout import goals, sample_spawn
-from beverage_disposal.core.scripted import ScriptedController
+from beverage_disposal.core.scripted import Phase, ScriptedController
 from beverage_disposal.sim.rollout import run_episode
 
 CONFIG = load_scene_config(ROOT / "configs" / "scene.toml")
@@ -56,20 +56,27 @@ def test_the_script_still_works_with_two_millimetres_of_perception_noise():
 
 
 @pytest.mark.medium
-def test_five_millimetres_of_perception_noise_breaks_the_unfiltered_script():
+def test_ten_millimetres_of_perception_noise_breaks_the_unfiltered_script():
     # A measured limit, not a goal: the script reads the container position afresh every step and
-    # waits for it within 3 to 5 mm, so jitter of that size keeps it from moving on (1 of 8 seeds
-    # succeeded). A filter on the container estimate is the fix; this test then changes.
-    noise = PositionNoise(sigma=0.005)
+    # waits for it within 3 to 5 mm, so enough jitter keeps it from moving on. At a gain of 0.2 it
+    # survives 5 mm (7 of 8) and 7 mm (5 of 8) and fails at 10 mm (1 of 8); at the old gain of
+    # 0.5 it failed already at 5 mm. A filter on the container estimate is the fix; this test
+    # then changes.
+    noise = PositionNoise(sigma=0.01)
     results = [episode(ScriptedController(CONFIG), "set_aside", s, noise=noise) for s in SEEDS]
     assert sum(r.success for r in results) <= 3
 
 
 @pytest.mark.medium
 def test_each_seed_spawns_the_can_somewhere_else():
-    # A script that never squeezes leaves the can where it started: the final position is the spawn.
+    # Stopped after a few steps the can has not been touched, so its position is the spawn. (Letting
+    # a never-squeezing script run on does not work: its open jaws sweep across the can on the way
+    # to the goal and can tip it.)
     config = CONFIG
-    stay = [episode(ScriptedController(config, squeeze=False), "set_aside", s) for s in (0, 1)]
+    stay = [
+        episode(ScriptedController(config, squeeze=False), "set_aside", s, max_steps=5)
+        for s in (0, 1)
+    ]
     spawns = [sample_spawn(config, np.random.default_rng(s)) for s in (0, 1)]
     for result, spawn in zip(stay, spawns, strict=True):
         assert result.container[:2] == pytest.approx(spawn, abs=2e-3)
@@ -88,3 +95,43 @@ def test_an_episode_that_runs_out_of_steps_fails_with_a_reason():
     result = episode(ScriptedController(CONFIG), "set_aside", 0, max_steps=5)
     assert not result.success
     assert "time" in result.reason
+
+
+# First-leg failures of the 2.8 acceptance run: cans spawned beyond x = 0.29 m that the script
+# knocked over while hovering (seed, millilitres). A fixed list, so a regression shows by name.
+FAR_SPAWN_FAILURES = [(17, 0.0), (31, 0.0), (42, 0.0), (51, 0.0), (4, 30.0), (10, 30.0), (13, 30.0)]
+
+
+@pytest.mark.medium
+@pytest.mark.parametrize(("seed", "fill_ml"), FAR_SPAWN_FAILURES)
+def test_the_script_reaches_the_pad_from_spawns_that_used_to_fail(seed, fill_ml):
+    config = dataclasses.replace(CONFIG, fill_ml=fill_ml)
+    result = run_episode(config, SO101 / MJCF, ScriptedController(config), GOALS["pad"], seed=seed)
+    assert result.success, result.reason
+
+
+@pytest.mark.medium
+def test_the_tip_does_not_swing_while_hovering_over_a_far_can():
+    # The approach loop oscillated: the tip swung about 40 mm up and down while closing on the
+    # hover point, hit the can and sometimes knocked it over. The tip must stay near the line from
+    # where it started to the hover height.
+    config = dataclasses.replace(CONFIG, fill_ml=30.0)
+    controller = ScriptedController(config)
+    heights = []
+    start = {}
+
+    def watch(loop):
+        if not start:
+            start["can_z"] = float(loop.data.body("container").xpos[2])
+            start["tip_z"] = float(loop.tip[2])
+        if controller.phase is Phase.ABOVE:
+            heights.append(float(loop.tip[2]))
+
+    run_episode(
+        config, SO101 / MJCF, controller, GOALS["pad"], seed=4, on_step=watch, max_steps=120
+    )
+    box = config.container
+    hover = start["can_z"] - box.height / 2 + box.grasp_height + config.reach.approach_clearance
+    assert heights
+    assert max(heights) <= max(start["tip_z"], hover) + 0.01
+    assert min(heights) >= min(start["tip_z"], hover) - 0.015
