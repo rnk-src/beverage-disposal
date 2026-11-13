@@ -1,0 +1,23 @@
+# The fullness decision of 2.6a: the weighing pad and the weight rule. Masses in grams here.
+# The pad figures are a guess for a 1 kg single-point bar load cell read through an HX711 amplifier;
+# no datasheet was checked, so none of them is verified.
+
+[rule]
+threshold_ml = 30.0
+# The lightest drink assumed: vodka at 40 % is about 0.95 g/mL; water, soda, juice and beer are heavier.
+min_density_g_per_ml = 0.95
+# Roughly four standard deviations of one weighing (see the sweep test); pure oil or spirit would defeat it.
+margin_g = 2.0
+
+[pad]
+noise_sigma_g = 0.5
+offset_sigma_g = 0.3
+drift_g_per_s = 0.002
+settle_time_constant_s = 0.15
+arm_load_g = 3.0
+arm_load_time_constant_s = 0.5
+resolution_g = 0.1
+sample_period_s = 0.1
+settle_wait_s = 2.0
+samples_averaged = 20
+stability_limit_g = 1.0
