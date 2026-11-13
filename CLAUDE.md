@@ -1,5 +1,7 @@
 # beverage-disposal
 
+Tier: portfolio
+
 Context file for anyone (human or AI assistant) working in this repository. It is committed,
 public, and must stay accurate: see "Maintenance rules".
 
@@ -63,7 +65,7 @@ simulation with statistics, 2 = a real arm, 3 = wider containers and more sensor
   the friction; softer contacts). **2.5 (scripted pick-and-place) built the same day** (`core/interfaces.py`, `core/scripted.py`, `core/baselines.py`,
   `sim/rollout.py`, `tests/scripted/`): a nine-phase script puts an empty or a full can on the pad, in the bin or in the
   set-aside area from 12 of 12 seeded spawns each, at 0.6 N m of squeeze; a random policy and a never-squeeze script score
-  zero, and perception noise of 5 mm breaks it (8 of 8 at 2 mm). **2.3 (recorder and task tests) built the same day** (`core/trajectory.py`, `core/task_tests.py`, `sim/recorder.py`,
+  zero, and perception noise of 10 mm breaks it (5 of 8 at 7 mm, 7 of 8 at 5 mm and 8 of 8 at 2 mm, after the gain fix below). **2.3 (recorder and task tests) built the same day** (`core/trajectory.py`, `core/task_tests.py`, `sim/recorder.py`,
   `tests/tasktests/`): six pass-fail tests and five indicators on a recorded episode, with thresholds measured on 24 scripted
   episodes. **2.2 (container registry) built the same day** (`core/registry.py`, `configs/containers.toml`, `tests/containers/`): container
   types are data tables with provenance, the scene names one, and an unknown type is met with a request to enrol it. **2.6a (pad and weight rule) built the same day** (`core/pad.py`, `core/fullness.py`, `core/fullness_eval.py`,
@@ -77,7 +79,7 @@ simulation with statistics, 2 = a real arm, 3 = wider containers and more sensor
   Computed, not run through MuJoCo. **2.7 (safety supervisor) built the same day** (`core/supervisor.py`, `core/supervised.py`, `core/safety_config.py`, `configs/safety.toml`,
   `tests/safety/`): checks for a too-wide or too-heavy container, an unknown type, a failed test lift, arm force and gripper torque, bad or
   missing observations, timeout and a moved container, all reported by light, sound and message; a check that throws is a stop. Faults injected
-  into a running episode (NaN, dead sensor, no finish, throwing supervisor, NaN action) all end in a safe stop. **2.8 (sequencer, harness, results file, demo) built the same day** (`core/sequencer.py`, `core/acceptance.py`, `sim/skills.py`, `sim/harness.py`, `sim/demo.py`, `scripts/run_acceptance.py`, `scripts/record_demo.py`, `tests/sequencer/`): the sequencer carries a container to the pad, weighs it, decides and carries it on, under the supervisor; the harness runs it over a volume grid with seeded runs and writes a results file (commit, config hash, versions, seeds, counts). First run (can, known type, 381 trials at each of 0, 30, 31 and 35 mL, scripted skill, git cfc6544 plus uncommitted 2.8 files): in simulation, 0 of 381 binned at each of 30, 31 and 35 mL (Wilson 95 % upper bound 0.998 %); 342 of 381 empties binned (the other 39 were set aside or stopped; the summary does not split them yet); pick-and-place completed in 1389 of 1524 runs (lower bound 89.6 %, just under the 90 % target; one found cause: seed 4 at 30 mL times out on the first leg). Not run: the unknown-type (tilt) grid and the bottle. Iteration 2 is built continuously from 2026-11-13 with no
+  into a running episode (NaN, dead sensor, no finish, throwing supervisor, NaN action) all end in a safe stop. **2.8 (sequencer, harness, results file, demo) built the same day** (`core/sequencer.py`, `core/acceptance.py`, `sim/skills.py`, `sim/harness.py`, `sim/demo.py`, `scripts/run_acceptance.py`, `scripts/record_demo.py`, `tests/sequencer/`): the sequencer carries a container to the pad, weighs it, decides and carries it on, under the supervisor; the harness runs it over a volume grid with seeded runs and writes a results file (commit, config hash, versions, seeds, counts). First run (can, known type, 381 trials at each of 0, 30, 31 and 35 mL, scripted skill, git cfc6544 plus uncommitted 2.8 files, approach gain 0.5): in simulation, 0 of 381 binned at each of 30, 31 and 35 mL (Wilson 95 % upper bound 0.998 %); 342 of 381 empties binned (the other 39 were all stopped on the first leg); pick-and-place completed in 1389 of 1524 runs (lower bound 89.6 %, just under the 90 % target). **Cause found and fixed on `fix/scripted-gain-oscillation` (2026-11-13):** the scripted controller's gain of 0.5 on the tip error, added to the delta controller's previous target, is an integrator behind 1 to 2 steps of servo lag; the tip swung about 40 mm over cans spawned beyond x = 0.29 m and knocked them over (71 of 762 first legs at 0 and 30 mL). Gains 0.15, 0.2 and 0.25 had 0 failures in 2286 first legs; gain 0.3 failed 5 of 20 hard seeds; the gain is now 0.2. The results file now splits empties into binned, set aside and stopped, counts stops by code and lists one row per run. **Rerun at gain 0.2 (git 4a67868, clean tree, 381 trials at 0, 30, 31 and 35 mL):** 0 of 381 binned at each of 30, 31 and 35 mL (Wilson 95 % upper bound 0.998 %); 381 of 381 empties binned; pick-and-place completed in 1524 of 1524 runs (lower bound 99.7 %), for the can, the scripted skill, in simulation. The unknown-type grid (tilt path, same volumes and trials) gave the same counts: 0 of 381 binned at each of 30, 31 and 35 mL, 381 of 381 empties binned, 1524 of 1524 completed; it runs the tilt verdict and logs the enrolment request. The "5 seeds" bound applies to learned-policy training seeds, not to this deterministic script, so it is not measured here. Not run: the bottle. Iteration 2 is built continuously from 2026-11-13 with no
   teaching pauses (the owner studies separately): 2.1a, 2.1b, 2.4, 2.5, 2.3, 2.2, 2.6a, 2.6b, 2.6c, 2.7, 2.8. The
   order comes from the iteration 2 plan review (2026-10-29) and keeps the full scope, tilt routine included.
   2.1 is split into the minimal scene (table, can, one config home for container size and mass) and the layout
@@ -92,7 +94,7 @@ simulation with statistics, 2 = a real arm, 3 = wider containers and more sensor
   30 mL promise), RL narrowed to one pick-and-place skill, the bottle was added after the can, and a real-arm
   tier (iteration 9) and headline metrics were added. The Locked decisions and Roadmap below are the result.
 - Iterations 2 to 9 are planned in detail down to sub-iterations (see Roadmap) and not started.
-- Last updated: 2026-11-13 (2.8 built; iteration 2 complete). Update this section in the same change as every sub-iteration.
+- Last updated: 2026-11-13 (2.8 built; iteration 2 complete; scripted gain fixed and acceptance rerun). Update this section in the same change as every sub-iteration.
 
 ## Locked decisions
 
@@ -236,9 +238,12 @@ Each label is a stable name; the owner's private decision journal uses the same 
   come from a sensitivity study, and a "sim-to-sim gap budget" doc lists each MuJoCo/Gazebo
   difference and whether it is randomized, matched or accepted.
 - **License:** The Unlicense. Vendored third-party files keep their own licenses.
-- **Repo policy:** since 2026-11-13 assistants commit on a sub-iteration's branch and merge it into `main`
-  with `git merge --no-ff`, staging named publishable files only; the owner reviews the history afterwards.
-  Assistants never push. (Before that date the owner made every commit.)
+- **Repo policy:** portfolio tier (full pull-request loop). Assistants commit small Conventional Commits on a feature
+  branch, staging named publishable files only, and run the full check before a pull request. The owner reads the diff
+  and merges; assistants do not merge. Assistants push or open a pull request only on the owner's explicit go. Until the
+  repo is published (no remote yet) the owner merges locally with `git merge --no-ff`. (Between 2026-11-13 and
+  2026-11-13 evening, during the iteration 2 run, assistants merged into `main` themselves; before that the owner
+  made every commit.) There is no single check command and no workflow that runs the checks on every push yet; both are to be added.
 
 ## Process rules
 
