@@ -16,7 +16,7 @@ name = "can_12floz"
 diameter = 0.066
 height = 0.122
 empty_mass = 0.014
-grasp_height = 0.061  # half the can: the jaws take it at its middle
+grasp_height = 0.10  # near the rim: lower, the jaw housing hits the can (2.4)
 friction = 1.0
 
 [container.provenance]
@@ -35,13 +35,13 @@ floor = 0.005
 friction = 1.0
 
 [set_aside]
-center_x = 0.32
-center_y = 0.16
-half_x = 0.05
+center_x = 0.275
+center_y = 0.17
+half_x = 0.045
 half_y = 0.05
 
 [pad]
-center_x = 0.18
+center_x = 0.17
 center_y = 0.15
 half_x = 0.04
 half_y = 0.04
@@ -49,12 +49,34 @@ height = 0.02
 friction = 1.0
 
 [spawn]
-center_x = 0.30
+center_x = 0.29
 center_y = 0.0
-half_size = 0.06
+half_size = 0.04
 
 [reach]
 min_pitch_deg = 60.0
 approach_clearance = 0.04
 lift_height = 0.03
 release_clearance = 0.01
+
+[grasp]
+wrist_roll = 1.5707963  # pi/2: the jaws close sideways, so the tool can tilt forward
+pitch_deg = 60.0
+open_angle = 1.3
+close_target = -0.1
+close_rate = 0.02
+clearance = 0.002
+force_limit = 0.3  # N m; too much squeeze pops the can out of the jaws
+
+[gripper_pads]
+design_angle = 0.9
+thickness = 0.008
+half_width = 0.008
+half_height = 0.012
+depth = -0.095
+friction = 1.0
+
+[physics]
+timestep = 0.002
+contact_time_constant = 0.02
+contact_damping_ratio = 1.0

@@ -41,9 +41,6 @@ def _poses(config: SceneConfig) -> list[tuple[str, tuple[float, float, float]]]:
     site("pad", config.pad.center_x, config.pad.center_y, config.pad.height, "place")
     site("set_aside", config.set_aside.center_x, config.set_aside.center_y, 0.0, "place")
     release_z = config.bin.height + reach.release_clearance + grasp
-    poses.append(
-        ("bin:approach", (config.bin.center_x, config.bin.center_y, release_z + reach.lift_height))
-    )
     poses.append(("bin:release", (config.bin.center_x, config.bin.center_y, release_z)))
     return poses
 

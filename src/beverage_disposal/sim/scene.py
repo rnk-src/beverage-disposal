@@ -7,6 +7,7 @@ import mujoco
 from beverage_disposal.core.config import BinConfig, PadConfig, SceneConfig, SetAsideConfig
 from beverage_disposal.core.containers import total_mass
 from beverage_disposal.sim.arm import arm_spec
+from beverage_disposal.sim.pads import add_gripper_pads
 
 # MuJoCo's default torsional and rolling friction; only the sliding coefficient is configured.
 # Two touching geoms use the larger of their sliding coefficients, so the table's counts too.
@@ -27,6 +28,9 @@ def build_scene(config: SceneConfig, mjcf: str | Path) -> mujoco.MjModel:
     spec = arm_spec(mjcf)
     spec.option.cone = CONE
     spec.option.impratio = IMPRATIO
+    spec.option.timestep = config.physics.timestep
+    add_gripper_pads(spec, config, mjcf)
+    spec.actuator("gripper").forcerange = [-config.grasp.force_limit, config.grasp.force_limit]
     world = spec.worldbody
     table = config.table
     # The table's top is z = 0 of the arm's base frame, where the base body sits.
@@ -52,6 +56,7 @@ def build_scene(config: SceneConfig, mjcf: str | Path) -> mujoco.MjModel:
         mass=total_mass(can, config.fill_ml),
         friction=[can.friction, TORSIONAL_FRICTION, ROLLING_FRICTION],
     )
+    _soften(spec, config)
     return spec.compile()
 
 
@@ -122,3 +127,14 @@ def _add_set_aside_marker(world, area: SetAsideConfig) -> None:
     marker.contype = 0
     marker.conaffinity = 0
     marker.rgba = MARKER_COLOUR
+
+
+def _soften(spec, config: SceneConfig) -> None:
+    """The configured contact softness on the scene's own geoms (the pads get it in sim/pads.py)."""
+    solref = [config.physics.contact_time_constant, config.physics.contact_damping_ratio]
+    scene_geoms = {"table", "container", "pad", "bin_floor"} | {
+        f"bin_wall_{side}" for side in ("north", "south", "east", "west")
+    }
+    for geom in spec.geoms:
+        if geom.name in scene_geoms:
+            geom.solref = solref

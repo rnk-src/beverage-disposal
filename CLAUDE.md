@@ -57,7 +57,10 @@ simulation with statistics, 2 = a real arm, 3 = wider containers and more sensor
   can creep. **2.1b (layout) built the same day** (`core/layout.py`, `core/reach.py`, bin, pad, set-aside marker and
   spawn box in `configs/scene.toml`): a reach check requires every pick, pad, set-aside and bin pose to be reachable
   at 60 degrees of pitch or more; top-down is reachable only to about x = 0.26 m at the can's middle height, which
-  sized the spawn box (0.12 m square) and the bin walls (0.06 m). **Next: 2.4.** Iteration 2 is built continuously from 2026-11-13 with no
+  sized the spawn box (0.12 m square) and the bin walls (0.06 m). **2.4 (grasp physics) built the same day** (`sim/pads.py`, `sim/grasp.py`, `tests/grasp/`): the vendored jaws could not hold
+  the can, so two flat pads replace the jaw collision, the wrist rolls 90 degrees and the can is taken near its rim (0.10 m);
+  a prescribed grasp lifts empty and full cans at normal friction, with two strict, documented limits (a full can at half
+  the friction; softer contacts). **Next: 2.5.** Iteration 2 is built continuously from 2026-11-13 with no
   teaching pauses (the owner studies separately): 2.1a, 2.1b, 2.4, 2.5, 2.3, 2.2, 2.6a, 2.6b, 2.6c, 2.7, 2.8. The
   order comes from the iteration 2 plan review (2026-10-29) and keeps the full scope, tilt routine included.
   2.1 is split into the minimal scene (table, can, one config home for container size and mass) and the layout
@@ -72,7 +75,7 @@ simulation with statistics, 2 = a real arm, 3 = wider containers and more sensor
   30 mL promise), RL narrowed to one pick-and-place skill, the bottle was added after the can, and a real-arm
   tier (iteration 9) and headline metrics were added. The Locked decisions and Roadmap below are the result.
 - Iterations 2 to 9 are planned in detail down to sub-iterations (see Roadmap) and not started.
-- Last updated: 2026-11-13 (2.1b built). Update this section in the same change as every sub-iteration.
+- Last updated: 2026-11-13 (2.4 built). Update this section in the same change as every sub-iteration.
 
 ## Locked decisions
 
