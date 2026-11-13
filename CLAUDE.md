@@ -77,8 +77,9 @@ simulation with statistics, 2 = a real arm, 3 = wider containers and more sensor
   Computed, not run through MuJoCo. **2.7 (safety supervisor) built the same day** (`core/supervisor.py`, `core/supervised.py`, `core/safety_config.py`, `configs/safety.toml`,
   `tests/safety/`): checks for a too-wide or too-heavy container, an unknown type, a failed test lift, arm force and gripper torque, bad or
   missing observations, timeout and a moved container, all reported by light, sound and message; a check that throws is a stop. Faults injected
-  into a running episode (NaN, dead sensor, no finish, throwing supervisor, NaN action) all end in a safe stop. **Next: 2.8.**
-  Iteration 2 is built continuously from 2026-11-13 with no
+  into a running episode (NaN, dead sensor, no finish, throwing supervisor, NaN action) all end in a safe stop. **2.8 (sequencer, harness, results file, demo) is in progress on branch `iter2/2.8-sequencer-harness`, not merged:** `core/sequencer.py`
+  (13 tests), `sim/skills.py` and `run_episode(start=, on_step=)` are written; the evaluation harness, `scripts/run_acceptance.py`,
+  `scripts/record_demo.py`, the sim-backed sequencer tests and the 2.8 docs are still to do. Iteration 2 is built continuously from 2026-11-13 with no
   teaching pauses (the owner studies separately): 2.1a, 2.1b, 2.4, 2.5, 2.3, 2.2, 2.6a, 2.6b, 2.6c, 2.7, 2.8. The
   order comes from the iteration 2 plan review (2026-10-29) and keeps the full scope, tilt routine included.
   2.1 is split into the minimal scene (table, can, one config home for container size and mass) and the layout

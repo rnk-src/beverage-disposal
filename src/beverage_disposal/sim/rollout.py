@@ -2,6 +2,7 @@
 
 import dataclasses
 import math
+from collections.abc import Callable
 from dataclasses import dataclass
 
 import mujoco
@@ -45,17 +46,31 @@ def run_episode(
     seed: int,
     noise: ObservationNoise | None = None,
     max_steps: int = MAX_STEPS,
+    start: tuple[float, float, float] | None = None,
+    on_step: Callable[[ArmLoop], None] | None = None,
 ) -> Episode:
-    """Spawn the container at a seeded position, run `controller`, and judge where it ended up."""
+    """Spawn the container at a seeded position, run `controller`, and judge where it ended up.
+
+    `start` (x, y, surface height) puts the container there instead, standing on that surface;
+    `on_step` is called with the loop after every control step (the demo recorder draws from it).
+    """
     x, y = sample_spawn(config, np.random.default_rng(seed))
     config = dataclasses.replace(config, container_x=x, container_y=y)
     loop = ArmLoop(build_scene(config, mjcf))
     grasp = config.grasp
     pitch = math.radians(grasp.pitch_deg)
-    start = np.array(HOME, dtype=float)
-    start[4] = grasp.wrist_roll
-    ready = solve_ik(np.array(READY_TIP), pitch, start).angles
+    start_pose = np.array(HOME, dtype=float)
+    start_pose[4] = grasp.wrist_roll
+    ready = solve_ik(np.array(READY_TIP), pitch, start_pose).angles
     loop.reset(ready[:5], grasp.open_angle)
+    if start is not None:
+        address = loop.model.joint("container").qposadr[0]
+        loop.data.qpos[address : address + 3] = [
+            start[0],
+            start[1],
+            start[2] + config.container.height / 2,
+        ]
+        mujoco.mj_forward(loop.model, loop.data)
     arm = EEDeltaController(workspace=WORKSPACE, pitch=pitch)
     arm.reset(loop.joints, loop.gripper)
     noise_rng = np.random.default_rng([seed, 1])
@@ -82,6 +97,8 @@ def run_episode(
         command = arm.step(previous, loop.joints, loop.gripper)
         loop.step(command.joints[:5], command.gripper)
         recorder.record(loop, previous)
+        if on_step is not None:
+            on_step(loop)
         step += 1
     finished = bool(getattr(controller, "done", False))
     stop = getattr(controller, "stop_event", None)
