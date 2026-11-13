@@ -79,6 +79,10 @@ class Supervisor:
         self._indicators.message(message)
         return Decision(outcome, event)
 
+    def stop(self, code: str, message: str) -> Decision:
+        """Report a failure the caller saw (a pick that did not lift, say) as a safe stop."""
+        return self._trip(Outcome.SAFE_STOP, code, message)
+
     def check_container(
         self, record: ContainerRecord | None, *, diameter: float, mass_kg: float
     ) -> Decision:

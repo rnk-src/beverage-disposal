@@ -26,6 +26,7 @@ ALLOWED_IN_TESTS = [
     "statics",
     "tilt",
     "safety",
+    "sequencer",
 ]
 
 
