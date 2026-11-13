@@ -77,7 +77,12 @@ def never_open_the_gripper_at_the_goal(package):
 
 
 def accept_any_place_as_inside_the_goal(package):
-    edit(package, ROLLOUT, "(goal.holds(position[0], position[1], radius),", "(True,")
+    edit(
+        package,
+        "core/task_tests.py",
+        "    if not goal.holds(position[0], position[1], radius):",
+        "    if False:",
+    )
 
 
 def spawn_every_seed_at_the_same_place(package):

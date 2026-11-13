@@ -21,6 +21,8 @@ ALLOWED_IN_TESTS = [
     "grasp",
     "scripted",
     "tasktests",
+    "containers",
+    "fullness",
 ]
 
 

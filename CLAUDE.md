@@ -65,7 +65,9 @@ simulation with statistics, 2 = a real arm, 3 = wider containers and more sensor
   set-aside area from 12 of 12 seeded spawns each, at 0.6 N m of squeeze; a random policy and a never-squeeze script score
   zero, and perception noise of 5 mm breaks it (8 of 8 at 2 mm). **2.3 (recorder and task tests) built the same day** (`core/trajectory.py`, `core/task_tests.py`, `sim/recorder.py`,
   `tests/tasktests/`): six pass-fail tests and five indicators on a recorded episode, with thresholds measured on 24 scripted
-  episodes. **Next: 2.2.** Iteration 2 is built continuously from 2026-11-13 with no
+  episodes. **2.2 (container registry) built the same day** (`core/registry.py`, `configs/containers.toml`, `tests/containers/`): container
+  types are data tables with provenance, the scene names one, and an unknown type is met with a request to enrol it. **Next: 2.6a.**
+  Iteration 2 is built continuously from 2026-11-13 with no
   teaching pauses (the owner studies separately): 2.1a, 2.1b, 2.4, 2.5, 2.3, 2.2, 2.6a, 2.6b, 2.6c, 2.7, 2.8. The
   order comes from the iteration 2 plan review (2026-10-29) and keeps the full scope, tilt routine included.
   2.1 is split into the minimal scene (table, can, one config home for container size and mass) and the layout
@@ -80,7 +82,7 @@ simulation with statistics, 2 = a real arm, 3 = wider containers and more sensor
   30 mL promise), RL narrowed to one pick-and-place skill, the bottle was added after the can, and a real-arm
   tier (iteration 9) and headline metrics were added. The Locked decisions and Roadmap below are the result.
 - Iterations 2 to 9 are planned in detail down to sub-iterations (see Roadmap) and not started.
-- Last updated: 2026-11-13 (2.3 built). Update this section in the same change as every sub-iteration.
+- Last updated: 2026-11-13 (2.2 built). Update this section in the same change as every sub-iteration.
 
 ## Locked decisions
 
@@ -390,7 +392,7 @@ rewrites files and stops the commit so you re-stage them.
 
 ```
 src/beverage_disposal/   Python package (placeholder name)
-  core/                    the ROS-free core (no MuJoCo): trajectory.py and task_tests.py (an episode record and the
+  core/                    the ROS-free core (no MuJoCo): registry.py (container types as data, enrolment), trajectory.py and task_tests.py (an episode record and the
                            task's pass-fail and indicative functions), interfaces.py (Observation, Controller, noise), scripted.py
                            (the scripted pick-and-place), baselines.py (random policy); config.py (frozen scene dataclasses read from TOML),
                            containers.py (ContainerSpec, provenance, liquid mass), layout.py (footprints, spawn sampler, set-aside test),
@@ -415,6 +417,7 @@ tests/                   pytest tests (fast/medium/slow tiers), one folder per a
   kinematics/              FK against MuJoCo, the home pose, pan and roll properties, the core without
                            MuJoCo, the chain file's generator and staleness, and their can-fail proofs
   control/                 the end-effector delta controller and the closed loop through the PD actuators
+  containers/              the registry, its weights with sources and the enrolment of unknown types
   tasktests/               the recorder and the task's pass-fail and indicative functions
   scripted/                the observation, the scripted pick-and-place, the goals and the baselines
   grasp/                   the gripper pads and the prescribed grasp, with its measured limits
@@ -424,7 +427,7 @@ tests/                   pytest tests (fast/medium/slow tiers), one folder per a
                            damaged-copy and mutated-package harnesses); no tests
   conftest.py              tier hook and shared fixtures
 assets/                  vendored third-party files with provenance (the SO-101 model)
-configs/                 configs (scene.toml; task, training later) and the stored actuator step-response reference (JSON)
+configs/                 configs (scene.toml, containers.toml; training later) and the stored actuator step-response reference (JSON)
 scripts/                 helper scripts (view_so101.py, generate_so101_chain.py, measure_actuators.py)
 pyproject.toml  uv.lock  .python-version   uv project, exact lockfile, pinned Python
 .pre-commit-config.yaml                    git hooks (ruff, fast tests)

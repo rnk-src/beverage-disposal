@@ -2,7 +2,8 @@
 # The table top is the plane z = 0 of the arm's base frame. Nothing here is measured on a real can.
 container_x = 0.27  # the middle of the spawn box
 container_y = 0.0
-fill_ml = 0.0       # liquid inside the can, water at 1 g per mL
+fill_ml = 0.0       # liquid inside the container, water at 1 g per mL
+container_type = "can_12floz"  # a table in containers.toml
 
 [table]
 center_x = 0.20
@@ -10,20 +11,6 @@ half_x = 0.30
 half_y = 0.30
 thickness = 0.04
 friction = 1.0
-
-[container]
-name = "can_12floz"
-diameter = 0.066
-height = 0.122
-empty_mass = 0.014
-grasp_height = 0.10  # near the rim: lower, the jaw housing hits the can (2.4)
-friction = 1.0
-torsional_friction = 0.01
-
-[container.provenance]
-source = "web figures for a 12 fl oz aluminium can (about 66 mm by 122 mm, about 14 g); the old repo used the same"
-date = "2026-11-13"
-kind = "assumed"
 
 [bin]
 center_x = 0.20
