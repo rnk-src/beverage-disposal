@@ -71,7 +71,10 @@ simulation with statistics, 2 = a real arm, 3 = wider containers and more sensor
   less a 2 g margin), Wilson bounds, and a Monte Carlo: in simulation, 0 of 100 000 binned at 30, 31 and 35 mL of the lightest
   drink (bound 3.8e-5); the sweep breaks at about four times the nominal noise. **2.6b (statics wrench) built the same day** (`core/statics.py`, `tests/statics/`): the liquid's torque on a tilted grasp from a
   rigid-cylinder model with closed-form checks; at 60 degrees about 0.6 mN m per mL, and the plausible parameter errors move 30 mL's
-  torque by about 4 mL's worth (model M, unvalidated). **Next: 2.6c.**
+  torque by about 4 mL's worth (model M, unvalidated). **2.6c (tilt routine) built the same day** (`core/tilt.py`, `core/coinft.py`, `core/tilt_config.py`, `configs/tilt.toml`,
+  `tests/tilt/`): a CoinFT model and a tilt verdict that bins an unknown container only if the volume bound is under 30 mL (about 14 mL
+  of margin with the guessed sensor, so cans under about 16 mL), with a pad-only fallback; 0 of 500 binned at 30, 31 and 35 mL.
+  Computed, not run through MuJoCo. **Next: 2.7.**
   Iteration 2 is built continuously from 2026-11-13 with no
   teaching pauses (the owner studies separately): 2.1a, 2.1b, 2.4, 2.5, 2.3, 2.2, 2.6a, 2.6b, 2.6c, 2.7, 2.8. The
   order comes from the iteration 2 plan review (2026-10-29) and keeps the full scope, tilt routine included.
@@ -87,7 +90,7 @@ simulation with statistics, 2 = a real arm, 3 = wider containers and more sensor
   30 mL promise), RL narrowed to one pick-and-place skill, the bottle was added after the can, and a real-arm
   tier (iteration 9) and headline metrics were added. The Locked decisions and Roadmap below are the result.
 - Iterations 2 to 9 are planned in detail down to sub-iterations (see Roadmap) and not started.
-- Last updated: 2026-11-13 (2.6b built). Update this section in the same change as every sub-iteration.
+- Last updated: 2026-11-13 (2.6c built). Update this section in the same change as every sub-iteration.
 
 ## Locked decisions
 
@@ -397,7 +400,8 @@ rewrites files and stops the commit so you re-stage them.
 
 ```
 src/beverage_disposal/   Python package (placeholder name)
-  core/                    the ROS-free core (no MuJoCo): statics.py (the liquid wrench of a tilted container), pad.py (weighing pad model), fullness.py (the weight rule),
+  core/                    the ROS-free core (no MuJoCo): tilt.py (the tilt verdict and pad-only fallback), coinft.py
+                           (torque sensor model), tilt_config.py, statics.py (the liquid wrench of a tilted container), pad.py (weighing pad model), fullness.py (the weight rule),
                            fullness_eval.py (Monte Carlo and sweeps), fullness_config.py, statistics.py (Wilson bounds), registry.py (container types as data, enrolment), trajectory.py and task_tests.py (an episode record and the
                            task's pass-fail and indicative functions), interfaces.py (Observation, Controller, noise), scripted.py
                            (the scripted pick-and-place), baselines.py (random policy); config.py (frozen scene dataclasses read from TOML),
@@ -423,6 +427,7 @@ tests/                   pytest tests (fast/medium/slow tiers), one folder per a
   kinematics/              FK against MuJoCo, the home pose, pan and roll properties, the core without
                            MuJoCo, the chain file's generator and staleness, and their can-fail proofs
   control/                 the end-effector delta controller and the closed loop through the PD actuators
+  tilt/                    the CoinFT model, the tilt verdict, the volume bound and the pad-only fallback
   statics/                 the liquid wrench: closed-form checks, spill angle and the sensitivity sweep
   fullness/                the pad model, the weight rule, the Wilson bound and the false-bin Monte Carlo
   containers/              the registry, its weights with sources and the enrolment of unknown types
@@ -435,7 +440,7 @@ tests/                   pytest tests (fast/medium/slow tiers), one folder per a
                            damaged-copy and mutated-package harnesses); no tests
   conftest.py              tier hook and shared fixtures
 assets/                  vendored third-party files with provenance (the SO-101 model)
-configs/                 configs (scene.toml, containers.toml, fullness.toml; training later) and the stored actuator step-response reference (JSON)
+configs/                 configs (scene.toml, containers.toml, fullness.toml, tilt.toml; training later) and the stored actuator step-response reference (JSON)
 scripts/                 helper scripts (view_so101.py, generate_so101_chain.py, measure_actuators.py)
 pyproject.toml  uv.lock  .python-version   uv project, exact lockfile, pinned Python
 .pre-commit-config.yaml                    git hooks (ruff, fast tests)
