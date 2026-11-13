@@ -12,9 +12,10 @@ from beverage_disposal.sim.rollout import run_episode
 class SimSkill:
     """Runs one leg as a full simulated episode. Each leg starts with the arm at its ready pose."""
 
-    def __init__(self, scene: SceneConfig, mjcf):
+    def __init__(self, scene: SceneConfig, mjcf, on_step=None):
         self._scene = scene
         self._mjcf = mjcf
+        self._on_step = on_step
 
     def pick_and_place(
         self, source: Placement | None, goal: Goal, *, item: Item, seed: int
@@ -25,6 +26,12 @@ class SimSkill:
         )
         start = None if source is None else (source.x, source.y, source.surface_z)
         episode = run_episode(
-            config, self._mjcf, ScriptedController(config), goal, seed=seed, start=start
+            config,
+            self._mjcf,
+            ScriptedController(config),
+            goal,
+            seed=seed,
+            start=start,
+            on_step=self._on_step,
         )
         return SkillResult(episode.success, episode.reason)
