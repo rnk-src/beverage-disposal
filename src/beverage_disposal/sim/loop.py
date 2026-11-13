@@ -19,7 +19,8 @@ class ArmLoop:
     def reset(self, joints, gripper):
         """Rest the arm in the given pose, holding it there (the targets equal the pose)."""
         mujoco.mj_resetData(self._model, self._data)
-        self._data.qpos[:] = [*joints, gripper]
+        # Only the arm's own coordinates: a scene adds the container's free joint after them.
+        self._data.qpos[: ARM_JOINTS + 1] = [*joints, gripper]
         self._data.ctrl[:] = [*joints, gripper]
         mujoco.mj_forward(self._model, self._data)
 
