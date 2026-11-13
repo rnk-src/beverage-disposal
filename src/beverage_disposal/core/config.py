@@ -159,7 +159,7 @@ def load_scene_config(path: str | Path, registry_path: str | Path | None = None)
         data = tomllib.load(file)
     registry = load_registry(registry_path or path.parent / "containers.toml")
     type_id = data.get("container_type")
-    record = registry.lookup(type_id)
+    record = registry.lookup(type_id) if isinstance(type_id, str) else None
     if record is None:
         raise ValueError(f"scene: container_type {type_id!r} is not in the registry")
     return from_mapping(SceneConfig, {**data, "container": record.spec})

@@ -243,7 +243,7 @@ Each label is a stable name; the owner's private decision journal uses the same 
   and merges; assistants do not merge. Assistants push or open a pull request only on the owner's explicit go. Until the
   repo is published (no remote yet) the owner merges locally with `git merge --no-ff`. (Between 2026-11-13 and
   2026-11-13 evening, during the iteration 2 run, assistants merged into `main` themselves; before that the owner
-  made every commit.) There is no single check command and no workflow that runs the checks on every push yet; both are to be added.
+  made every commit.) `make check` is the single check command and the workflow in `.github/workflows/check.yml` runs it on pull requests and on pushes to `main`.
 
 ## Process rules
 
@@ -380,6 +380,7 @@ uv run pytest                # default run: fast + medium tiers (slow is exclude
 uv run pytest -m fast        # quick loop, run on every change (about 45 s today)
 uv run pytest -m slow        # slow tier only (for example training runs)
 uv run pytest tests/tooling  # one area of the tests
+make check                   # format check, lint, mypy on core/, tests (not Docker/Gazebo); what CI runs
 uv lock --check              # is uv.lock consistent with pyproject.toml?
 uv run ruff check .          # lint (reports only; nothing is auto-fixed)
 uv run ruff format .         # format
@@ -395,7 +396,7 @@ uv run pytest tests/gazebo   # Gazebo image tests: need a running Docker daemon,
 
 Dependencies: ranges in `pyproject.toml`, exact versions in `uv.lock`. Runtime: `mujoco`,
 `numpy`, `gymnasium`. Dev group: `pytest`, `hypothesis`, `packaging`, `ruff`, `pre-commit`,
-`pillow`, `mink` (the IK oracle of 1.4; it pulls in `qpsolvers`, `daqp` and `scipy`). A test
+`pillow`, `mypy` (types of `core/`, run by `make check`), `mink` (the IK oracle of 1.4; it pulls in `qpsolvers`, `daqp` and `scipy`). A test
 fails if the installed environment drifts from `uv.lock`, and another fails if the "Versions
 locked" sentence above disagrees with it, so update both together when a dependency changes. To add or upgrade a dependency, edit `pyproject.toml`, run
 `uv lock` then `uv sync`, and commit both files.
@@ -455,6 +456,8 @@ assets/                  vendored third-party files with provenance (the SO-101 
 configs/                 configs (scene.toml, containers.toml, fullness.toml, tilt.toml, safety.toml; training later) and the stored actuator step-response reference (JSON)
 scripts/                 helper scripts (view_so101.py, generate_so101_chain.py, measure_actuators.py, run_acceptance.py, record_demo.py)
 pyproject.toml  uv.lock  .python-version   uv project, exact lockfile, pinned Python
+Makefile                                   `make check`, the one command for every gate
+.github/                                   the check workflow and the pull-request template
 .pre-commit-config.yaml                    git hooks (ruff, fast tests)
 README.md  CLAUDE.md  LICENSE  .gitignore
 ```
