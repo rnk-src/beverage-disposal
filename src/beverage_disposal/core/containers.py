@@ -24,11 +24,12 @@ class ContainerSpec:
     diameter: float
     height: float
     empty_mass: float
+    grasp_height: float  # TCP height above the container's bottom when the jaws take it, metres
     friction: float
     provenance: Provenance
 
 
-def total_mass(container, fill_ml):
+def total_mass(container: ContainerSpec, fill_ml: float) -> float:
     """Empty container plus `fill_ml` of liquid, in kilograms."""
     if fill_ml < 0:
         raise ValueError(f"fill must not be negative, got {fill_ml} mL")
