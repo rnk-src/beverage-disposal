@@ -6,7 +6,7 @@ import pytest
 from support.so101 import MJCF, SO101
 from test_sequencer import CAN, FULLNESS, LIMITS, REGISTRY, SCENE, TILT
 
-from beverage_disposal.core.sequencer import IdealSkill
+from beverage_disposal.core.sequencer import IdealSkill, SkillResult
 from beverage_disposal.sim.harness import evaluate
 from beverage_disposal.sim.skills import SimSkill
 
@@ -44,6 +44,37 @@ def test_a_hundred_percent_misbinning_rule_shows_up_in_the_summary():
     options = {**SETUP, "fullness": broken}
     results = evaluate(IdealSkill(), volumes_ml=(35.0,), trials=3, container=CAN, **options)
     assert results["summary"]["binned_at_or_above_threshold"]["35"]["k"] == 3
+
+
+class FailingSkill:
+    def pick_and_place(self, source, goal, *, item, seed):
+        return SkillResult(False, "time ran out")
+
+
+def test_the_record_has_one_row_per_run_saying_how_it_ended():
+    rows = grid(IdealSkill())["runs"]
+    assert [(row["volume_ml"], row["seed"]) for row in rows] == [
+        (0.0, 0),
+        (0.0, 1),
+        (0.0, 2),
+        (31.0, 0),
+        (31.0, 1),
+        (31.0, 2),
+    ]
+    assert {row["destination"] for row in rows if row["volume_ml"] == 0.0} == {"binned"}
+    assert all(row["stop"] is None for row in rows)
+
+
+def test_a_stopped_run_names_its_stop_code_and_the_skills_reason():
+    results = grid(FailingSkill(), volumes=(0.0,), n=2)
+    for row in results["runs"]:
+        assert row["destination"] == "stopped"
+        assert row["stop"] == {
+            "code": "pick_failed",
+            "message": "the first pick failed: time ran out",
+        }
+    assert results["summary"]["stops"] == {"pick_failed": 2}
+    json.dumps(results)
 
 
 @pytest.mark.medium

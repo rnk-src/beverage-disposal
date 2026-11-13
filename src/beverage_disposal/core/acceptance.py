@@ -1,14 +1,27 @@
 """Turns a list of sequencer runs into the headline numbers of the results file."""
 
-from collections import defaultdict
+from collections import Counter, defaultdict
 from collections.abc import Sequence
 
-from beverage_disposal.core.sequencer import BINNED, STOPPED, Run
+from beverage_disposal.core.sequencer import BINNED, SET_ASIDE_AREA, STOPPED, Run
 from beverage_disposal.core.statistics import wilson_upper
 
 
 def _key(volume_ml: float) -> str:
     return f"{volume_ml:g}"
+
+
+UNRECORDED = "unrecorded"  # a stopped run whose supervisor left no event: should not happen
+
+
+def stop_of(run: Run) -> dict | None:
+    """The stop that ended a run (its last event), or None for a run that was not stopped."""
+    if run.destination != STOPPED:
+        return None
+    if not run.events:
+        return {"code": UNRECORDED, "message": ""}
+    last = run.events[-1]
+    return {"code": last.code, "message": last.message}
 
 
 def summarize(runs: Sequence[Run]) -> dict:
@@ -35,6 +48,18 @@ def summarize(runs: Sequence[Run]) -> dict:
             "n": len(empties),
             "k": sum(run.destination == BINNED for run in empties),
         },
+        "empties": {
+            "n": len(empties),
+            **{
+                name: sum(run.destination == destination for run in empties)
+                for name, destination in (
+                    ("binned", BINNED),
+                    ("set_aside", SET_ASIDE_AREA),
+                    ("stopped", STOPPED),
+                )
+            },
+        },
+        "stops": dict(Counter(stop["code"] for run in runs if (stop := stop_of(run)))),
         "pick_and_place": {
             "n": len(runs),
             "k": done,
