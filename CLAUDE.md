@@ -51,13 +51,22 @@ simulation with statistics, 2 = a real arm, 3 = wider containers and more sensor
   tiers pass on the merged result (the Gazebo tier was not run). Found on the way: straight-down
   pitch together with a tip position is reachable only below about z = 0.09 m, so a can cannot be grasped
   top-down at its middle.
-- **Next: iteration 2** (world, containers and the decision), starting with 2.1 (the scene).
+- **Next: iteration 2** (world, containers and the decision), built continuously from 2026-11-13 with no
+  teaching pauses (the owner studies separately): 2.1a, 2.1b, 2.4, 2.5, 2.3, 2.2, 2.6a, 2.6b, 2.6c, 2.7, 2.8. The
+  order comes from the iteration 2 plan review (2026-10-29) and keeps the full scope, tilt routine included.
+  2.1 is split into the minimal scene (table, can, one config home for container size and mass) and the layout
+  (bin, set-aside area, pad, reach map). 2.6 is split into the pad model with the weight rule, the statics model
+  and the tilt routine. 2.2 is data plus enrolment logic. 2.7 adds fault-injection tests that must end in
+  set-aside or a safe stop. The "binned at most 1 %" promise is tested as a measured miss rate per volume bin
+  (at least 381 trials in the bins near 30 mL for a zero-miss 95 % Wilson bound below 1 %), simulation only, and
+  is worded "in simulation, k/N misses, Wilson 95 % upper bound X %". Config is frozen dataclasses plus TOML read
+  with stdlib `tomllib`. The run is a work in progress by design; it stops at the end of iteration 2.
 - **Plan review closed (2026-10-13).** Every decision was re-examined against the real alternatives. The
   fullness decision became a coded rule (weighing pad and database, CoinFT tilt for unknown containers, a
   30 mL promise), RL narrowed to one pick-and-place skill, the bottle was added after the can, and a real-arm
   tier (iteration 9) and headline metrics were added. The Locked decisions and Roadmap below are the result.
 - Iterations 2 to 9 are planned in detail down to sub-iterations (see Roadmap) and not started.
-- Last updated: 2026-10-14 (after the iteration 1 merges). Update this section in the same change as every sub-iteration.
+- Last updated: 2026-11-13 (iteration 2 run rules; no iteration 2 code yet). Update this section in the same change as every sub-iteration.
 
 ## Locked decisions
 
@@ -167,7 +176,7 @@ Each label is a stable name; the owner's private decision journal uses the same 
 - **Architecture and code standards:** modules for perception, sequencer, the RL skill, the fullness
   rule and the safety supervisor; interfaces and data contracts (typed dataclasses and Protocols) are
   fixed first and their internals built test-first; core code is ROS-free and MuJoCo-free; mypy on
-  `core/` only, ruff everywhere; no magic numbers (named constants or YAML); comments only where the
+  `core/` only, ruff everywhere; no magic numbers (named constants or TOML); comments only where the
   code is complex or has a reason.
 - **TdRL later:** pass-fail and indicative test functions define the task and drive a
   hand-shaped reward first. The learned-reward method (Test-driven RL, AAAI-26) is a later
@@ -185,7 +194,8 @@ Each label is a stable name; the owner's private decision journal uses the same 
   then the randomization stages (S4, S5), promoted automatically when the lower confidence bound of
   evaluation success passes a threshold (unit-tested scheduler). Demonstrations or DORAEMON only if a
   stage stalls. The 4.3 run: SAC, at least 5 seeds, bootstrap intervals.
-- **Tracking:** dataclass + YAML configs and TensorBoard. Hydra and Weights & Biases are noted
+- **Tracking:** frozen dataclass configs read from TOML (stdlib `tomllib`, no new dependency; changed from
+  YAML on 2026-11-13) and TensorBoard. Hydra and Weights & Biases are noted
   alternatives to revisit when sweeping.
 - **Robustness (iteration 5, aimed at the Gazebo sim-to-sim test):** match what can be measured
   in Gazebo (for example actuator step responses) and randomize the residual uncertainty.
@@ -198,15 +208,18 @@ Each label is a stable name; the owner's private decision journal uses the same 
   come from a sensitivity study, and a "sim-to-sim gap budget" doc lists each MuJoCo/Gazebo
   difference and whether it is randomized, matched or accepted.
 - **License:** The Unlicense. Vendored third-party files keep their own licenses.
-- **Repo policy:** the owner makes every commit. Assistants must never run `git add` or
-  `git commit`.
+- **Repo policy:** since 2026-11-13 assistants commit on a sub-iteration's branch and merge it into `main`
+  with `git merge --no-ff`, staging named publishable files only; the owner reviews the history afterwards.
+  Assistants never push. (Before that date the owner made every commit.)
 
 ## Process rules
 
 1. **Iterations and sub-iterations.** Each iteration delivers a milestone; each has several
    sub-iterations.
-2. **Pause after every sub-iteration.** Stop, show the files, and teach what was written. Do not
-   start the next sub-iteration until the owner says go.
+2. **No pauses in the iteration 2 run.** Since 2026-11-13 the owner studies separately, so the
+   sub-iterations of iteration 2 are built one after another without stopping to teach. The run stops
+   at the end of iteration 2, or earlier when a decision belongs to the owner. Each sub-iteration still
+   ends with the tests green, the docs updated and a commit.
 3. **Strict test-driven development.** Write the tests first and watch them fail for the right
    reason, then the minimum code, then green, then refactor. RL-specific layers are in
    "Testing layers" below. The method follows the `test-driven-development` skill from
@@ -218,7 +231,8 @@ Each label is a stable name; the owner's private decision journal uses the same 
    claims against current docs, not memory.
 5. **Be honest about uncertainty.** Mark unverified facts as unverified; never claim something
    works unless it was run.
-6. **The owner commits.** Assistants summarize changes and may suggest a commit message.
+6. **Assistants commit on branches.** Each sub-iteration is committed on its own branch and merged
+   with a merge commit (see Repo policy); the owner reviews the history and may revert any merge.
 7. **Parallel work uses git worktrees.** Independent tasks run at the same time by separate
    agents, each in its own git worktree on its own branch (for example `iter1/fk`), created in a
    sibling directory next to the repository, never inside it. Each worktree has its own uv
@@ -319,6 +333,9 @@ Decisions and ideas to reopen at a specific point:
   it cannot live in the ROS-free core.
 - Hydra / Weights & Biases: when sweeping many runs.
 - Scripted-controller demonstrations for imitation-assisted RL: only if the grasp stage stalls.
+- A small C++ module for the pad pipeline (filter, tare, debounce, threshold, fail-safe state machine; no
+  dynamic allocation, unit tested, called from Python): an embedded-skills idea saved for after iteration 2,
+  once 2.6a works in Python. Not started.
 
 ## Commands
 
@@ -415,11 +432,12 @@ update docs.
   render smoke test; 0.7 Gazebo platform spike (narrow, built).
 - **1 Kinematics and end-effector control.** 1.1 model tests + tip site; 1.2 FK; 1.3 Jacobian;
   1.4 numerical IK; 1.5 EE-delta controller; 1.6 closed loop through PD actuators.
-- **2 World, containers and the decision (no RL yet).** 2.1 scene (table, weighing pad, bin, separate
-  set-aside area); 2.2 container registry, empty-weight database and enrolment logic; 2.3 trajectory
-  recorder + pass-fail/indicative tests; 2.4 grasp physics (can); 2.5 scripted pick-and-place controller;
-  2.6 fullness (statics liquid wrench, pad sensor model, weight rule, coded tilt routine and verdict);
-  2.7 safety supervisor; 2.8 sequencer + acceptance harness + metrics file.
+- **2 World, containers and the decision (no RL yet).** Build order: 2.1a minimal scene (table, can, config,
+  container spec); 2.1b layout (bin, set-aside area, weighing pad, reach map, spawn sampler); 2.4 grasp physics
+  (can); 2.5 scripted pick-and-place controller; 2.3 trajectory recorder + pass-fail/indicative tests; 2.2
+  container registry, empty-weight database and enrolment logic; 2.6a pad sensor model and weight rule; 2.6b
+  statics liquid wrench; 2.6c coded tilt routine and verdict; 2.7 safety supervisor with fault injection; 2.8
+  sequencer + acceptance harness + metrics file.
 - **3 Gymnasium environment for the skill.** 3.1 observations (with the simulated perception noise);
   3.2 action layer; 3.3 env core (goal B as input); 3.4 reward and termination; 3.5 wrappers and
   vectorization; 3.6 contract and baseline tests.
