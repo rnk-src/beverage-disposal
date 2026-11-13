@@ -12,14 +12,17 @@ SCENE = ROOT / "configs" / "scene.toml"
 
 
 def scene_with(tmp_path, old, new):
-    text = SCENE.read_text()
-    assert old in text, f"{old!r} is not in scene.toml: the edit would change nothing"
-    path = tmp_path / "scene.toml"
-    path.write_text(text.replace(old, new))
-    return path
+    """Copy the scene and container files to `tmp_path`, editing `old` to `new` where it occurs."""
+    found = False
+    for name in ["scene.toml", "containers.toml"]:
+        text = (SCENE.parent / name).read_text()
+        found = found or old in text
+        (tmp_path / name).write_text(text.replace(old, new))
+    assert found, f"{old!r} is in neither config file: the edit would change nothing"
+    return tmp_path / "scene.toml"
 
 
-def test_the_scene_file_describes_a_12_fl_oz_can_with_its_source():
+def test_the_scene_names_the_can_and_gets_its_figures_from_the_registry():
     # 66 mm by 122 mm and 14 g are the figures in CLAUDE.md, none checked on a real can.
     can = load_scene_config(SCENE).container
     assert (can.diameter, can.height, can.empty_mass) == (0.066, 0.122, 0.014)

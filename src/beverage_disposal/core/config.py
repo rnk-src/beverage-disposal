@@ -110,6 +110,7 @@ class SceneConfig:
     container_x: float
     container_y: float
     fill_ml: float
+    container_type: str  # the registry table the container comes from
     table: TableConfig
     container: ContainerSpec
     bin: BinConfig
@@ -136,16 +137,29 @@ def from_mapping(cls: type, data: dict, where: str = "scene"):
 
 def _convert(hint, value, where):
     if is_dataclass(hint):
+        if isinstance(value, hint):
+            return value
         if not isinstance(value, dict):
             raise ValueError(f"{where}: expected a table")
         return from_mapping(hint, value, where)
     if hint is float and isinstance(value, int) and not isinstance(value, bool):
         return float(value)
-    if not isinstance(value, hint) or isinstance(value, bool):
+    if not isinstance(value, hint) or (isinstance(value, bool) and hint is not bool):
         raise ValueError(f"{where}: expected {hint.__name__}, got {value!r}")
     return value
 
 
-def load_scene_config(path: str | Path) -> SceneConfig:
+def load_scene_config(path: str | Path, registry_path: str | Path | None = None) -> SceneConfig:
+    """Read a scene file; its container comes from the registry next to it unless one is given."""
+    # Imported here because the registry module itself uses this module's loader.
+    from beverage_disposal.core.registry import load_registry
+
+    path = Path(path)
     with open(path, "rb") as file:
-        return from_mapping(SceneConfig, tomllib.load(file))
+        data = tomllib.load(file)
+    registry = load_registry(registry_path or path.parent / "containers.toml")
+    type_id = data.get("container_type")
+    record = registry.lookup(type_id)
+    if record is None:
+        raise ValueError(f"scene: container_type {type_id!r} is not in the registry")
+    return from_mapping(SceneConfig, {**data, "container": record.spec})
