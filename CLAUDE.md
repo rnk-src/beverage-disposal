@@ -54,7 +54,10 @@ simulation with statistics, 2 = a real arm, 3 = wider containers and more sensor
 - **Iteration 2, 2.1a (minimal scene): built test-first on 2026-11-13** (`core/config.py`, `core/containers.py`,
   `sim/scene.py`, `configs/scene.toml`, `tests/scene/`): a table, one can (settles at half height, no creep under a
   small push) and the arm in one model; solver settings elliptic cone and impratio 10 because the default let the
-  can creep. **Next: 2.1b.** Iteration 2 is built continuously from 2026-11-13 with no
+  can creep. **2.1b (layout) built the same day** (`core/layout.py`, `core/reach.py`, bin, pad, set-aside marker and
+  spawn box in `configs/scene.toml`): a reach check requires every pick, pad, set-aside and bin pose to be reachable
+  at 60 degrees of pitch or more; top-down is reachable only to about x = 0.26 m at the can's middle height, which
+  sized the spawn box (0.12 m square) and the bin walls (0.06 m). **Next: 2.4.** Iteration 2 is built continuously from 2026-11-13 with no
   teaching pauses (the owner studies separately): 2.1a, 2.1b, 2.4, 2.5, 2.3, 2.2, 2.6a, 2.6b, 2.6c, 2.7, 2.8. The
   order comes from the iteration 2 plan review (2026-10-29) and keeps the full scope, tilt routine included.
   2.1 is split into the minimal scene (table, can, one config home for container size and mass) and the layout
@@ -69,7 +72,7 @@ simulation with statistics, 2 = a real arm, 3 = wider containers and more sensor
   30 mL promise), RL narrowed to one pick-and-place skill, the bottle was added after the can, and a real-arm
   tier (iteration 9) and headline metrics were added. The Locked decisions and Roadmap below are the result.
 - Iterations 2 to 9 are planned in detail down to sub-iterations (see Roadmap) and not started.
-- Last updated: 2026-11-13 (2.1a built). Update this section in the same change as every sub-iteration.
+- Last updated: 2026-11-13 (2.1b built). Update this section in the same change as every sub-iteration.
 
 ## Locked decisions
 
@@ -378,11 +381,12 @@ rewrites files and stops the commit so you re-stage them.
 ```
 src/beverage_disposal/   Python package (placeholder name)
   core/                    the ROS-free core (no MuJoCo): config.py (frozen scene dataclasses read from TOML),
-                           containers.py (ContainerSpec, provenance, liquid mass); kinematics.py (FK, Jacobian, pitch) and
+                           containers.py (ContainerSpec, provenance, liquid mass), layout.py (footprints, spawn sampler, set-aside test),
+                           reach.py (reach check of the layout); kinematics.py (FK, Jacobian, pitch) and
                            so101_chain.json, the generated, frozen robot spec it reads; ik.py (solve_ik);
                            controller.py (EEDeltaController); step_response.py (rise, overshoot, settling)
-  sim/                     the MuJoCo side: arm.py loads the vendored arm and adds the TCP site; scene.py (table,
-                           container and the arm in one model); loop.py
+  sim/                     the MuJoCo side: arm.py loads the vendored arm and adds the TCP site; scene.py (table, bin, pad, set-aside
+                           marker, container and the arm in one model); loop.py
                            (20 Hz closed loop through the PD actuators); actuator_response.py (step tests)
 docker/gazebo/           headless Gazebo validation image: Dockerfile, worlds/, step_world.py,
                          apt-versions.txt (recorded package versions, arm64)
@@ -398,7 +402,8 @@ tests/                   pytest tests (fast/medium/slow tiers), one folder per a
   kinematics/              FK against MuJoCo, the home pose, pan and roll properties, the core without
                            MuJoCo, the chain file's generator and staleness, and their can-fail proofs
   control/                 the end-effector delta controller and the closed loop through the PD actuators
-  scene/                   the scene config and container record, the can on the table, the jaw opening
+  scene/                   the scene config and container record, the can on the table, the jaw opening, the
+                           layout (bin, pad, set-aside area, spawn box) and its reach check
   support/                 shared helpers only (paths, git, scanning, the SO-101 facts and the
                            damaged-copy and mutated-package harnesses); no tests
   conftest.py              tier hook and shared fixtures

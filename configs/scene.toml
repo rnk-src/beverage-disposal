@@ -16,9 +16,45 @@ name = "can_12floz"
 diameter = 0.066
 height = 0.122
 empty_mass = 0.014
+grasp_height = 0.061  # half the can: the jaws take it at its middle
 friction = 1.0
 
 [container.provenance]
 source = "web figures for a 12 fl oz aluminium can (about 66 mm by 122 mm, about 14 g); the old repo used the same"
 date = "2026-11-13"
 kind = "assumed"
+
+[bin]
+center_x = 0.20
+center_y = -0.17
+inner_x = 0.10
+inner_y = 0.10
+height = 0.06
+wall = 0.01
+floor = 0.005
+friction = 1.0
+
+[set_aside]
+center_x = 0.32
+center_y = 0.16
+half_x = 0.05
+half_y = 0.05
+
+[pad]
+center_x = 0.18
+center_y = 0.15
+half_x = 0.04
+half_y = 0.04
+height = 0.02
+friction = 1.0
+
+[spawn]
+center_x = 0.30
+center_y = 0.0
+half_size = 0.06
+
+[reach]
+min_pitch_deg = 60.0
+approach_clearance = 0.04
+lift_height = 0.03
+release_clearance = 0.01
