@@ -95,6 +95,7 @@ class GripperPadsConfig:
     half_height: float
     depth: float  # pad centre along the gripper's z axis (negative: towards the fingertips)
     friction: float
+    torsional_friction: float  # resists the container twisting on the pads, metres (MuJoCo units)
 
 
 @dataclass(frozen=True)
