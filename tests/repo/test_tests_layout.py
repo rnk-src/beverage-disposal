@@ -20,6 +20,7 @@ ALLOWED_IN_TESTS = [
     "scene",
     "grasp",
     "scripted",
+    "tasktests",
 ]
 
 
