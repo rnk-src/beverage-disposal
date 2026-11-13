@@ -1,0 +1,15 @@
+# Runs the same `make check` as a local run. The Docker and Gazebo tests are left out of it
+# (see the Makefile): they need a Docker daemon and an arm64 package record.
+name: check
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: make check
