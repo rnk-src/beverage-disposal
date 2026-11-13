@@ -10,10 +10,15 @@ TCP_POS = (0.0, 0.0, -0.0981274)
 TCP_QUAT = (0.0, 1.0, 0.0, 0.0)
 
 
-def load_arm(mjcf):
-    """Compile the vendored MJCF at `mjcf` with a TCP site added to the gripper body."""
+def arm_spec(mjcf):
+    """The vendored MJCF at `mjcf` as an editable spec, with a TCP site on the gripper body."""
     # MJCF cannot add a child to a body defined in an included file, so the site goes in through
     # MjSpec, MuJoCo's model-editing API, and the vendored file stays untouched.
     spec = mujoco.MjSpec.from_file(str(mjcf))
     spec.body("gripper").add_site(name="tcp", pos=TCP_POS, quat=TCP_QUAT)
-    return spec.compile()
+    return spec
+
+
+def load_arm(mjcf):
+    """Compile the arm alone."""
+    return arm_spec(mjcf).compile()

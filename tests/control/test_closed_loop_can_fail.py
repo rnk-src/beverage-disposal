@@ -21,8 +21,8 @@ def forget_the_gripper_on_reset(package):
     edit(
         package,
         LOOP,
-        "self._data.qpos[:] = [*joints, gripper]",
-        "self._data.qpos[:] = [*joints, 0.0]",
+        "self._data.qpos[: ARM_JOINTS + 1] = [*joints, gripper]",
+        "self._data.qpos[: ARM_JOINTS + 1] = [*joints, 0.0]",
     )
 
 

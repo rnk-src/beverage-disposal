@@ -31,8 +31,8 @@ def change_the_timestep_while_loading(package):
     edit(
         package,
         ARM,
-        "    return spec.compile()",
-        "    spec.option.timestep = 0.001\n    return spec.compile()",
+        "    return spec\n",
+        "    spec.option.timestep = 0.001\n    return spec\n",
     )
 
 
