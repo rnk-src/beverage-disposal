@@ -2,8 +2,8 @@
 
 import mujoco
 
-# Locked decision: 20 Hz policy rate, with frame skip over the physics steps.
-CONTROL_PERIOD = 0.05
+from beverage_disposal.core.interfaces import CONTROL_PERIOD  # noqa: F401 - re-exported
+
 ARM_JOINTS = 5
 
 

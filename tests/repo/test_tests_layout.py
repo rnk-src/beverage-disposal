@@ -25,6 +25,7 @@ ALLOWED_IN_TESTS = [
     "fullness",
     "statics",
     "tilt",
+    "safety",
 ]
 
 
