@@ -39,7 +39,7 @@ def prescribed_grasp(config: SceneConfig, mjcf, *, close: bool = True) -> GraspR
     grasp, reach = config.grasp, config.reach
     model = build_scene(config, mjcf)
     loop = ArmLoop(model)
-    data = loop._data
+    data = loop.data
 
     start = np.array(HOME, dtype=float)
     start[4] = grasp.wrist_roll

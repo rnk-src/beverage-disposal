@@ -41,6 +41,10 @@ def leave_the_jaw_collisions_on(package):
     )
 
 
+def forget_torsional_friction(package):
+    edit(package, PADS, "PAD_CONDIM = 4", "PAD_CONDIM = 3")
+
+
 def ignore_the_force_limit(package):
     edit(package, SCENE, "[-config.grasp.force_limit, config.grasp.force_limit]", "[-3.35, 3.35]")
 
@@ -74,6 +78,10 @@ PADS_FAULTS = [
     (lift_the_moving_pad_ten_millimetres, "test_the_pads_meet_the_can_at_the_same_height"),
     (leave_the_jaw_collisions_on, "test_only_the_pads_collide_on_the_gripper_and_the_jaw"),
     (ignore_the_force_limit, "test_the_gripper_servo_is_limited_to_the_configured_torque"),
+    (
+        forget_torsional_friction,
+        "test_the_pads_resist_twisting_with_the_configured_torsional_friction",
+    ),
     (ignore_the_timestep, "test_the_configured_timestep_and_contact_softness_reach_the_model"),
     (
         skip_the_contact_softness,

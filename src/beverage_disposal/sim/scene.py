@@ -18,6 +18,8 @@ ROLLING_FRICTION = 0.0001
 # elliptic cone makes it isotropic. These are solver settings, not physical ones.
 CONE = mujoco.mjtCone.mjCONE_ELLIPTIC
 IMPRATIO = 10
+# Contact dimension 4 gives the container friction against twisting on the table and the pads.
+CONTAINER_CONDIM = 4
 # The set-aside marker is paint: thin and without collisions.
 MARKER_THICKNESS = 0.001
 MARKER_COLOUR = [0.9, 0.6, 0.1, 1.0]
@@ -54,7 +56,8 @@ def build_scene(config: SceneConfig, mjcf: str | Path) -> mujoco.MjModel:
         type=mujoco.mjtGeom.mjGEOM_CYLINDER,
         size=[can.diameter / 2, can.height / 2, 0.0],
         mass=total_mass(can, config.fill_ml),
-        friction=[can.friction, TORSIONAL_FRICTION, ROLLING_FRICTION],
+        friction=[can.friction, can.torsional_friction, ROLLING_FRICTION],
+        condim=CONTAINER_CONDIM,
     )
     _soften(spec, config)
     return spec.compile()

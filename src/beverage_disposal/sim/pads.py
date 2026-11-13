@@ -18,9 +18,10 @@ FIXED_JAW = "gripper"
 MOVING_JAW = "moving_jaw_so101_v1"
 # The fixed finger's inner face in the gripper frame, metres (7.9 mm off the roll axis, D-77).
 FIXED_FACE_X = -0.0079
-# MuJoCo's default torsional and rolling friction; only the sliding coefficient is configured.
-TORSIONAL_FRICTION = 0.005
+# MuJoCo's default rolling friction; sliding and torsional friction are configured.
 ROLLING_FRICTION = 0.0001
+# Contact dimension 4 adds friction against twisting about the contact normal (3 has none).
+PAD_CONDIM = 4
 
 
 def _moving_jaw_in_gripper_frame(arm, angle):
@@ -37,7 +38,7 @@ def add_gripper_pads(spec, config: SceneConfig, mjcf) -> None:
     """Switch the jaw collisions off and add the two pads to `spec`."""
     pads = config.gripper_pads
     half = [pads.thickness / 2, pads.half_width, pads.half_height]
-    friction = [pads.friction, TORSIONAL_FRICTION, ROLLING_FRICTION]
+    friction = [pads.friction, pads.torsional_friction, ROLLING_FRICTION]
     solref = [config.physics.contact_time_constant, config.physics.contact_damping_ratio]
 
     rotation, jaw_origin = _moving_jaw_in_gripper_frame(load_arm(mjcf), pads.design_angle)
@@ -61,6 +62,7 @@ def add_gripper_pads(spec, config: SceneConfig, mjcf) -> None:
         pos=[FIXED_FACE_X - pads.thickness / 2, 0.0, pads.depth],
         friction=friction,
         solref=solref,
+        condim=PAD_CONDIM,
     )
     spec.body(MOVING_JAW).add_geom(
         name="moving_pad",
@@ -70,4 +72,5 @@ def add_gripper_pads(spec, config: SceneConfig, mjcf) -> None:
         quat=quat.tolist(),
         friction=friction,
         solref=solref,
+        condim=PAD_CONDIM,
     )
