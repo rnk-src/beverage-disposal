@@ -13,7 +13,10 @@ from beverage_disposal.core.ik import solve_ik
 from beverage_disposal.core.interfaces import Controller, Observation, ObservationNoise
 from beverage_disposal.core.kinematics import HOME
 from beverage_disposal.core.layout import Goal, sample_spawn
+from beverage_disposal.core.task_tests import final_state_problem
+from beverage_disposal.core.trajectory import Trajectory
 from beverage_disposal.sim.loop import CONTROL_PERIOD, ArmLoop
+from beverage_disposal.sim.recorder import Recorder
 from beverage_disposal.sim.scene import build_scene
 
 MAX_STEPS = 600
@@ -22,9 +25,6 @@ READY_TIP = (0.26, 0.0, 0.15)
 # The controller's target box (base frame, metres): wide enough for every pose of the layout.
 WORKSPACE = (np.array([0.10, -0.25, 0.0]), np.array([0.40, 0.25, 0.25]))
 SETTLE_STEPS = 20  # control steps after the controller is done, so the container can come to rest
-REST_HEIGHT_TOLERANCE = 0.003  # metres
-MAX_TILT_DEG = 5.0
-MAX_REST_SPEED = 0.01  # m/s
 
 
 @dataclass(frozen=True)
@@ -33,6 +33,7 @@ class Episode:
     reason: str  # "ok", or what failed first
     container: np.ndarray  # final container centre, metres
     steps: int
+    trajectory: Trajectory | None = None
 
 
 def run_episode(
@@ -73,41 +74,36 @@ def run_episode(
         )
         return observation if noise is None else noise.apply(observation, noise_rng)
 
+    recorder = Recorder(loop.model)
     controller.reset(observe(0))
     step = 0
     while step < max_steps and not getattr(controller, "done", False):
         previous = np.asarray(controller.act(observe(step)), dtype=float)
         command = arm.step(previous, loop.joints, loop.gripper)
         loop.step(command.joints[:5], command.gripper)
+        recorder.record(loop, previous)
         step += 1
+    finished = bool(getattr(controller, "done", False))
+    if finished:
+        for _ in range(SETTLE_STEPS):
+            loop.step(command.joints[:5], command.gripper)
+            recorder.record(loop, np.zeros(4))
+    trajectory = recorder.trajectory(finished)
     can = loop.data.body("container").xpos.copy()
-    if not getattr(controller, "done", False):
-        return Episode(False, "time ran out", can, step)
-    for _ in range(SETTLE_STEPS):
-        loop.step(command.joints[:5], command.gripper)
-    return judge(config, loop.data, goal, step)
+    if not finished:
+        return Episode(False, "time ran out", can, len(trajectory.time), trajectory)
+    result = judge(config, loop.data, goal, len(trajectory.time))
+    return dataclasses.replace(result, trajectory=trajectory)
 
 
 def judge(config: SceneConfig, data, goal: Goal, steps: int = 0) -> Episode:
     """Whether the container rests upright on the goal's surface, wholly inside the goal."""
     can = data.body("container")
     position = can.xpos.copy()
-    radius = config.container.diameter / 2
-    upright = can.xmat.reshape(3, 3)[2, 2] > math.cos(math.radians(MAX_TILT_DEG))
-    speed = _container_speed(data)
-    checks = [
-        (goal.holds(position[0], position[1], radius), "not inside the goal"),
-        (
-            abs(position[2] - (goal.rest_z + config.container.height / 2)) < REST_HEIGHT_TOLERANCE,
-            "not resting on the goal's surface",
-        ),
-        (bool(upright), "not upright"),
-        (speed < MAX_REST_SPEED, "not at rest"),
-    ]
-    for passed, reason in checks:
-        if not passed:
-            return Episode(False, reason, position, steps)
-    return Episode(True, "ok", position, steps)
+    problem = final_state_problem(
+        position, float(can.xmat.reshape(3, 3)[2, 2]), _container_speed(data), goal, config
+    )
+    return Episode(problem is None, problem or "ok", position, steps)
 
 
 def _container_speed(data) -> float:
