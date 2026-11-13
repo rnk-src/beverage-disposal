@@ -1,0 +1,22 @@
+# The tilt test of 2.6c, for a container the registry does not know. Torques in millinewton metres.
+# The CoinFT figures are a guess from the 0.3 to 0.5 mN m stop-to-stop error the plan allows for;
+# no bench measurement exists, so none of them is verified.
+
+[sensor]
+noise_sigma_mnm = 0.15
+offset_sigma_mnm = 0.20
+resolution_mnm = 0.05
+samples_averaged = 20
+
+[test]
+tilt_deg = 60.0
+threshold_ml = 30.0
+nominal_density_g_per_ml = 1.0
+density_error = 0.05  # drinks from 0.95 to 1.05 g/mL
+radius_error_m = 0.001
+height_error_m = 0.002
+grasp_error_m = 0.005
+tilt_error_deg = 1.0
+empty_centre_error_fraction = 0.1  # the empty container's centre of mass may sit this fraction of its height off middle
+k_sigma = 4.0  # sensor errors are covered to this many standard deviations
+unknown_gross_limit_kg = 0.080  # a heavier unknown container (glass, metal flask) is set aside without a test
