@@ -5,6 +5,9 @@ from typing import ClassVar, Protocol, runtime_checkable
 
 import numpy as np
 
+# Seconds per control step: the locked 20 Hz policy rate.
+CONTROL_PERIOD = 0.05
+
 
 @dataclass(frozen=True)
 class Observation:
