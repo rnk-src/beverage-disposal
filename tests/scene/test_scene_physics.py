@@ -11,6 +11,7 @@ from support.so101 import MJCF, SO101
 
 from beverage_disposal.core.config import load_scene_config
 from beverage_disposal.core.kinematics import HOME, fk
+from beverage_disposal.sim.arm import load_arm
 from beverage_disposal.sim.loop import ArmLoop
 from beverage_disposal.sim.scene import build_scene
 
@@ -136,7 +137,8 @@ def test_the_arm_loop_runs_in_the_scene_and_holds_its_pose():
 def test_the_gripper_opens_wider_than_the_can_by_a_margin_well_inside_its_range():
     # The jaw gap is read where the TCP sits along the fingers. The margin is the room a grasp needs
     # for the arm's positioning error (assumed, 5 mm); the angle must leave the controller slack.
-    model = scene()
+    # The stock jaws, before the pads replace their collision: the vendored arm alone.
+    model = load_arm(SO101 / MJCF)
     data = mujoco.MjData(model)
     address = model.joint("gripper").qposadr[0]
     low, high = model.jnt_range[model.joint("gripper").id]

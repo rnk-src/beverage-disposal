@@ -73,6 +73,38 @@ class ReachConfig:
 
 
 @dataclass(frozen=True)
+class GraspConfig:
+    """How the prescribed grasp moves; angles in radians, lengths in metres."""
+
+    wrist_roll: float  # locked for the whole grasp; pi/2 makes the jaws close sideways
+    pitch_deg: float  # tool tilt below horizontal, 90 is straight down
+    open_angle: float  # gripper angle while the pads straddle the container
+    close_target: float  # gripper target while squeezing (past the container, so it stalls on it)
+    close_rate: float  # target decrease per 20 Hz control step
+    clearance: float  # gap between the fixed pad and the container before closing
+    force_limit: float  # gripper servo torque limit, N m (the vendored limit is 3.35)
+
+
+@dataclass(frozen=True)
+class GripperPadsConfig:
+    """Two flat pads replace the jaw meshes' collision; see sim/pads.py."""
+
+    design_angle: float  # gripper angle at which the two pad faces are parallel, rad
+    thickness: float
+    half_width: float
+    half_height: float
+    depth: float  # pad centre along the gripper's z axis (negative: towards the fingertips)
+    friction: float
+
+
+@dataclass(frozen=True)
+class PhysicsConfig:
+    timestep: float  # seconds
+    contact_time_constant: float  # MuJoCo solref[0], seconds: smaller is stiffer
+    contact_damping_ratio: float  # MuJoCo solref[1]
+
+
+@dataclass(frozen=True)
 class SceneConfig:
     container_x: float
     container_y: float
@@ -84,6 +116,9 @@ class SceneConfig:
     pad: PadConfig
     spawn: SpawnConfig
     reach: ReachConfig
+    grasp: GraspConfig
+    gripper_pads: GripperPadsConfig
+    physics: PhysicsConfig
 
 
 def from_mapping(cls: type, data: dict, where: str = "scene"):
