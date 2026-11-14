@@ -94,6 +94,10 @@ def spawn_every_seed_at_the_same_place(package):
     )
 
 
+def bring_back_the_high_approach_gain(package):
+    edit(package, SCRIPTED, "GAIN = 0.2", "GAIN = 0.5")
+
+
 def ignore_the_noise_model(package):
     edit(
         package,
@@ -158,7 +162,17 @@ FAULTS = [
     (
         ROLLOUT_TESTS,
         ignore_the_noise_model,
-        "test_five_millimetres_of_perception_noise_breaks_the_unfiltered_script",
+        "test_ten_millimetres_of_perception_noise_breaks_the_unfiltered_script",
+    ),
+    (
+        ROLLOUT_TESTS,
+        bring_back_the_high_approach_gain,
+        "test_the_tip_does_not_swing_while_hovering_over_a_far_can",
+    ),
+    (
+        ROLLOUT_TESTS,
+        bring_back_the_high_approach_gain,
+        "test_the_script_reaches_the_pad_from_spawns_that_used_to_fail[4-30.0]",
     ),
 ]
 

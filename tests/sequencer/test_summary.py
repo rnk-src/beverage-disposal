@@ -6,10 +6,11 @@ from test_sequencer import CAN, item
 from beverage_disposal.core.acceptance import summarize
 from beverage_disposal.core.sequencer import BINNED, SET_ASIDE_AREA, STOPPED, Run
 from beverage_disposal.core.statistics import wilson_upper
+from beverage_disposal.core.supervisor import Event
 
 
-def run(volume_ml, destination):
-    return Run(item(CAN, volume_ml), None, destination, [], 30.0)
+def run(volume_ml, destination, events=()):
+    return Run(item(CAN, volume_ml), None, destination, list(events), 30.0)
 
 
 def test_misbins_are_counted_per_volume_and_only_from_thirty_millilitres_up():
@@ -41,3 +42,16 @@ def test_the_results_file_is_stable_json_data():
     import json
 
     json.dumps(summarize([run(0.0, BINNED)]))
+
+
+def test_the_empties_are_split_into_binned_set_aside_and_stopped():
+    runs = [run(0.0, BINNED)] * 3 + [run(0.0, SET_ASIDE_AREA), run(0.0, STOPPED)] * 2
+    runs.append(run(35.0, STOPPED))  # a container that is not empty does not count here
+    assert summarize(runs)["empties"] == {"n": 7, "binned": 3, "set_aside": 2, "stopped": 2}
+
+
+def test_stopped_runs_are_counted_by_the_code_of_the_stop_that_ended_them():
+    first = [Event("pick_failed", "the first pick failed: time ran out")]
+    second = [Event("place_failed", "the second pick failed: time ran out")]
+    runs = [run(0.0, STOPPED, first)] * 3 + [run(30.0, STOPPED, second), run(0.0, BINNED)]
+    assert summarize(runs)["stops"] == {"pick_failed": 3, "place_failed": 1}
