@@ -240,10 +240,9 @@ Each label is a stable name; the owner's private decision journal uses the same 
 - **License:** The Unlicense. Vendored third-party files keep their own licenses.
 - **Repo policy:** portfolio tier (full pull-request loop). Assistants commit small Conventional Commits on a feature
   branch, staging named publishable files only, and run the full check before a pull request. The owner reads the diff
-  and merges; assistants do not merge. Assistants push or open a pull request only on the owner's explicit go. Until the
-  repo is published (no remote yet) the owner merges locally with `git merge --no-ff`. (Between 2026-11-13 and
-  2026-11-13 evening, during the iteration 2 run, assistants merged into `main` themselves; before that the owner
-  made every commit.) `make check` is the single check command and the workflow in `.github/workflows/check.yml` runs it on pull requests and on pushes to `main`.
+  and merges; assistants do not merge. Assistants push or open a pull request only on the owner's explicit go. The repo is public
+  at `rnk-src/beverage-disposal` since 2026-11-13. (During the iteration 2 run, until 2026-11-13, assistants merged
+  into `main` themselves; before that the owner made every commit.) `make check` is the single check command and the workflow in `.github/workflows/check.yml` runs it on pull requests and on pushes to `main`.
 
 ## Process rules
 
