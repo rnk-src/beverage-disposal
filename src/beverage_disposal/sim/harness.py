@@ -9,7 +9,7 @@ from pathlib import Path
 
 import numpy as np
 
-from beverage_disposal.core.acceptance import summarize
+from beverage_disposal.core.acceptance import stop_of, summarize
 from beverage_disposal.core.coinft import CoinFT
 from beverage_disposal.core.pad import PadSensor
 from beverage_disposal.core.sequencer import Item, Sequencer, Skill
@@ -39,6 +39,7 @@ def evaluate(
     depend on the ones before it.
     """
     runs = []
+    rows = []
     seeds = {}
     for volume in volumes_ml:
         seeds[f"{volume:g}"] = list(range(trials))
@@ -63,10 +64,20 @@ def evaluate(
                 empty_mass_kg=container.spec.empty_mass,
                 cap_confirmed=True if container.cap_check_required else None,
             )
-            runs.append(machine.process(item, seed=seed))
+            run = machine.process(item, seed=seed)
+            runs.append(run)
+            rows.append(
+                {
+                    "volume_ml": volume,
+                    "seed": seed,
+                    "destination": run.destination,
+                    "stop": stop_of(run),
+                }
+            )
     return {
         "summary": summarize(runs),
         "seeds": seeds,
+        "runs": rows,
         "provenance": provenance(scene, registry, fullness, tilt, limits),
     }
 

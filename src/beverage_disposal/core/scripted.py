@@ -15,8 +15,11 @@ from beverage_disposal.core.controller import MAX_DELTA
 from beverage_disposal.core.interfaces import Observation
 from beverage_disposal.core.kinematics import fk, load_chain
 
-# Fraction of the remaining distance asked for per control step; under 1 so lag cannot overshoot.
-GAIN = 0.5
+# Fraction of the remaining distance asked for per control step. The delta controller adds each
+# action to its previous target, so it integrates; with the servos 1-2 steps behind, a gain of 0.5
+# made the tip swing 40 mm over a far can and knock it over. Swept over 381 spawns at 0 and 30 mL:
+# 0.15, 0.2 and 0.25 never failed, 0.3 failed 5 of 20 hard seeds.
+GAIN = 0.2
 ABOVE_TOLERANCE = 0.004  # metres from the point above the container before descending
 GRASP_TOLERANCE = 0.003  # metres from the grasp point before squeezing
 LIFT_TOLERANCE = 0.005
