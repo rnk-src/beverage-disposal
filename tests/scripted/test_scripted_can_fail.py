@@ -172,7 +172,7 @@ FAULTS = [
     (
         ROLLOUT_TESTS,
         bring_back_the_high_approach_gain,
-        "test_the_script_reaches_the_pad_from_spawns_that_used_to_fail[4-30.0]",
+        "test_the_script_reaches_the_pad_from_spawns_that_used_to_fail[17-0.0]",
     ),
 ]
 
