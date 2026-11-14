@@ -24,8 +24,12 @@ def run_on_damaged_copy(tmp_path, test_module, fault):
     return _run_pytest(tmp_path, test_module, {"SO101_DIR": str(copy)})
 
 
-def run_on_mutated_package(tmp_path, test_module, fault):
-    """Copy our package, apply `fault(copy)`, run `test_module` on the copy, return the result."""
+def run_on_mutated_package(tmp_path, test_module, fault, only=None):
+    """Copy our package, apply `fault(copy)`, run `test_module` on the copy, return the result.
+
+    `only` names one test in the module. Running just that test keeps a slow module from being
+    run in full once per fault.
+    """
     src = tmp_path / "src"
     shutil.copytree(
         ROOT / "src" / "beverage_disposal",
@@ -34,7 +38,8 @@ def run_on_mutated_package(tmp_path, test_module, fault):
     )
     fault(src / "beverage_disposal")
     # PYTHONPATH comes before site-packages, so the copy shadows the editable install.
-    return _run_pytest(tmp_path, test_module, {"PYTHONPATH": str(src)})
+    target = test_module if only is None else f"{test_module}::{only}"
+    return _run_pytest(tmp_path, target, {"PYTHONPATH": str(src)})
 
 
 def _run_pytest(tmp_path, test_module, env):

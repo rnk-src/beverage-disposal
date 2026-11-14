@@ -184,5 +184,5 @@ FAULTS = [
     ids=lambda value: getattr(value, "__name__", None) if callable(value) else None,
 )
 def test_the_scripted_tests_fail_on_a_mutated_package(tmp_path, module, fault, failing_test):
-    result = run_on_mutated_package(tmp_path, module, fault)
+    result = run_on_mutated_package(tmp_path, module, fault, only=failing_test)
     assert_the_test_failed(result, module, failing_test)
