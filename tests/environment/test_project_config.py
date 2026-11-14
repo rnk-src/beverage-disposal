@@ -11,7 +11,8 @@ PYPROJECT = tomllib.loads((ROOT / "pyproject.toml").read_text())
 RUNTIME = {"mujoco", "numpy", "gymnasium"}
 # packaging is what test_python_pin.py uses to compare versions; declared so it is not borrowed.
 # mink is the IK oracle of 1.4: it needs MuJoCo, so it checks our core from the test side only.
-DEV = {"pytest", "hypothesis", "packaging", "ruff", "pre-commit", "pillow", "mink"}
+# mypy type-checks the core in `make check`.
+DEV = {"pytest", "hypothesis", "packaging", "ruff", "pre-commit", "pillow", "mink", "mypy"}
 
 
 def package_name(spec):

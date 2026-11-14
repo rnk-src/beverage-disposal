@@ -48,11 +48,13 @@ def test_the_message_names_the_entry_and_both_remedies():
 
 # Top-level entries that belong to the project. Add a new one here when the project grows.
 PROJECT_TOP_LEVEL = [
+    ".github",
     ".gitignore",
     ".pre-commit-config.yaml",
     ".python-version",
     "CLAUDE.md",
     "LICENSE",
+    "Makefile",
     "README.md",
     "assets",
     "configs",
