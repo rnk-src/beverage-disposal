@@ -4,4 +4,4 @@ check:
 	uv run --frozen ruff format --check .
 	uv run --frozen ruff check .
 	uv run --frozen mypy
-	uv run --frozen pytest --ignore=tests/gazebo
+	uv run --frozen pytest --ignore=tests/gazebo $(PYTEST_ARGS)
