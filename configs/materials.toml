@@ -1,0 +1,42 @@
+# Material constants for the empty-weight bounds of 2B. Lengths in mm, masses in g, density in g/cm^3.
+# Every figure is a range with a source. None of them is measured: each is a typical figure written
+# from memory and marked "assumed" until it is checked against a published source or a real bottle
+# (caliper the walls at Tier 2). The low end of each wall is deliberately below the thinnest wall
+# found, so a lighter real bottle cannot slip under the bound.
+
+[PET]
+
+[PET.density_g_cm3]
+lo = 1.33
+hi = 1.40
+provenance = { source = "textbook PET densities: about 1.33 amorphous, up to about 1.455 fully crystalline; bottle grade lies between", date = "2026-11-15", kind = "assumed" }
+
+[PET.t_side_mm]
+lo = 0.07
+hi = 0.40
+provenance = { source = "about 0.10 to 0.40 mm for water and soda bottles; the low end is 70 percent of the thinnest figure, 0.10 mm", date = "2026-11-15", kind = "assumed" }
+
+[PET.t_base_mm]
+lo = 0.15
+hi = 1.20
+provenance = { source = "bases are thicker than walls: flat water-bottle bases down to about 0.2 mm, petaloid soda bases up to about 1 mm", date = "2026-11-15", kind = "assumed" }
+
+[PET.finish_g]
+lo = 1.2
+hi = 4.0
+provenance = { source = "threaded neck finish of a 28 mm bottle: lightweight finishes about 1.5 g, standard about 3 g", date = "2026-11-15", kind = "assumed" }
+
+[PET.cap_g]
+lo = 0.0
+hi = 3.5
+provenance = { source = "plastic screw caps run about 1 to 3.5 g; zero for a bottle with no cap", date = "2026-11-15", kind = "assumed" }
+
+[PET.label_g]
+lo = 0.0
+hi = 1.5
+provenance = { source = "paper or film labels and shrink sleeves, up to about 1.5 g on the large sizes; zero if peeled", date = "2026-11-15", kind = "assumed" }
+
+[PET.wet_g]
+lo = 0.0
+hi = 5.0
+provenance = { source = "water clinging to the outside, a guess for a bottle just taken from a fridge or a wash", date = "2026-11-15", kind = "assumed" }
