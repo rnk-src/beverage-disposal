@@ -38,6 +38,11 @@ FACE_TO_TCP = 0.0079
 _GRIPPER_LOW, _GRIPPER_HIGH = load_chain()["gripper_range"]
 
 
+def grasp_offset_m(config: SceneConfig) -> float:
+    """Metres from the container's centre to the TCP along the closing direction, before closing."""
+    return config.container.grasp_diameter / 2 + config.grasp.clearance - FACE_TO_TCP
+
+
 class Phase(Enum):
     ABOVE = auto()
     DESCEND = auto()
@@ -79,8 +84,7 @@ class ScriptedController:
         bottom = container[2] - config.container.height / 2
         closing = fk(observation.joints)[:2, 0]
         closing = closing / np.linalg.norm(closing)
-        to_centre = config.container.diameter / 2 + grasp.clearance - FACE_TO_TCP
-        beside = container[:2] - to_centre * closing
+        beside = container[:2] - grasp_offset_m(config) * closing
         carry_z = max(
             self._anchor[2] + config.reach.lift_height,
             goal[2] + height + CARRY_CLEARANCE,

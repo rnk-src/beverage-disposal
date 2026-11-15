@@ -79,6 +79,7 @@ def test_a_negative_fill_is_rejected():
     can = ContainerSpec(
         name="x",
         diameter=0.05,
+        grasp_diameter=0.05,
         height=0.1,
         empty_mass=0.01,
         grasp_height=0.05,

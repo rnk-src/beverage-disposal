@@ -16,6 +16,7 @@ kind = "assumed"
 [can_12floz.spec]
 name = "can_12floz"
 diameter = 0.066
+grasp_diameter = 0.066  # the jaws close on the whole can
 height = 0.122
 empty_mass = 0.014
 grasp_height = 0.10  # near the rim: lower, the jaw housing hits the can (2.4)
@@ -41,6 +42,7 @@ kind = "cited"
 [bottle_500ml.spec]
 name = "bottle_500ml"
 diameter = 0.0635
+grasp_diameter = 0.0635
 height = 0.203
 empty_mass = 0.021
 grasp_height = 0.15

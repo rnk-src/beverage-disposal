@@ -29,11 +29,13 @@ def test_the_can_record_holds_the_figures_of_the_12_fl_oz_can():
     assert can.lightest_empty_mass == 0.013
     assert can.has_tab and not can.cap_check_required
     assert can.spec.grasp_height == 0.10  # the pads take the can near its rim
+    assert can.spec.grasp_diameter == 0.066  # the jaws close on the whole can
 
 
 def test_the_bottle_record_is_plain_data_with_a_cap_rule_and_cited_figures():
     bottle = REGISTRY.lookup("bottle_500ml")
     assert (bottle.spec.diameter, bottle.spec.height) == (0.0635, 0.203)
+    assert bottle.spec.grasp_diameter == 0.0635
     assert bottle.lightest_empty_mass == 0.0185
     assert bottle.cap_check_required and not bottle.has_tab
     assert bottle.spec.provenance.kind == "cited" and bottle.weight_provenance.kind == "cited"
@@ -157,6 +159,7 @@ kind = "assumed"
 name = "can_16floz"
 diameter = 0.0683
 height = 0.1627
+grasp_diameter = 0.0683
 empty_mass = 0.017
 grasp_height = 0.14
 friction = 1.0

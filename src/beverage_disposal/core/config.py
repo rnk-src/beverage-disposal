@@ -90,6 +90,7 @@ class GripperPadsConfig:
     """Two flat pads replace the jaw meshes' collision; see sim/pads.py."""
 
     design_angle: float  # gripper angle at which the two pad faces are parallel, rad
+    design_width: float  # the gap between the pad faces at that angle, metres: fixed hardware
     thickness: float
     half_width: float
     half_height: float

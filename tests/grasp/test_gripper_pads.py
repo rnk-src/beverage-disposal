@@ -36,13 +36,14 @@ def test_the_two_pad_faces_are_parallel_at_the_design_angle(at_design_angle):
     assert abs(fixed @ moving) > np.cos(np.radians(0.5))
 
 
-def test_the_pad_faces_are_one_container_diameter_apart_at_the_design_angle(at_design_angle):
+def test_the_pad_faces_are_the_design_width_apart_at_the_design_angle(at_design_angle):
     model, data = at_design_angle
     pads = CONFIG.gripper_pads
     fixed_inner = in_gripper_frame(data, data.geom("fixed_pad").xpos)[0] + pads.thickness / 2
     moving_inner = in_gripper_frame(data, data.geom("moving_pad").xpos)[0] - pads.thickness / 2
     assert fixed_inner == pytest.approx(FIXED_FACE_X, abs=5e-4)
-    assert moving_inner - fixed_inner == pytest.approx(0.066, abs=5e-4)
+    assert moving_inner - fixed_inner == pytest.approx(pads.design_width, abs=5e-4)
+    assert pads.design_width == 0.066  # the can's width: the figure the hardware is sized for
 
 
 def test_the_pads_meet_the_can_at_the_same_height(at_design_angle):
@@ -72,20 +73,30 @@ def test_the_gripper_servo_is_limited_to_the_configured_torque():
     assert model.actuator("shoulder_pan").forcerange[1] > limit
 
 
-def test_a_wider_container_widens_the_pad_gap():
-    wide = dataclasses.replace(
-        CONFIG, container=dataclasses.replace(CONFIG.container, diameter=0.07)
-    )
-    model = build_scene(wide, SO101 / MJCF)
+def pad_gap_at_the_design_angle(config):
+    model = build_scene(config, SO101 / MJCF)
     data = mujoco.MjData(model)
-    data.qpos[model.joint("gripper").qposadr[0]] = CONFIG.gripper_pads.design_angle
+    data.qpos[model.joint("gripper").qposadr[0]] = config.gripper_pads.design_angle
     mujoco.mj_kinematics(model, data)
-    thickness = CONFIG.gripper_pads.thickness
-    gap = (
+    thickness = config.gripper_pads.thickness
+    return (
         in_gripper_frame(data, data.geom("moving_pad").xpos)[0]
         - thickness / 2
         - (in_gripper_frame(data, data.geom("fixed_pad").xpos)[0] + thickness / 2)
     )
+
+
+def test_the_pads_are_hardware_so_the_container_does_not_move_them():
+    other = dataclasses.replace(
+        CONFIG.container, diameter=0.07, grasp_diameter=0.026, name="something_else"
+    )
+    gap = pad_gap_at_the_design_angle(dataclasses.replace(CONFIG, container=other))
+    assert gap == pytest.approx(CONFIG.gripper_pads.design_width, abs=5e-4)
+
+
+def test_the_configured_design_width_sets_the_pad_gap():
+    pads = dataclasses.replace(CONFIG.gripper_pads, design_width=0.07)
+    gap = pad_gap_at_the_design_angle(dataclasses.replace(CONFIG, gripper_pads=pads))
     assert gap == pytest.approx(0.07, abs=5e-4)
 
 

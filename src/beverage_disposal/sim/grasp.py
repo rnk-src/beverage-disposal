@@ -8,14 +8,13 @@ import numpy as np
 from beverage_disposal.core.config import SceneConfig
 from beverage_disposal.core.ik import solve_ik
 from beverage_disposal.core.kinematics import HOME, fk
+from beverage_disposal.core.scripted import grasp_offset_m
 from beverage_disposal.sim.loop import ArmLoop
 from beverage_disposal.sim.scene import build_scene
 
 SETTLE_STEPS = 20  # control steps of holding still between phases
 DESCEND_STEPS = 40
 LIFT_STEPS = 40
-# The TCP's distance from the fixed pad's inner face along the closing direction, metres (D-77).
-FACE_TO_TCP = 0.0079
 
 
 @dataclass(frozen=True)
@@ -48,10 +47,7 @@ def prescribed_grasp(config: SceneConfig, mjcf, *, close: bool = True) -> GraspR
     # The closing direction in the base frame: the tool's x axis, horizontal at a 90 degree roll.
     closing = fk(_pose((cx, cy, height), pitch, start))[:2, 0]
     closing = closing / np.linalg.norm(closing)
-    # The container's centre sits half a diameter plus the clearance from the fixed pad's face,
-    # and the face is 7.9 mm from the TCP on the side away from the moving jaw.
-    to_centre = config.container.diameter / 2 + grasp.clearance - FACE_TO_TCP
-    tcp_xy = np.array([cx, cy]) - to_centre * closing
+    tcp_xy = np.array([cx, cy]) - grasp_offset_m(config) * closing
 
     above = _pose((*tcp_xy, height + reach.approach_clearance), pitch, start)
     at = _pose((*tcp_xy, height), pitch, above)
