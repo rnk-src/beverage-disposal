@@ -1,29 +1,21 @@
 """The sequencer: carries one container through weighing and the decision to bin or set-aside.
 
 It is plain code around the learned skill. The skill picks something up and puts it somewhere;
-the sequencer decides where, from the pad (and, for a container the registry does not know, from
-the tilt test), under the safety supervisor.
+the sequencer decides where, from the pad's weight and the weight rule, under the safety
+supervisor. A container the registry does not know is always set aside.
 """
 
 from dataclasses import dataclass
 from typing import Protocol
 
-from beverage_disposal.core.coinft import CoinFT
 from beverage_disposal.core.config import SceneConfig
 from beverage_disposal.core.containers import ContainerSpec
-from beverage_disposal.core.fullness import BIN, SET_ASIDE, Verdict, decide
+from beverage_disposal.core.fullness import BIN, Verdict, decide
 from beverage_disposal.core.fullness_config import FullnessConfig
 from beverage_disposal.core.layout import Goal, goals
 from beverage_disposal.core.pad import PadSensor
 from beverage_disposal.core.registry import Registry
 from beverage_disposal.core.supervisor import Event, Outcome, Supervisor
-from beverage_disposal.core.tilt import (
-    Geometry,
-    pad_only_unknown_verdict,
-    simulate_measurement,
-    tilt_verdict,
-)
-from beverage_disposal.core.tilt_config import TiltConfig
 
 BINNED = "binned"
 SET_ASIDE_AREA = "set_aside"
@@ -97,12 +89,9 @@ class Sequencer:
     scene: SceneConfig
     registry: Registry
     fullness: FullnessConfig
-    tilt: TiltConfig
     supervisor: Supervisor
     skill: Skill
     pad: PadSensor
-    coinft: CoinFT
-    use_tilt: bool = True
 
     def process(self, item: Item, *, seed: int) -> Run:
         mark = len(self.supervisor.events)
@@ -138,14 +127,4 @@ class Sequencer:
         return run(verdict, BINNED if verdict.action == BIN else SET_ASIDE_AREA)
 
     def _decide(self, item: Item, record, weighing) -> Verdict:
-        if record is not None:
-            return decide(self.fullness.rule, record, weighing, item.cap_confirmed)
-        if not weighing.stable:
-            return Verdict(SET_ASIDE, "the weight did not settle", None)
-        if not self.use_tilt:
-            return pad_only_unknown_verdict(self.fullness.rule, weighing.mass_kg)
-        geometry = Geometry(item.spec.diameter / 2, item.spec.height, item.spec.grasp_height)
-        torque = simulate_measurement(
-            self.tilt, geometry, item.volume_ml, item.empty_mass_kg, item.density, self.coinft
-        )
-        return tilt_verdict(self.tilt, geometry, weighing.mass_kg, torque)
+        return decide(self.fullness.rule, record, weighing, item.cap_confirmed)

@@ -11,8 +11,8 @@ A simulated SO-101 arm learns, with reinforcement learning (RL), to pick up a be
 move it from A to B. A coded sequencer around that learned skill decides where a container goes: a
 practically empty one (under 30 mL) goes into a bin, anything else, or anything unsure, goes to a
 separate set-aside area on the table. The fullness decision is a tested rule, not learned: a weighing
-pad plus a database of empty weights for known container types, and a CoinFT tilt test for unknown
-ones. Containers: the 12 fl oz can first, then the 16.9 fl oz (500 mL) PET bottle. Tiers: 1 =
+pad plus a database of empty weights for known container types; a container of an unknown type is
+set aside. Containers: the 12 fl oz can first, then the 16.9 fl oz (500 mL) PET bottle. Tiers: 1 =
 simulation with statistics, 2 = a real arm, 3 = wider containers and more sensors.
 
 - **MuJoCo** simulates the physics and is where all training happens.
@@ -71,9 +71,9 @@ simulation with statistics, 2 = a real arm, 3 = wider containers and more sensor
   types are data tables with provenance, the scene names one, and an unknown type is met with a request to enrol it. **2.6a (pad and weight rule) built the same day** (`core/pad.py`, `core/fullness.py`, `core/fullness_eval.py`,
   `core/statistics.py`, `configs/fullness.toml`, `tests/fullness/`): a pad model, a rule that bins under 26.5 g net (30 mL at 0.95 g/mL
   less a 2 g margin), Wilson bounds, and a Monte Carlo: in simulation, 0 of 100 000 binned at 30, 31 and 35 mL of the lightest
-  drink (bound 3.8e-5); the sweep breaks at about four times the nominal noise. **2.6b (statics wrench) built the same day** (`core/statics.py`, `tests/statics/`): the liquid's torque on a tilted grasp from a
+  drink (bound 3.8e-5); the sweep breaks at about four times the nominal noise. **2.6b (statics wrench) built the same day, removed on 2026-11-14** (`core/statics.py`, `tests/statics/`): the liquid's torque on a tilted grasp from a
   rigid-cylinder model with closed-form checks; at 60 degrees about 0.6 mN m per mL, and the plausible parameter errors move 30 mL's
-  torque by about 4 mL's worth (model M, unvalidated). **2.6c (tilt routine) built the same day** (`core/tilt.py`, `core/coinft.py`, `core/tilt_config.py`, `configs/tilt.toml`,
+  torque by about 4 mL's worth (model M, unvalidated). **2.6c (tilt routine) built the same day, removed on 2026-11-14** (`core/tilt.py`, `core/coinft.py`, `core/tilt_config.py`, `configs/tilt.toml`,
   `tests/tilt/`): a CoinFT model and a tilt verdict that bins an unknown container only if the volume bound is under 30 mL (about 14 mL
   of margin with the guessed sensor, so cans under about 16 mL), with a pad-only fallback; 0 of 500 binned at 30, 31 and 35 mL.
   Computed, not run through MuJoCo. **2.7 (safety supervisor) built the same day** (`core/supervisor.py`, `core/supervised.py`, `core/safety_config.py`, `configs/safety.toml`,
@@ -89,12 +89,17 @@ simulation with statistics, 2 = a real arm, 3 = wider containers and more sensor
   (at least 381 trials in the bins near 30 mL for a zero-miss 95 % Wilson bound below 1 %), simulation only, and
   is worded "in simulation, k/N misses, Wilson 95 % upper bound X %". Config is frozen dataclasses plus TOML read
   with stdlib `tomllib`. The run is a work in progress by design; it stops at the end of iteration 2.
+- **Tilt removed (2026-11-14, `chore/remove-tilt`).** The owner does not want a tilt test or CoinFT in the end product,
+  so `core/tilt.py`, `tilt_config.py`, `coinft.py`, `statics.py`, `configs/tilt.toml`, `tests/tilt/` and `tests/statics/` are
+  deleted (git history keeps them). A container of an unknown type is now always set aside, with the enrolment request
+  kept. The unknown-type grid result in the 2.8 text above (tilt path) therefore no longer applies. The next work is
+  iteration 2B, the emptiness policy for plastic bottles (the plan is in the owner's notes; 2B.0 records it here).
 - **Plan review closed (2026-10-13).** Every decision was re-examined against the real alternatives. The
-  fullness decision became a coded rule (weighing pad and database, CoinFT tilt for unknown containers, a
-  30 mL promise), RL narrowed to one pick-and-place skill, the bottle was added after the can, and a real-arm
+  fullness decision became a coded rule (weighing pad and database, a CoinFT tilt for unknown containers
+  that was cut on 2026-11-14, a 30 mL promise), RL narrowed to one pick-and-place skill, the bottle was added after the can, and a real-arm
   tier (iteration 9) and headline metrics were added. The Locked decisions and Roadmap below are the result.
 - Iterations 2 to 9 are planned in detail down to sub-iterations (see Roadmap) and not started.
-- Last updated: 2026-11-13 (2.8 built; iteration 2 complete; scripted gain fixed and acceptance rerun). Update this section in the same change as every sub-iteration.
+- Last updated: 2026-11-14 (tilt, CoinFT and statics removed; unknown types are set aside; 2B planned). Update this section in the same change as every sub-iteration.
 
 ## Locked decisions
 
@@ -172,9 +177,8 @@ Each label is a stable name; the owner's private decision journal uses the same 
   (a worst-case promise per volume; brimful containers are left to the weight check). A container of a
   known type is decided by its weight on the pad against the type's lightest plausible empty weight
   (bin only if the weight above it is under 30 g minus the scale's error margin). An unknown container
-  heavier than a material-dependent limit is set aside; otherwise a coded CoinFT tilt test runs with
-  the opening on the high side and the same strict threshold applies, and the robot asks the owner to
-  enrol the type. The tilt routine is coded, not learned; RL only brings the container to its start pose.
+  is always set aside, and the robot asks the owner to enrol the type (the CoinFT tilt test that once
+  handled it was cut on 2026-11-14). The decision is coded, not learned.
   The set-aside area is separate from the pad. Tests always know the true volume.
 - **Containers:** the 12 fl oz can first, then the 16.9 fl oz PET bottle (right after the can works). A
   container type is data in a registry (dimensions, lightest empty weight, grasp height and width, cap and
@@ -185,11 +189,11 @@ Each label is a stable name; the owner's private decision journal uses the same 
 - **Perception:** markerless camera: detect the container, recognise its type, find the tab, check a
   bottle's cap. Simulation uses ground truth plus a noise model (position noise, bias, delay,
   dropouts). Material and cap recognition for other containers is Tier 3.
-- **Weight and tilt signals (replace servo-load weighing, which a study showed fails):** a weighing pad
-  (a MuJoCo force sensor with noise and drift) and CoinFT force/torque pads on the gripper. Servo
+- **Weight signal (replaces servo-load weighing, which a study showed fails):** a weighing pad
+  (a MuJoCo force sensor with noise and drift). CoinFT and the tilt test were cut on 2026-11-14. Servo
   load is not an observation.
-- **Container model:** rigid body plus a precomputed statics "liquid wrench" for the tilt test, checked
-  occasionally against OpenFOAM. Container mass is a randomized range, not two classes.
+- **Container model:** rigid body with the liquid as a point mass at its centroid. Container mass is a
+  randomized range, not two classes.
 - **Reward:** sparse success bonus (container released at B, upright, within tolerance, not spilled) plus
   potential-based progress shaping, small regularizers (weights tuned in 4.3), failure penalties (drop,
   tip-over, off the table, hard joint or table contact), early termination on those failures and on
@@ -233,7 +237,7 @@ Each label is a stable name; the owner's private decision journal uses the same 
   promotion rule as the curriculum (stage S5). Container mass is a continuous range and the liquid
   amount is continuous (no two-class gap). Physics randomization covers friction, container mass and
   size, joint damping/friction/armature, actuator gains, gripper force limit and contact softness;
-  sensor and timing randomization covers pad and CoinFT noise/drift, perception noise/bias/delay,
+  sensor and timing randomization covers pad noise/drift, perception noise/bias/delay,
   encoder resolution and observation/action delay. Ranges
   come from a sensitivity study, and a "sim-to-sim gap budget" doc lists each MuJoCo/Gazebo
   difference and whether it is randomized, matched or accepted.
@@ -345,7 +349,7 @@ Decisions and ideas to reopen at a specific point:
   5.2, 5.3, 5.4, 6.1, 7.2 to 7.9, and iteration 8. Code: https://github.com/aalmuzairee/squint (MIT).
 - Range or ultrasound fullness sensor for varied containers (glass bottle, plastic bottle, metal flask,
   can): an idea the owner is interested in pursuing, perhaps in parallel with the main line, as a
-  fallback if the weighing pad and the CoinFT tilt test are not enough to tell how much liquid a
+  fallback if the weighing pad and the camera are not enough to tell how much liquid a
   container holds. Parked, not started (the HC-SR04 veto is Tier 3). MuJoCo (`rangefinder`, checked in
   3.14) and Gazebo both only ray-cast, so the sensor model would live in the ROS-free core like the pad
   model, with MuJoCo as the natural place to train it. Real ultrasound is the hard part to model: beam
@@ -353,9 +357,6 @@ Decisions and ideas to reopen at a specific point:
   shapes. Natural homes: 2.6 (fullness) or after iteration 8.
 - Asymmetric critic (the critic sees the true container mass during training): no longer needed for the
   decision; kept as an optional experiment for the grasp, for iteration 6 or after 4.4.
-- CoinFT bench test (a soft gate): CoinFT is built in parallel with the main line. If it fails, fall back
-  to the weighing pad alone. Revisit the 1 % promise only if the bench shows about 0.3 to 0.5 mN m of
-  stop-to-stop error (a 5 % promise would then roughly halve the empties set aside).
 - Sim-to-sim test protocol (none published; ours to define): iteration 7.
 - Failure search and metamorphic testing: after iteration 5.
 - Bridge choice (thin node over standard controllers vs a ros2_control controller plugin;
@@ -410,8 +411,8 @@ rewrites files and stops the commit so you re-stage them.
 ```
 src/beverage_disposal/   Python package (placeholder name)
   core/                    the ROS-free core (no MuJoCo): sequencer.py (pick, weigh, decide, place), acceptance.py (results summary), supervisor.py (safety checks and indicators), supervised.py (a controller
-                           under the supervisor), safety_config.py, tilt.py (the tilt verdict and pad-only fallback), coinft.py
-                           (torque sensor model), tilt_config.py, statics.py (the liquid wrench of a tilted container), pad.py (weighing pad model), fullness.py (the weight rule),
+                           under the supervisor), safety_config.py,
+                           pad.py (weighing pad model), fullness.py (the weight rule),
                            fullness_eval.py (Monte Carlo and sweeps), fullness_config.py, statistics.py (Wilson bounds), registry.py (container types as data, enrolment), trajectory.py and task_tests.py (an episode record and the
                            task's pass-fail and indicative functions), interfaces.py (Observation, Controller, noise), scripted.py
                            (the scripted pick-and-place), baselines.py (random policy); config.py (frozen scene dataclasses read from TOML),
@@ -439,8 +440,6 @@ tests/                   pytest tests (fast/medium/slow tiers), one folder per a
   control/                 the end-effector delta controller and the closed loop through the PD actuators
   sequencer/               the sequencer (ideal and simulated skill), the results summary, the harness and the demo recorder
   safety/                  the supervisor's checks with near-misses, the indicators and faults injected into an episode
-  tilt/                    the CoinFT model, the tilt verdict, the volume bound and the pad-only fallback
-  statics/                 the liquid wrench: closed-form checks, spill angle and the sensitivity sweep
   fullness/                the pad model, the weight rule, the Wilson bound and the false-bin Monte Carlo
   containers/              the registry, its weights with sources and the enrolment of unknown types
   tasktests/               the recorder and the task's pass-fail and indicative functions
@@ -452,7 +451,7 @@ tests/                   pytest tests (fast/medium/slow tiers), one folder per a
                            damaged-copy and mutated-package harnesses); no tests
   conftest.py              tier hook and shared fixtures
 assets/                  vendored third-party files with provenance (the SO-101 model)
-configs/                 configs (scene.toml, containers.toml, fullness.toml, tilt.toml, safety.toml; training later) and the stored actuator step-response reference (JSON)
+configs/                 configs (scene.toml, containers.toml, fullness.toml, safety.toml; training later) and the stored actuator step-response reference (JSON)
 scripts/                 helper scripts (view_so101.py, generate_so101_chain.py, measure_actuators.py, run_acceptance.py, record_demo.py)
 pyproject.toml  uv.lock  .python-version   uv project, exact lockfile, pinned Python
 Makefile                                   `make check`, the one command for every gate
@@ -463,9 +462,9 @@ README.md  CLAUDE.md  LICENSE  .gitignore
 
 Planned modules, not built yet (the tree above is what exists): `core/` gains the IK and controller
 (iteration 1), `containers.py` (type registry, empty-weight database, enrolment), `fullness.py` (the rule),
-`tilt.py` (the coded tilt routine and the statics model), `sequencer.py`, `supervisor.py`, `observation.py`
+`sequencer.py`, `supervisor.py`, `observation.py`
 and `interfaces.py` (the Protocols and dataclasses that fix every boundary first); `sim/` gains the scene,
-pad and CoinFT sensor models and the simulated perception; then `env/` (the Gymnasium environment for the
+pad sensor model and the simulated perception; then `env/` (the Gymnasium environment for the
 skill), `train/` (SAC configs, curriculum scheduler, evaluation harness, metrics writer), `ros/` (adapter
 only: policy node, Gazebo bridge) and `hardware/` (Tier 2 drivers implementing the same Protocols).
 
@@ -493,7 +492,7 @@ update docs.
   container spec); 2.1b layout (bin, set-aside area, weighing pad, reach map, spawn sampler); 2.4 grasp physics
   (can); 2.5 scripted pick-and-place controller; 2.3 trajectory recorder + pass-fail/indicative tests; 2.2
   container registry, empty-weight database and enrolment logic; 2.6a pad sensor model and weight rule; 2.6b
-  statics liquid wrench; 2.6c coded tilt routine and verdict; 2.7 safety supervisor with fault injection; 2.8
+  statics liquid wrench and 2.6c coded tilt routine (both built, then removed on 2026-11-14); 2.7 safety supervisor with fault injection; 2.8
   sequencer + acceptance harness + metrics file.
 - **3 Gymnasium environment for the skill.** 3.1 observations (with the simulated perception noise);
   3.2 action layer; 3.3 env core (goal B as input); 3.4 reward and termination; 3.5 wrappers and
@@ -514,8 +513,8 @@ update docs.
   acceptance; 7.9 the gap loop.
 - **8 Stretch.** Camera observations (end-to-end vision), optional.
 - **9 Real arm (Tier 2, behind a soft gate).** 9.1 bring-up and calibration; 9.2 weighing pad, scale and
-  database enrolment; 9.3 camera perception (detect, type, tab, cap; no tags on containers); 9.4 CoinFT
-  bench and tilt on hardware (parallel track; the bench test is the gate); 9.5 the supervisor on
+  database enrolment; 9.3 camera perception (detect, type, tab, cap; no tags on containers); 9.4 (cut:
+  the CoinFT bench and tilt were removed on 2026-11-14); 9.5 the supervisor on
   hardware; 9.6 end-to-end trials; 9.7 results and write-up.
 
 ## Unverified or open
