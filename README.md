@@ -23,11 +23,6 @@ uv run pytest   # fast and medium tiers
 `uv run pre-commit install` (once per clone) makes every commit run ruff and the fast tests.
 `CLAUDE.md` lists all commands.
 
-## For contributors and AI assistants
-
-`CLAUDE.md` is the project's context file: purpose, locked decisions, process rules,
-layout and commands. Start there.
-
 ## License
 
 [The Unlicense](LICENSE) (public domain). The vendored SO-101 model files under

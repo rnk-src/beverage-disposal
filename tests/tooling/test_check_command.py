@@ -49,3 +49,10 @@ def test_the_workflow_runs_make_check_on_pushes_to_main_and_on_pull_requests():
 
 def test_the_workflow_installs_uv_so_the_locked_environment_is_used():
     assert "astral-sh/setup-uv" in WORKFLOW.read_text()
+
+
+def test_the_workflow_gives_the_runner_software_rendering_for_the_offscreen_tests():
+    # The first run on a hosted Linux runner aborted in MuJoCo's renderer: no display or GPU there.
+    text = WORKFLOW.read_text()
+    assert "MUJOCO_GL: osmesa" in text
+    assert "libosmesa6" in text
