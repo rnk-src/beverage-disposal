@@ -1,0 +1,108 @@
+# PET bottle sizes for 2B: the ranges a real bottle of each nominal size is drawn from.
+# Lengths in metres. One table per size class; the body height is not drawn but solved so the
+# brim capacity is the nominal size times a drawn `overfill`, so `body_height` is only the range
+# that solution must fall in. Nothing here was measured on a real bottle: every figure is a typical
+# value written from memory, marked "assumed", until it is checked against a real bottle (Tier 2).
+# `gate` records the 2B.3 neck-grasp result per size; a size counts as supported only when it passed.
+
+[pet_250ml]
+nominal_ml = 250.0
+body_diameter = { lo = 0.05, hi = 0.058 }
+body_height = { lo = 0.075, hi = 0.145 }
+shoulder_height = { lo = 0.02, hi = 0.045 }
+neck_diameter = { lo = 0.024, hi = 0.028 }
+neck_height = { lo = 0.018, hi = 0.024 }
+support_ring_diameter = { lo = 0.032, hi = 0.034 }
+support_ring_drop = { lo = 0.010, hi = 0.014 }
+overfill = { lo = 1.03, hi = 1.10 }
+base_styles = ["flat"]
+grasp_mode = "neck"
+grasp_below_ring = 0.004
+grasp_pitch_deg = 60.0
+gate = { status = "untested", date = "2026-11-15", note = "" }
+provenance = { source = "typical 250 mL PET bottle figures recalled from memory, not measured; the 28 mm finish is the common standard", date = "2026-11-15", kind = "assumed" }
+
+[pet_330ml]
+nominal_ml = 330.0
+body_diameter = { lo = 0.055, hi = 0.063 }
+body_height = { lo = 0.085, hi = 0.17 }
+shoulder_height = { lo = 0.025, hi = 0.05 }
+neck_diameter = { lo = 0.024, hi = 0.028 }
+neck_height = { lo = 0.018, hi = 0.024 }
+support_ring_diameter = { lo = 0.032, hi = 0.034 }
+support_ring_drop = { lo = 0.010, hi = 0.014 }
+overfill = { lo = 1.03, hi = 1.10 }
+base_styles = ["flat"]
+grasp_mode = "neck"
+grasp_below_ring = 0.004
+grasp_pitch_deg = 60.0
+gate = { status = "untested", date = "2026-11-15", note = "" }
+provenance = { source = "typical 330 mL PET bottle figures recalled from memory, not measured; the 28 mm finish is the common standard", date = "2026-11-15", kind = "assumed" }
+
+[pet_500ml]
+nominal_ml = 500.0
+body_diameter = { lo = 0.062, hi = 0.07 }
+body_height = { lo = 0.11, hi = 0.18 }
+shoulder_height = { lo = 0.03, hi = 0.06 }
+neck_diameter = { lo = 0.024, hi = 0.028 }
+neck_height = { lo = 0.018, hi = 0.024 }
+support_ring_diameter = { lo = 0.032, hi = 0.034 }
+support_ring_drop = { lo = 0.010, hi = 0.014 }
+overfill = { lo = 1.03, hi = 1.10 }
+base_styles = ["flat"]
+grasp_mode = "neck"
+grasp_below_ring = 0.004
+grasp_pitch_deg = 60.0
+gate = { status = "untested", date = "2026-11-15", note = "" }
+provenance = { source = "typical 500 mL PET bottle figures recalled from memory, not measured; the 28 mm finish is the common standard", date = "2026-11-15", kind = "assumed" }
+
+[pet_1000ml]
+nominal_ml = 1000.0
+body_diameter = { lo = 0.075, hi = 0.088 }
+body_height = { lo = 0.15, hi = 0.23 }
+shoulder_height = { lo = 0.04, hi = 0.08 }
+neck_diameter = { lo = 0.024, hi = 0.028 }
+neck_height = { lo = 0.018, hi = 0.024 }
+support_ring_diameter = { lo = 0.032, hi = 0.034 }
+support_ring_drop = { lo = 0.010, hi = 0.014 }
+overfill = { lo = 1.03, hi = 1.10 }
+base_styles = ["flat", "petaloid"]
+grasp_mode = "neck"
+grasp_below_ring = 0.004
+grasp_pitch_deg = 60.0
+gate = { status = "untested", date = "2026-11-15", note = "" }
+provenance = { source = "typical 1000 mL PET bottle figures recalled from memory, not measured; the 28 mm finish is the common standard", date = "2026-11-15", kind = "assumed" }
+
+[pet_1500ml]
+nominal_ml = 1500.0
+body_diameter = { lo = 0.085, hi = 0.094 }
+body_height = { lo = 0.18, hi = 0.27 }
+shoulder_height = { lo = 0.05, hi = 0.09 }
+neck_diameter = { lo = 0.024, hi = 0.028 }
+neck_height = { lo = 0.018, hi = 0.024 }
+support_ring_diameter = { lo = 0.032, hi = 0.034 }
+support_ring_drop = { lo = 0.010, hi = 0.014 }
+overfill = { lo = 1.03, hi = 1.10 }
+base_styles = ["flat", "petaloid"]
+grasp_mode = "neck"
+grasp_below_ring = 0.004
+grasp_pitch_deg = 60.0
+gate = { status = "untested", date = "2026-11-15", note = "" }
+provenance = { source = "typical 1500 mL PET bottle figures recalled from memory, not measured; the 28 mm finish is the common standard", date = "2026-11-15", kind = "assumed" }
+
+[pet_2000ml]
+nominal_ml = 2000.0
+body_diameter = { lo = 0.1, hi = 0.11 }
+body_height = { lo = 0.17, hi = 0.26 }
+shoulder_height = { lo = 0.05, hi = 0.09 }
+neck_diameter = { lo = 0.024, hi = 0.028 }
+neck_height = { lo = 0.018, hi = 0.024 }
+support_ring_diameter = { lo = 0.032, hi = 0.034 }
+support_ring_drop = { lo = 0.010, hi = 0.014 }
+overfill = { lo = 1.03, hi = 1.10 }
+base_styles = ["flat", "petaloid"]
+grasp_mode = "neck"
+grasp_below_ring = 0.004
+grasp_pitch_deg = 60.0
+gate = { status = "untested", date = "2026-11-15", note = "" }
+provenance = { source = "typical 2000 mL PET bottle figures recalled from memory, not measured; the 28 mm finish is the common standard", date = "2026-11-15", kind = "assumed" }

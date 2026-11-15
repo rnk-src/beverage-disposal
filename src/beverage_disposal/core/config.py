@@ -3,7 +3,7 @@
 import tomllib
 from dataclasses import dataclass, fields, is_dataclass
 from pathlib import Path
-from typing import get_type_hints
+from typing import get_args, get_origin, get_type_hints
 
 from beverage_disposal.core.containers import ContainerSpec
 
@@ -142,6 +142,11 @@ def _convert(hint, value, where):
         if not isinstance(value, dict):
             raise ValueError(f"{where}: expected a table")
         return from_mapping(hint, value, where)
+    if get_origin(hint) is tuple:
+        (element, _) = get_args(hint)  # only tuple[T, ...] is read: a list in the file
+        if not isinstance(value, list):
+            raise ValueError(f"{where}: expected a list")
+        return tuple(_convert(element, item, f"{where}[{i}]") for i, item in enumerate(value))
     if hint is float and isinstance(value, int) and not isinstance(value, bool):
         return float(value)
     if not isinstance(value, hint) or (isinstance(value, bool) and hint is not bool):

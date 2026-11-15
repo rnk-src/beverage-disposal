@@ -27,6 +27,7 @@ ALLOWED_IN_TESTS = [
     "sequencer",
     "materials",
     "bottles",
+    "bottle_family",
 ]
 
 
