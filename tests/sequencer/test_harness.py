@@ -48,8 +48,8 @@ def test_a_hundred_percent_misbinning_rule_shows_up_in_the_summary():
 
 def test_a_grid_of_unknown_containers_bins_none_of_them():
     """Catches the unknown-type path binning anything, at any volume."""
-    results = grid(IdealSkill(), volumes=(0.0, 31.0), known=False)
-    assert results["summary"]["runs"] == 6
+    results = grid(IdealSkill(), volumes=(0.0, 30.0, 31.0, 35.0), known=False)
+    assert results["summary"]["runs"] == 12
     assert all(row["destination"] == "set_aside" for row in results["runs"])
 
 

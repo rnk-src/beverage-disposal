@@ -30,7 +30,10 @@ def decide(
     weighing: Weighing,
     cap_confirmed: bool | None = None,
 ) -> Verdict:
-    """The verdict for a container of a known (or unknown) type, weighed on the pad."""
+    """The verdict for a container weighed on the pad.
+
+    An unknown type (no record) is set aside without looking at its weight.
+    """
     if record is None:
         return Verdict(SET_ASIDE, "unknown container type", None)
     net_g = (weighing.mass_kg - record.lightest_empty_mass) * 1000.0

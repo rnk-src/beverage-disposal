@@ -116,7 +116,7 @@ class Sequencer:
             return run(None, STOPPED)
 
         weighing = self.pad.weigh(gross)
-        verdict = self._decide(item, record, weighing)
+        verdict = decide(self.fullness.rule, record, weighing, item.cap_confirmed)
 
         destination_goal = goals(self.scene)["bin" if verdict.action == BIN else "set_aside"]
         pad_spot = Placement(pad_goal.center_x, pad_goal.center_y, pad_goal.rest_z)
@@ -125,6 +125,3 @@ class Sequencer:
             self.supervisor.stop("place_failed", f"the second pick failed: {second.reason}")
             return run(verdict, STOPPED)
         return run(verdict, BINNED if verdict.action == BIN else SET_ASIDE_AREA)
-
-    def _decide(self, item: Item, record, weighing) -> Verdict:
-        return decide(self.fullness.rule, record, weighing, item.cap_confirmed)
