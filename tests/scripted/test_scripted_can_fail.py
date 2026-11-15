@@ -107,7 +107,16 @@ def ignore_the_noise_model(package):
     )
 
 
+def size_the_offset_by_the_whole_container_not_the_grasp_width(package):
+    edit(package, SCRIPTED, "config.container.grasp_diameter / 2", "config.container.diameter / 2")
+
+
 FAULTS = [
+    (
+        CONTROLLER_TESTS,
+        size_the_offset_by_the_whole_container_not_the_grasp_width,
+        "test_the_tcp_stands_off_the_container_by_half_the_width_the_jaws_close_on",
+    ),
     (
         OBSERVATION_TESTS,
         double_the_noise,

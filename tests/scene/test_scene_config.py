@@ -5,7 +5,7 @@ import dataclasses
 import pytest
 from support.paths import ROOT
 
-from beverage_disposal.core.config import load_scene_config
+from beverage_disposal.core.config import from_mapping, load_scene_config
 from beverage_disposal.core.containers import ContainerSpec, Provenance, total_mass
 
 SCENE = ROOT / "configs" / "scene.toml"
@@ -79,6 +79,7 @@ def test_a_negative_fill_is_rejected():
     can = ContainerSpec(
         name="x",
         diameter=0.05,
+        grasp_diameter=0.05,
         height=0.1,
         empty_mass=0.01,
         grasp_height=0.05,
@@ -88,3 +89,34 @@ def test_a_negative_fill_is_rejected():
     )
     with pytest.raises(ValueError, match="fill"):
         total_mass(can, -1.0)
+
+
+@dataclasses.dataclass(frozen=True)
+class _Styles:
+    names: tuple[str, ...]
+
+
+def test_a_toml_list_fills_a_tuple_field_of_the_right_element_type():
+    assert from_mapping(_Styles, {"names": ["a", "b"]}).names == ("a", "b")
+
+
+@pytest.mark.parametrize("value", ["ab", ["a", 2], 3])
+def test_a_tuple_field_refuses_a_non_list_or_a_wrong_element(value):
+    with pytest.raises(ValueError, match="names"):
+        from_mapping(_Styles, {"names": value})
+
+
+@dataclasses.dataclass(frozen=True)
+class _WithDefault:
+    needed: float
+    optional: float = 2.0
+
+
+def test_a_field_with_a_default_may_be_left_out_of_the_file_but_a_needed_one_may_not():
+    assert from_mapping(_WithDefault, {"needed": 1.0}).optional == 2.0
+    with pytest.raises(ValueError, match="needed"):
+        from_mapping(_WithDefault, {"optional": 1.0})
+
+
+def test_the_real_scene_holds_no_bottle_so_the_can_stays_the_default():
+    assert load_scene_config(SCENE).bottle is None

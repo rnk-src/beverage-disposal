@@ -1,10 +1,11 @@
 """Scene settings as frozen dataclasses, read from a TOML file."""
 
 import tomllib
-from dataclasses import dataclass, fields, is_dataclass
+from dataclasses import MISSING, dataclass, fields, is_dataclass
 from pathlib import Path
-from typing import get_type_hints
+from typing import get_args, get_origin, get_type_hints
 
+from beverage_disposal.core.bottles import Bottle
 from beverage_disposal.core.containers import ContainerSpec
 
 
@@ -90,6 +91,7 @@ class GripperPadsConfig:
     """Two flat pads replace the jaw meshes' collision; see sim/pads.py."""
 
     design_angle: float  # gripper angle at which the two pad faces are parallel, rad
+    design_width: float  # the gap between the pad faces at that angle, metres: fixed hardware
     thickness: float
     half_width: float
     half_height: float
@@ -121,6 +123,8 @@ class SceneConfig:
     grasp: GraspConfig
     gripper_pads: GripperPadsConfig
     physics: PhysicsConfig
+    bottle: Bottle | None = None  # set by scene_for_bottle; the container is then this bottle
+    fill_density_g_ml: float = 1.0  # a bottle's liquid: fill_ml is its volume, this its density
 
 
 def from_mapping(cls: type, data: dict, where: str = "scene"):
@@ -129,7 +133,11 @@ def from_mapping(cls: type, data: dict, where: str = "scene"):
     unknown = sorted(set(data) - set(hints))
     if unknown:
         raise ValueError(f"{where}: unknown key(s) {unknown}")
-    missing = sorted(f.name for f in fields(cls) if f.name not in data)
+    missing = sorted(
+        f.name
+        for f in fields(cls)
+        if f.name not in data and f.default is MISSING and f.default_factory is MISSING
+    )
     if missing:
         raise ValueError(f"{where}: missing key(s) {missing}")
     return cls(**{name: _convert(hints[name], data[name], f"{where}.{name}") for name in data})
@@ -142,10 +150,15 @@ def _convert(hint, value, where):
         if not isinstance(value, dict):
             raise ValueError(f"{where}: expected a table")
         return from_mapping(hint, value, where)
+    if get_origin(hint) is tuple:
+        (element, _) = get_args(hint)  # only tuple[T, ...] is read: a list in the file
+        if not isinstance(value, list):
+            raise ValueError(f"{where}: expected a list")
+        return tuple(_convert(element, item, f"{where}[{i}]") for i, item in enumerate(value))
     if hint is float and isinstance(value, int) and not isinstance(value, bool):
         return float(value)
     if not isinstance(value, hint) or (isinstance(value, bool) and hint is not bool):
-        raise ValueError(f"{where}: expected {hint.__name__}, got {value!r}")
+        raise ValueError(f"{where}: expected {getattr(hint, '__name__', hint)}, got {value!r}")
     return value
 
 

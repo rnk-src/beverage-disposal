@@ -7,6 +7,7 @@ PADS_TESTS = "tests/grasp/test_gripper_pads.py"
 GRASP_TESTS = "tests/grasp/test_prescribed_grasp.py"
 PADS = "sim/pads.py"
 GRASP = "sim/grasp.py"
+OFFSET = "core/scripted.py"
 SCENE = "sim/scene.py"
 
 
@@ -14,8 +15,8 @@ def put_the_moving_pad_ten_millimetres_too_far(package):
     edit(
         package,
         PADS,
-        "FIXED_FACE_X + config.container.diameter +",
-        "FIXED_FACE_X + 0.01 + config.container.diameter +",
+        "FIXED_FACE_X + pads.design_width +",
+        "FIXED_FACE_X + 0.01 + pads.design_width +",
     )
 
 
@@ -58,7 +59,7 @@ def skip_the_contact_softness(package):
 
 
 def aim_the_tcp_on_the_wrong_side(package):
-    edit(package, GRASP, "- FACE_TO_TCP\n    tcp_xy", "+ 0.04\n    tcp_xy")
+    edit(package, OFFSET, "clearance - FACE_TO_TCP", "clearance + 0.04")
 
 
 def never_close_the_gripper(package):
@@ -69,10 +70,23 @@ def report_the_height_not_the_gain(package):
     edit(package, GRASP, "lift_gain=float(after[2] - before[2])", "lift_gain=float(after[2])")
 
 
+def let_the_container_move_the_pads(package):
+    edit(
+        package,
+        PADS,
+        "FIXED_FACE_X + pads.design_width +",
+        "FIXED_FACE_X + config.container.diameter +",
+    )
+
+
 PADS_FAULTS = [
     (
         put_the_moving_pad_ten_millimetres_too_far,
-        "test_the_pad_faces_are_one_container_diameter_apart_at_the_design_angle",
+        "test_the_pad_faces_are_the_design_width_apart_at_the_design_angle",
+    ),
+    (
+        let_the_container_move_the_pads,
+        "test_the_pads_are_hardware_so_the_container_does_not_move_them",
     ),
     (leave_the_moving_pad_unturned, "test_the_two_pad_faces_are_parallel_at_the_design_angle"),
     (lift_the_moving_pad_ten_millimetres, "test_the_pads_meet_the_can_at_the_same_height"),

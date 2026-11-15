@@ -7,6 +7,7 @@ import mujoco
 from beverage_disposal.core.config import BinConfig, PadConfig, SceneConfig, SetAsideConfig
 from beverage_disposal.core.containers import total_mass
 from beverage_disposal.sim.arm import arm_spec
+from beverage_disposal.sim.bottle import add_bottle
 from beverage_disposal.sim.pads import add_gripper_pads
 
 # MuJoCo's default torsional and rolling friction; only the sliding coefficient is configured.
@@ -47,18 +48,32 @@ def build_scene(config: SceneConfig, mjcf: str | Path) -> mujoco.MjModel:
     _add_pad(world, config.pad)
     _add_set_aside_marker(world, config.set_aside)
     can = config.container
-    body = world.add_body(
-        name="container", pos=[config.container_x, config.container_y, can.height / 2]
-    )
-    body.add_freejoint(name="container")
-    body.add_geom(
-        name="container",
-        type=mujoco.mjtGeom.mjGEOM_CYLINDER,
-        size=[can.diameter / 2, can.height / 2, 0.0],
-        mass=total_mass(can, config.fill_ml),
-        friction=[can.friction, can.torsional_friction, ROLLING_FRICTION],
-        condim=CONTAINER_CONDIM,
-    )
+    friction = [can.friction, can.torsional_friction, ROLLING_FRICTION]
+    if config.bottle is not None:
+        add_bottle(
+            spec,
+            world,
+            config.bottle,
+            config.fill_ml,
+            density_g_ml=config.fill_density_g_ml,
+            x=config.container_x,
+            y=config.container_y,
+            friction=friction,
+            condim=CONTAINER_CONDIM,
+        )
+    else:
+        body = world.add_body(
+            name="container", pos=[config.container_x, config.container_y, can.height / 2]
+        )
+        body.add_freejoint(name="container")
+        body.add_geom(
+            name="container",
+            type=mujoco.mjtGeom.mjGEOM_CYLINDER,
+            size=[can.diameter / 2, can.height / 2, 0.0],
+            mass=total_mass(can, config.fill_ml),
+            friction=friction,
+            condim=CONTAINER_CONDIM,
+        )
     _soften(spec, config)
     return spec.compile()
 
@@ -135,9 +150,15 @@ def _add_set_aside_marker(world, area: SetAsideConfig) -> None:
 def _soften(spec, config: SceneConfig) -> None:
     """The configured contact softness on the scene's own geoms (the pads get it in sim/pads.py)."""
     solref = [config.physics.contact_time_constant, config.physics.contact_damping_ratio]
-    scene_geoms = {"table", "container", "pad", "bin_floor"} | {
-        f"bin_wall_{side}" for side in ("north", "south", "east", "west")
-    }
+    scene_geoms = {
+        "table",
+        "container",
+        "container_shoulder",
+        "container_neck",
+        "container_ring",
+        "pad",
+        "bin_floor",
+    } | {f"bin_wall_{side}" for side in ("north", "south", "east", "west")}
     for geom in spec.geoms:
         if geom.name in scene_geoms:
             geom.solref = solref
