@@ -42,6 +42,23 @@ def leave_the_cap_out_of_the_empty_mass(package):
     )
 
 
+def use_a_wrong_frustum_centroid(package):
+    edit(package, BOTTLES, "3 * radius**2", "radius**2")
+
+
+def let_the_ring_be_as_wide_as_the_neck(package):
+    edit(
+        package,
+        BOTTLES,
+        "self.neck_diameter < self.support_ring_diameter",
+        "self.neck_diameter <= self.support_ring_diameter",
+    )
+
+
+def measure_the_centroid_from_the_inside_floor(package):
+    edit(package, BOTTLES, "moment + part * (shape.t_base + up / 2)", "moment + part * (up / 2)")
+
+
 FAULTS = [
     (
         use_the_wall_thickness_for_the_base,
@@ -66,6 +83,18 @@ FAULTS = [
     (
         allow_a_neck_wider_than_the_body,
         "test_an_impossible_shape_is_refused[change0-neck]",
+    ),
+    (
+        use_a_wrong_frustum_centroid,
+        "test_the_centroid_of_body_plus_whole_shoulder_is_the_volume_weighted_mean",
+    ),
+    (
+        let_the_ring_be_as_wide_as_the_neck,
+        "test_an_impossible_support_ring_is_refused[change0-ring]",
+    ),
+    (
+        measure_the_centroid_from_the_inside_floor,
+        "test_the_centroid_sits_on_the_raised_floor_inside_the_walls",
     ),
     (
         leave_the_cap_out_of_the_empty_mass,
