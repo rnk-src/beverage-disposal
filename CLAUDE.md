@@ -413,7 +413,7 @@ src/beverage_disposal/   Python package (placeholder name)
   core/                    the ROS-free core (no MuJoCo): sequencer.py (pick, weigh, decide, place), acceptance.py (results summary), supervisor.py (safety checks and indicators), supervised.py (a controller
                            under the supervisor), safety_config.py,
                            pad.py (weighing pad model), fullness.py (the weight rule),
-                           fullness_eval.py (Monte Carlo and sweeps), fullness_config.py, statistics.py (Wilson bounds), registry.py (container types as data, enrolment), trajectory.py and task_tests.py (an episode record and the
+                           fullness_eval.py (Monte Carlo and sweeps), fullness_config.py, statistics.py (Wilson bounds), registry.py (container types as data, enrolment), materials.py (material constants as ranges with sources), bottles.py (a bottle's shape: areas, shell mass, capacity, liquid level), trajectory.py and task_tests.py (an episode record and the
                            task's pass-fail and indicative functions), interfaces.py (Observation, Controller, noise), scripted.py
                            (the scripted pick-and-place), baselines.py (random policy); config.py (frozen scene dataclasses read from TOML),
                            containers.py (ContainerSpec, provenance, liquid mass), layout.py (footprints, spawn sampler, set-aside test),
@@ -441,6 +441,8 @@ tests/                   pytest tests (fast/medium/slow tiers), one folder per a
   sequencer/               the sequencer (ideal and simulated skill), the results summary, the harness and the demo recorder
   safety/                  the supervisor's checks with near-misses, the indicators and faults injected into an episode
   fullness/                the pad model, the weight rule, the Wilson bound and the false-bin Monte Carlo
+  materials/               the material table: ranges with sources, the bounds' safe ends
+  bottles/                 bottle geometry against closed forms: areas, shell mass, capacity, liquid level
   containers/              the registry, its weights with sources and the enrolment of unknown types
   tasktests/               the recorder and the task's pass-fail and indicative functions
   scripted/                the observation, the scripted pick-and-place, the goals and the baselines
@@ -451,7 +453,7 @@ tests/                   pytest tests (fast/medium/slow tiers), one folder per a
                            damaged-copy and mutated-package harnesses); no tests
   conftest.py              tier hook and shared fixtures
 assets/                  vendored third-party files with provenance (the SO-101 model)
-configs/                 configs (scene.toml, containers.toml, fullness.toml, safety.toml; training later) and the stored actuator step-response reference (JSON)
+configs/                 configs (scene.toml, containers.toml, materials.toml, fullness.toml, safety.toml; training later) and the stored actuator step-response reference (JSON)
 scripts/                 helper scripts (view_so101.py, generate_so101_chain.py, measure_actuators.py, run_acceptance.py, record_demo.py)
 pyproject.toml  uv.lock  .python-version   uv project, exact lockfile, pinned Python
 Makefile                                   `make check`, the one command for every gate

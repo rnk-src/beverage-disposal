@@ -25,6 +25,8 @@ ALLOWED_IN_TESTS = [
     "fullness",
     "safety",
     "sequencer",
+    "materials",
+    "bottles",
 ]
 
 
