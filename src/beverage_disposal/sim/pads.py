@@ -42,11 +42,9 @@ def add_gripper_pads(spec, config: SceneConfig, mjcf) -> None:
     solref = [config.physics.contact_time_constant, config.physics.contact_damping_ratio]
 
     rotation, jaw_origin = _moving_jaw_in_gripper_frame(load_arm(mjcf), pads.design_angle)
-    # Where the moving pad's centre must be, in the gripper frame, so its face is one diameter
+    # Where the moving pad's centre must be, in the gripper frame, so its face is one design width
     # from the fixed face; then the same point in the jaw's own frame.
-    centre = np.array(
-        [FIXED_FACE_X + config.container.diameter + pads.thickness / 2, 0.0, pads.depth]
-    )
+    centre = np.array([FIXED_FACE_X + pads.design_width + pads.thickness / 2, 0.0, pads.depth])
     in_jaw = rotation.T @ (centre - jaw_origin)
     quat = np.zeros(4)
     mujoco.mju_mat2Quat(quat, rotation.T.flatten())
