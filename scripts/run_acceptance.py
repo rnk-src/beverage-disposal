@@ -25,7 +25,11 @@ def main(argv):
     parser.add_argument("--trials", type=int, default=DEFAULT_TRIALS, help="runs per volume")
     parser.add_argument("--volumes", type=float, nargs="+", default=DEFAULT_VOLUMES, help="mL")
     parser.add_argument("--container", default="can_12floz", help="registry type id")
-    parser.add_argument("--unknown", action="store_true", help="present it as an unknown type")
+    parser.add_argument(
+        "--unknown",
+        action="store_true",
+        help="present it as an unknown type (every run is then set aside)",
+    )
     parser.add_argument("--out", type=Path, default=ROOT / "runs" / "acceptance.json")
     args = parser.parse_args(argv)
 
