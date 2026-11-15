@@ -89,17 +89,20 @@ simulation with statistics, 2 = a real arm, 3 = wider containers and more sensor
   (at least 381 trials in the bins near 30 mL for a zero-miss 95 % Wilson bound below 1 %), simulation only, and
   is worded "in simulation, k/N misses, Wilson 95 % upper bound X %". Config is frozen dataclasses plus TOML read
   with stdlib `tomllib`. The run is a work in progress by design; it stops at the end of iteration 2.
+- **Iteration 2B decided (2026-11-14).** The emptiness policy for plastic bottles (see Locked decisions and
+  Roadmap) was grilled and approved; 2B.0 (this record) is the first step after the tilt removal. Nothing of
+  2B beyond this text is built yet.
 - **Tilt removed (2026-11-14, `chore/remove-tilt`).** The owner does not want a tilt test or CoinFT in the end product,
   so `core/tilt.py`, `tilt_config.py`, `coinft.py`, `statics.py`, `configs/tilt.toml`, `tests/tilt/` and `tests/statics/` are
   deleted (git history keeps them). A container of an unknown type is now always set aside, with the enrolment request
   kept. The unknown-type grid result in the 2.8 text above (tilt path) therefore no longer applies. The next work is
-  iteration 2B, the emptiness policy for plastic bottles (the plan is in the owner's notes; 2B.0 records it here).
+  iteration 2B, the emptiness policy for plastic bottles.
 - **Plan review closed (2026-10-13).** Every decision was re-examined against the real alternatives. The
   fullness decision became a coded rule (weighing pad and database, a CoinFT tilt for unknown containers
   that was cut on 2026-11-14, a 30 mL promise), RL narrowed to one pick-and-place skill, the bottle was added after the can, and a real-arm
   tier (iteration 9) and headline metrics were added. The Locked decisions and Roadmap below are the result.
-- Iterations 2 to 9 are planned in detail down to sub-iterations (see Roadmap) and not started.
-- Last updated: 2026-11-14 (tilt, CoinFT and statics removed; unknown types are set aside; 2B planned). Update this section in the same change as every sub-iteration.
+- Iterations 3 to 9 and iteration 2B are planned in detail down to sub-iterations (see Roadmap); 2B is not started beyond the tilt removal and this record.
+- Last updated: 2026-11-14 (tilt removed and merged; iteration 2B decided and recorded in 2B.0). Update this section in the same change as every sub-iteration.
 
 ## Locked decisions
 
@@ -168,27 +171,55 @@ Each label is a stable name; the owner's private decision journal uses the same 
 - **Grasp:** physical only. Tune pads, friction and solver settings within plausible physics;
   no weld or teleport fallback. Our own two pads replace the jaw meshes' collision in the scene (2.4), the wrist
   rolls 90 degrees and the can is taken near its rim; the gripper servo's torque limit (0.6 N m in the scene)
-  sets the squeeze.
+  sets the squeeze. Bottles wider than the jaws (about 75 mm) are taken by the neck, below the support ring,
+  behind a go/no-go gate (2B.3): slip under 2 mm, swing settled within 2 s, 12 of 12 upright places, empty
+  and at the payload-limit fill. A size that fails stops the run and goes to the owner (custom wider jaws, a
+  printed neck insert, or a smaller scope).
 - **Sequencer and skill:** RL learns one skill, "pick at A, place at B" (B is an input), through its
-  motion under contact. A plain, tested sequencer calls it twice (container to the weighing pad, then pad
-  to the bin or the set-aside area) around the fullness rule. RL never decides the destination.
+  motion under contact. A is random in training even though intake is always the pad, so the skill is not
+  tied to one spot. A person places the container on the weighing pad (the intake); a plain, tested
+  sequencer weighs it, perceives it and decides before any lift, then calls the skill once (pad to the bin
+  or the set-aside area). A container too heavy to lift is never lifted. RL never decides the destination.
+  (Changed on 2026-11-14, iteration 2B; the old flow lifted the container to the pad first.)
 - **Fullness (task rule):** bin only if confident the container holds under 30 mL; if unsure, set aside;
-  no capacity estimate. For every volume from 30 mL up, the container is binned at most 1 % of the time
-  (a worst-case promise per volume; brimful containers are left to the weight check). A container of a
-  known type is decided by its weight on the pad against the type's lightest plausible empty weight
-  (bin only if the weight above it is under 30 g minus the scale's error margin). An unknown container
-  is always set aside, and the robot asks the owner to enrol the type (the CoinFT tilt test that once
-  handled it was cut on 2026-11-14). The decision is coded, not learned.
-  The set-aside area is separate from the pad. Tests always know the true volume.
-- **Containers:** the 12 fl oz can first, then the 16.9 fl oz PET bottle (right after the can works). A
-  container type is data in a registry (dimensions, lightest empty weight, grasp height and width, cap and
-  tab rules); no logic branches on a specific container. One enrolled type covers every container of
-  that type. For a bottle the camera must confirm the cap is on, else it is set aside.
-- **Safety supervisor:** coded and tested; refuses or stops on a container that is too wide or too heavy,
-  a failed test lift, or a force limit, and reports by light, sound and message.
-- **Perception:** markerless camera: detect the container, recognise its type, find the tab, check a
-  bottle's cap. Simulation uses ground truth plus a noise model (position noise, bias, delay,
-  dropouts). Material and cap recognition for other containers is Tier 3.
+  no capacity estimate. For every volume from 30 mL up, the container is binned at most 1 % of the time,
+  in simulation, for every supported size (a worst-case promise per volume). A can is decided by its
+  weight on the pad against its type's lightest plausible empty weight (bin only if the weight above it is
+  under 30 g minus the scale's error margin). A plastic (PET) bottle is decided by the emptiness policy
+  below. A container of an unknown, non-PET type is always set aside, and the robot asks the owner to enrol
+  the type. No tilt test and no CoinFT (cut 2026-11-14). The set-aside area is separate from the pad.
+  Tests always know the true volume.
+- **Emptiness policy (iteration 2B, decided 2026-11-14):** no empty-weight database for bottles. Physics
+  bounds give the lightest and heaviest plausible empty mass of a PET bottle from its measured size (the
+  shell's surface area times a wall-thickness range, plus neck, cap, label and a wet-outside allowance;
+  the thin-wall bound is set at about 70 % of the thinnest published wall). With the pad weight W and a drink
+  density of 0.95 to 1.05 g/mL, W gives an interval for the liquid volume, hence three zones: surely under
+  30 mL (the rule may bin), surely over (hard set-aside, nothing overturns it), and ambiguous. A trained
+  classifier (scikit-learn gradient-boosted trees on weight, size and visible liquid level) works beside the
+  rule: it may veto a bin anywhere, and it may bin only in the ambiguous zone, only when its score passes a
+  Neyman-Pearson threshold (alpha 0.5 %, delta 5 %, at least 598 calibration bottles per size and volume
+  bin) and its features are in-distribution. That overturn is simulation-only: on hardware
+  `allow_overturn = false` until Tier 2 data recalibrates it. Hard vetoes (never overturned): unsettled
+  weight, too heavy to lift, size outside the supported range, low perception confidence, a failed
+  out-of-distribution check, an unknown non-PET type, the surely-over zone, a supervisor fault. There is no
+  cap veto. Out of scope, stated as known blind spots: liquids under 0.95 g/mL (oil, spirits), crushed or
+  deformed bottles, foreign objects inside, frozen contents (the harness tests that crushed bottles and
+  foreign objects end set aside). Supported sizes: 250, 330, 500, 1000, 1500 and 2000 mL, each only after it
+  passes the neck-grasp gate. The classifier is supervised learning, not RL: discarding is a one-shot
+  labelled decision.
+- **Containers:** the 12 fl oz can, and PET bottles of 250 to 2000 mL. A can is a registry type (data:
+  dimensions, lightest empty weight, grasp height and width, tab rules); no logic branches on a specific
+  container. A PET bottle is a parametric shape (diameter, height, shoulder, neck, support ring, base style,
+  wall thickness, cap, label) drawn from per-size ranges in `configs/bottles.toml`, with material constants
+  in `configs/materials.toml`; aluminium plugs in later through the same material table. No cap check.
+- **Safety supervisor:** coded and tested; refuses or stops on a container that is too wide or too heavy
+  (decided from the pad weight before any lift, so a full large bottle is left for a person to remove), a
+  failed test lift, or a force limit, and reports by light, sound and message.
+- **Perception:** markerless camera: measure the container's dimensions as intervals, pick its size class,
+  read the visible liquid level, find a can's tab. Material is assumed PET for bottles until material
+  recognition exists. Simulation uses ground truth plus a pessimistic, assumed noise model (dimension
+  error, level error, label occlusion, dropouts); camera hardware is chosen at 9.3. Material recognition
+  for other containers is Tier 3.
 - **Weight signal (replaces servo-load weighing, which a study showed fails):** a weighing pad
   (a MuJoCo force sensor with noise and drift). CoinFT and the tilt test were cut on 2026-11-14. Servo
   load is not an observation.
@@ -494,15 +525,22 @@ update docs.
   container registry, empty-weight database and enrolment logic; 2.6a pad sensor model and weight rule; 2.6b
   statics liquid wrench and 2.6c coded tilt routine (both built, then removed on 2026-11-14); 2.7 safety supervisor with fault injection; 2.8
   sequencer + acceptance harness + metrics file.
+- **2B Emptiness policy for PET bottles (decided 2026-11-14).** First half, before iteration 3, one branch
+  and one pull request each: remove tilt (done, PR 3); 2B.0 decision record (this change); 2B.1 materials and
+  bottle geometry; 2B.2 bottle family and the MuJoCo bottle; 2B.3 neck-grasp gate; 2B.4 intake-on-pad flow
+  (the can moves onto it too); 2B.5 physics bounds, zones and the rule-only policy (the veto-only
+  baseline); 2B.6 perception noise model. Second half, after 4.5: 2B.7 features and dataset; 2B.8 the
+  classifier (adds scikit-learn); 2B.9 Neyman-Pearson calibration; 2B.10 the full policy; 2B.11 acceptance
+  per size and volume (381 trials per cell at 30, 31 and 35 mL, Wilson bounds); 2B.12 docs and the learning check.
 - **3 Gymnasium environment for the skill.** 3.1 observations (with the simulated perception noise);
   3.2 action layer; 3.3 env core (goal B as input); 3.4 reward and termination; 3.5 wrappers and
   vectorization; 3.6 contract and baseline tests.
 - **4 First learning.** 4.1 training scaffold + probe environments; 4.2 overfit one config;
   4.3 reach with randomization (SAC seeds and hyperparameter sensitivity); 4.4 grasp and lift;
   4.5 pick and place to B with the can. (The hidden destination flag, old 4.6, is removed.)
-- **4B Bottle (after 4.5).** 4.7 bottle model, registry entry and grasp physics (a rigid simulated bottle;
-  the real bottle flexes); 4.8 bottle in the scripted controller, the fullness entries and the cap check;
-  4.9 the bottle skill (fine-tune, or one skill with the container type as an observation: decide at 4.7).
+- **4B Bottle skill (after 4.5).** 4.9 the bottle skill (fine-tune, or one skill with the container type
+  as an observation). The old 4.7 and 4.8 (bottle model, grasp physics, fullness entries) are now 2B.2,
+  2B.3 and 2B.5.
 - **5 Robustness.** 5.1 randomization framework; 5.2 physics parameter set; 5.3 sensor and timing
   set; 5.4 sensitivity study; 5.5 train under randomization; 5.6 held-out perturbations.
 - **6 TdRL comparison.** 6.1 read and choose the integration path; 6.2 map our tests to TdRL's;
