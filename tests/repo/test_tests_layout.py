@@ -23,8 +23,6 @@ ALLOWED_IN_TESTS = [
     "tasktests",
     "containers",
     "fullness",
-    "statics",
-    "tilt",
     "safety",
     "sequencer",
 ]
