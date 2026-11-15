@@ -9,7 +9,6 @@ from beverage_disposal.core.config import load_scene_config
 from beverage_disposal.core.fullness_config import load_fullness_config
 from beverage_disposal.core.registry import load_registry
 from beverage_disposal.core.safety_config import load_safety_limits
-from beverage_disposal.core.tilt_config import load_tilt_config
 from beverage_disposal.sim.harness import evaluate
 from beverage_disposal.sim.skills import SimSkill
 
@@ -40,7 +39,6 @@ def main(argv):
         scene=scene,
         registry=registry,
         fullness=load_fullness_config(CONFIGS / "fullness.toml"),
-        tilt=load_tilt_config(CONFIGS / "tilt.toml"),
         limits=load_safety_limits(CONFIGS / "safety.toml"),
         known=not args.unknown,
     )

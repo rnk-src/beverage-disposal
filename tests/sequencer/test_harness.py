@@ -4,13 +4,13 @@ import json
 
 import pytest
 from support.so101 import MJCF, SO101
-from test_sequencer import CAN, FULLNESS, LIMITS, REGISTRY, SCENE, TILT
+from test_sequencer import CAN, FULLNESS, LIMITS, REGISTRY, SCENE
 
 from beverage_disposal.core.sequencer import IdealSkill, SkillResult
 from beverage_disposal.sim.harness import evaluate
 from beverage_disposal.sim.skills import SimSkill
 
-SETUP = dict(scene=SCENE, registry=REGISTRY, fullness=FULLNESS, tilt=TILT, limits=LIMITS)
+SETUP = dict(scene=SCENE, registry=REGISTRY, fullness=FULLNESS, limits=LIMITS)
 
 
 def grid(skill, volumes=(0.0, 31.0), n=3, **options):
@@ -44,6 +44,13 @@ def test_a_hundred_percent_misbinning_rule_shows_up_in_the_summary():
     options = {**SETUP, "fullness": broken}
     results = evaluate(IdealSkill(), volumes_ml=(35.0,), trials=3, container=CAN, **options)
     assert results["summary"]["binned_at_or_above_threshold"]["35"]["k"] == 3
+
+
+def test_a_grid_of_unknown_containers_bins_none_of_them():
+    """Catches the unknown-type path binning anything, at any volume."""
+    results = grid(IdealSkill(), volumes=(0.0, 31.0), known=False)
+    assert results["summary"]["runs"] == 6
+    assert all(row["destination"] == "set_aside" for row in results["runs"])
 
 
 class FailingSkill:

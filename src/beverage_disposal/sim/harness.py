@@ -10,7 +10,6 @@ from pathlib import Path
 import numpy as np
 
 from beverage_disposal.core.acceptance import stop_of, summarize
-from beverage_disposal.core.coinft import CoinFT
 from beverage_disposal.core.pad import PadSensor
 from beverage_disposal.core.sequencer import Item, Sequencer, Skill
 from beverage_disposal.core.supervisor import RecordingIndicators, Supervisor
@@ -27,11 +26,9 @@ def evaluate(
     scene,
     registry,
     fullness,
-    tilt,
     limits,
     density: float = 1.0,
     known: bool = True,
-    use_tilt: bool = True,
 ) -> dict:
     """Run `trials` seeded episodes per volume (seeds 0..trials-1) and return the results record.
 
@@ -49,12 +46,9 @@ def evaluate(
                 scene=scene,
                 registry=registry,
                 fullness=fullness,
-                tilt=tilt,
                 supervisor=Supervisor(limits, RecordingIndicators()),
                 skill=skill,
                 pad=PadSensor(fullness.pad, rng),
-                coinft=CoinFT(tilt.sensor, rng),
-                use_tilt=use_tilt,
             )
             item = Item(
                 type_id=container.type_id if known else None,
@@ -78,7 +72,7 @@ def evaluate(
         "summary": summarize(runs),
         "seeds": seeds,
         "runs": rows,
-        "provenance": provenance(scene, registry, fullness, tilt, limits),
+        "provenance": provenance(scene, registry, fullness, limits),
     }
 
 

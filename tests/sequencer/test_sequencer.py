@@ -5,7 +5,6 @@ import dataclasses
 import numpy as np
 from support.paths import ROOT
 
-from beverage_disposal.core.coinft import CoinFT
 from beverage_disposal.core.config import load_scene_config
 from beverage_disposal.core.fullness_config import load_fullness_config
 from beverage_disposal.core.layout import goals
@@ -22,13 +21,11 @@ from beverage_disposal.core.sequencer import (
     SkillResult,
 )
 from beverage_disposal.core.supervisor import RecordingIndicators, Supervisor
-from beverage_disposal.core.tilt_config import load_tilt_config
 
 CONFIGS = ROOT / "configs"
 SCENE = load_scene_config(CONFIGS / "scene.toml")
 REGISTRY = load_registry(CONFIGS / "containers.toml")
 FULLNESS = load_fullness_config(CONFIGS / "fullness.toml")
-TILT = load_tilt_config(CONFIGS / "tilt.toml")
 LIMITS = load_safety_limits(CONFIGS / "safety.toml")
 CAN = REGISTRY.lookup("can_12floz")
 BOTTLE = REGISTRY.lookup("bottle_500ml")
@@ -61,7 +58,7 @@ def item(record=CAN, volume_ml=0.0, density=1.0, known=True, **changes):
     return dataclasses.replace(base, **changes)
 
 
-def sequencer(skill=None, *, use_tilt=True, registry=REGISTRY, seed=0):
+def sequencer(skill=None, *, registry=REGISTRY, seed=0):
     skill = skill or RecordingSkill()
     indicators = RecordingIndicators()
     rng = np.random.default_rng(seed)
@@ -69,12 +66,9 @@ def sequencer(skill=None, *, use_tilt=True, registry=REGISTRY, seed=0):
         scene=SCENE,
         registry=registry,
         fullness=FULLNESS,
-        tilt=TILT,
         supervisor=Supervisor(LIMITS, indicators),
         skill=skill,
         pad=PadSensor(FULLNESS.pad, rng),
-        coinft=CoinFT(TILT.sensor, rng),
-        use_tilt=use_tilt,
     )
     return machine, skill, indicators
 
@@ -134,33 +128,14 @@ def test_a_failed_second_pick_stops_the_run_with_the_container_left_on_the_pad()
     assert run.events[-1].code == "place_failed"
 
 
-def test_a_container_of_an_unknown_type_is_met_with_an_enrolment_request_and_the_tilt_test():
+def test_an_empty_container_of_an_unknown_type_is_set_aside_not_binned():
+    """Catches an unknown type being binned on a weight guess: its material is not known."""
     machine, _, indicators = sequencer()
     run = machine.process(item(known=False, volume_ml=0.0), seed=0)
-    assert run.destination == BINNED  # the tilt test bounds an empty can under 30 mL
+    assert run.destination == SET_ASIDE_AREA
+    assert run.verdict.reason == "unknown container type"
     assert [r.type_id for r in machine.registry.pending] == ["unrecognised"]
-    assert any(event.code == "unknown_type" for event in run.events)
     assert ("light", "amber") in indicators.log
-
-
-def test_an_unknown_container_of_twenty_five_millilitres_is_set_aside_by_the_strict_tilt_test():
-    machine, _, _ = sequencer()
-    assert machine.process(item(known=False, volume_ml=25.0), seed=0).destination == SET_ASIDE_AREA
-
-
-def test_an_unknown_container_heavier_than_the_limit_is_set_aside_without_a_tilt():
-    machine, _, _ = sequencer()
-    heavy = item(known=False, volume_ml=0.0, empty_mass_kg=0.10)
-    run = machine.process(heavy, seed=0)
-    assert run.destination == SET_ASIDE_AREA and "heavy" in run.verdict.reason
-
-
-def test_without_the_coinft_an_unknown_container_is_binned_only_if_all_of_it_is_under_the_limit():
-    machine, _, _ = sequencer(use_tilt=False)
-    # A 14 g empty can weighs under the 26.5 g limit; a 30 g empty one does not, whatever is inside.
-    assert machine.process(item(known=False, volume_ml=0.0), seed=0).destination == BINNED
-    heavier = item(known=False, volume_ml=0.0, empty_mass_kg=0.030)
-    assert machine.process(heavier, seed=0).destination == SET_ASIDE_AREA
 
 
 def test_the_same_seed_gives_the_same_run():
