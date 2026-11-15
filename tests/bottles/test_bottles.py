@@ -17,6 +17,7 @@ from beverage_disposal.core.bottles import (
     capacity_ml,
     empty_mass_kg,
     level_for_volume_m,
+    liquid_centroid_m,
     shell_mass_kg,
     total_height_m,
     volume_below_ml,
@@ -162,3 +163,93 @@ def test_the_empty_mass_adds_the_neck_cap_and_label_to_the_shell():
 def test_an_impossible_shape_is_refused(change, message):
     with pytest.raises(ValueError, match=message):
         dataclasses.replace(CONE, **change)
+
+
+RING = {"support_ring_diameter": 0.025, "support_ring_drop": 0.01}
+
+
+def test_a_shape_with_a_valid_support_ring_is_accepted():
+    assert dataclasses.replace(CONE, **RING).support_ring_drop == 0.01
+
+
+@pytest.mark.parametrize(
+    ("change", "message"),
+    [
+        ({"support_ring_diameter": 0.02}, "ring"),  # not wider than the neck
+        ({"support_ring_diameter": 0.09}, "ring"),  # wider than the body
+        ({"support_ring_drop": 0.0}, "ring"),
+        ({"support_ring_drop": 0.03}, "ring"),  # as far down as the neck is tall
+    ],
+)
+def test_an_impossible_support_ring_is_refused(change, message):
+    with pytest.raises(ValueError, match=message):
+        dataclasses.replace(CONE, **{**RING, **change})
+
+
+def test_the_centroid_of_liquid_in_a_cylinder_is_half_its_depth_above_the_floor():
+    volume = PI * 0.03**2 * 0.05 * M3_TO_ML  # 50 mm deep in a 60 mm cylinder with no walls
+    assert liquid_centroid_m(CYLINDER, volume) == pytest.approx(0.025, rel=1e-9)
+
+
+def test_the_centroid_sits_on_the_raised_floor_inside_the_walls():
+    volume = PI * 0.029**2 * 0.04 * M3_TO_ML  # 40 mm deep, floor 2 mm up
+    assert liquid_centroid_m(WALLED, volume) == pytest.approx(0.002 + 0.020, rel=1e-9)
+
+
+def test_the_centroid_of_a_full_body_is_half_way_between_the_floor_and_the_shoulder():
+    volume = PI * 0.029**2 * (0.10 - 0.002) * M3_TO_ML
+    assert liquid_centroid_m(WALLED, volume) == pytest.approx(0.002 + 0.098 / 2, rel=1e-9)
+
+
+def test_the_centroid_of_body_plus_whole_shoulder_is_the_volume_weighted_mean():
+    big, small, drop = 0.04, 0.01, 0.04
+    body = PI * big**2 * 0.10
+    frustum = PI * drop / 3 * (big**2 + big * small + small**2)
+    # Frustum centroid measured up from its wide end.
+    from_wide = (
+        drop * (big**2 + 2 * big * small + 3 * small**2) / (4 * (big**2 + big * small + small**2))
+    )
+    expected = (body * 0.05 + frustum * (0.10 + from_wide)) / (body + frustum)
+    assert liquid_centroid_m(CONE, (body + frustum) * M3_TO_ML) == pytest.approx(expected, rel=1e-9)
+
+
+def test_the_centroid_matches_a_numerical_integral_for_a_level_inside_the_shoulder():
+    shape = dataclasses.replace(CONE, t_side=0.001, t_base=0.002)
+    level = 0.12
+
+    def inner_radius(z):  # outside-frame height z; the walls take 1 mm off every radius
+        if z <= 0.10:
+            return 0.039
+        return 0.039 + (0.009 - 0.039) * (z - 0.10) / 0.04
+
+    slices = 20_000
+    width = (level - 0.002) / slices
+    moment = mass = 0.0
+    for i in range(slices):
+        z = 0.002 + (i + 0.5) * width
+        area = PI * inner_radius(z) ** 2
+        moment += z * area * width
+        mass += area * width
+    assert liquid_centroid_m(shape, volume_below_ml(shape, level)) == pytest.approx(
+        moment / mass, rel=1e-6
+    )
+
+
+def test_no_liquid_has_its_centroid_on_the_floor_and_too_much_or_a_negative_amount_has_none():
+    assert liquid_centroid_m(WALLED, 0.0) == pytest.approx(0.002)
+    with pytest.raises(ValueError, match="volume"):
+        liquid_centroid_m(WALLED, -1.0)
+    with pytest.raises(ValueError, match="volume"):
+        liquid_centroid_m(WALLED, 10_000.0)
+
+
+@settings(derandomize=True, max_examples=200)
+@given(low=st.floats(min_value=0.0, max_value=1.0), high=st.floats(min_value=0.0, max_value=1.0))
+def test_more_liquid_never_lowers_the_centroid_and_it_stays_under_the_level(low, high):
+    shape = dataclasses.replace(CONE, t_side=0.001, t_base=0.002)
+    low, high = sorted((low, high))
+    capacity = capacity_ml(shape)
+    c_low = liquid_centroid_m(shape, low * capacity)
+    c_high = liquid_centroid_m(shape, high * capacity)
+    assert 0.002 - 1e-9 <= c_low <= c_high + 1e-9
+    assert c_high <= level_for_volume_m(shape, high * capacity) + 1e-9
