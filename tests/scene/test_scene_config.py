@@ -104,3 +104,19 @@ def test_a_toml_list_fills_a_tuple_field_of_the_right_element_type():
 def test_a_tuple_field_refuses_a_non_list_or_a_wrong_element(value):
     with pytest.raises(ValueError, match="names"):
         from_mapping(_Styles, {"names": value})
+
+
+@dataclasses.dataclass(frozen=True)
+class _WithDefault:
+    needed: float
+    optional: float = 2.0
+
+
+def test_a_field_with_a_default_may_be_left_out_of_the_file_but_a_needed_one_may_not():
+    assert from_mapping(_WithDefault, {"needed": 1.0}).optional == 2.0
+    with pytest.raises(ValueError, match="needed"):
+        from_mapping(_WithDefault, {"optional": 1.0})
+
+
+def test_the_real_scene_holds_no_bottle_so_the_can_stays_the_default():
+    assert load_scene_config(SCENE).bottle is None

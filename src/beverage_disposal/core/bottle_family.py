@@ -4,6 +4,7 @@ Lengths are in metres and masses in kilograms here; the material table is in mil
 and is converted once, where a bottle is drawn.
 """
 
+import dataclasses
 import math
 import tomllib
 from dataclasses import dataclass
@@ -14,12 +15,13 @@ import numpy as np
 from beverage_disposal.core.bottles import (
     BASE_STYLES,
     M3_TO_ML,
+    Bottle,
     BottleShape,
     capacity_ml,
-    empty_mass_kg,
+    total_height_m,
 )
-from beverage_disposal.core.config import from_mapping
-from beverage_disposal.core.containers import Provenance
+from beverage_disposal.core.config import SceneConfig, from_mapping
+from beverage_disposal.core.containers import ContainerSpec, Provenance
 from beverage_disposal.core.materials import MaterialSpec
 
 GATE_STATUSES = ("untested", "passed", "failed")
@@ -29,6 +31,8 @@ LABEL_PRESENT_P = 0.8  # assumed: some labels are peeled off
 MAX_DRAWS = 1000
 MM = 1e-3  # metres per millimetre
 GRAM = 1e-3  # kilograms per gram
+CONTAINER_FRICTION = 1.0  # the can's figures, until a bottle is measured
+CONTAINER_TORSIONAL_FRICTION = 0.01
 PROBE_RISE = 0.001  # a body this much taller than its base, used only to measure the capacity
 
 
@@ -90,17 +94,6 @@ class BottleFamily:
     def supported(self) -> tuple[str, ...]:
         """The sizes that passed the neck-grasp gate, in file order."""
         return tuple(name for name, size in self.classes.items() if size.gate.status == "passed")
-
-
-@dataclass(frozen=True)
-class Bottle:
-    shape: BottleShape
-    density_g_cm3: float
-    size: str
-
-    @property
-    def empty_mass_kg(self) -> float:
-        return empty_mass_kg(self.shape, self.density_g_cm3)
 
 
 def load_family(path: str | Path) -> BottleFamily:
@@ -175,3 +168,45 @@ def _draw(spec: SizeClass, material: MaterialSpec, rng: np.random.Generator) -> 
     if not spec.body_height.lo <= height <= spec.body_height.hi:
         return None
     return Bottle(shape_with(height), density, spec.name)
+
+
+def container_spec_for(bottle: Bottle, size: SizeClass) -> ContainerSpec:
+    """The bottle as the jaws and the task tests see it: width and height of the grasp included."""
+    shape = bottle.shape
+    if size.grasp_mode == "neck":
+        if shape.support_ring_diameter <= 0:
+            raise ValueError(f"{size.name}: a neck grasp needs a support ring to stay below")
+        grasp_height = total_height_m(shape) - shape.support_ring_drop - size.grasp_below_ring
+        grasp_diameter = shape.neck_diameter
+    else:
+        grasp_height = shape.body_height - size.grasp_below_ring
+        grasp_diameter = shape.body_diameter
+    return ContainerSpec(
+        name=size.name,
+        diameter=shape.body_diameter,
+        grasp_diameter=grasp_diameter,
+        height=total_height_m(shape),
+        empty_mass=bottle.empty_mass_kg,
+        grasp_height=grasp_height,
+        friction=CONTAINER_FRICTION,
+        torsional_friction=CONTAINER_TORSIONAL_FRICTION,
+        provenance=size.provenance,
+    )
+
+
+def scene_for_bottle(
+    scene: SceneConfig,
+    bottle: Bottle,
+    size: SizeClass,
+    liquid_ml: float,
+    density_g_ml: float = 1.0,
+) -> SceneConfig:
+    """`scene` with this bottle as its container, `liquid_ml` of a drink of that density in it."""
+    return dataclasses.replace(
+        scene,
+        container=container_spec_for(bottle, size),
+        bottle=bottle,
+        # The scene counts fill as millilitres of water, so a denser drink counts as more of it.
+        fill_ml=liquid_ml * density_g_ml,
+        grasp=dataclasses.replace(scene.grasp, pitch_deg=size.grasp_pitch_deg),
+    )

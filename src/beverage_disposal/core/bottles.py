@@ -64,6 +64,19 @@ class BottleShape:
 
 
 @dataclass(frozen=True)
+class Bottle:
+    """A drawn bottle: its shape, the density of its plastic and the size class it came from."""
+
+    shape: BottleShape
+    density_g_cm3: float
+    size: str
+
+    @property
+    def empty_mass_kg(self) -> float:
+        return empty_mass_kg(self.shape, self.density_g_cm3)
+
+
+@dataclass(frozen=True)
 class Areas:
     """Outside surface areas in square metres."""
 

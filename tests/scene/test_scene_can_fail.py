@@ -52,11 +52,9 @@ def sink_the_table_top_to_the_base(package):
 
 def make_the_can_slippery(package):
     # MuJoCo takes the larger friction of the two touching geoms, so the table's has to drop too.
-    for old in [
-        "friction=[can.friction, can.torsional_friction, ROLLING_FRICTION]",
-        "friction=[table.friction, TORSIONAL_FRICTION, ROLLING_FRICTION]",
-    ]:
-        edit(package, SCENE, old, "friction=[0.05, TORSIONAL_FRICTION, ROLLING_FRICTION]")
+    slippery = "[0.05, TORSIONAL_FRICTION, ROLLING_FRICTION]"
+    edit(package, SCENE, "[can.friction, can.torsional_friction, ROLLING_FRICTION]", slippery)
+    edit(package, SCENE, "[table.friction, TORSIONAL_FRICTION, ROLLING_FRICTION]", slippery)
 
 
 def break_the_loop_for_scenes(package):

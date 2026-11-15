@@ -5,6 +5,7 @@ from support.damage import assert_the_test_failed, edit, run_on_mutated_package
 
 FAMILY_TESTS = "tests/bottle_family/test_bottle_family.py"
 CONFIG_TESTS = "tests/scene/test_scene_config.py"
+SCENE_TESTS = "tests/bottle_family/test_bottle_scene.py"
 FAMILY = "core/bottle_family.py"
 CONFIG = "core/config.py"
 
@@ -52,6 +53,36 @@ def skip_the_check_of_each_list_element(package):
     )
 
 
+def grasp_the_neck_at_the_body_width(package):
+    edit(
+        package,
+        FAMILY,
+        "grasp_diameter = shape.neck_diameter",
+        "grasp_diameter = shape.body_diameter",
+    )
+
+
+def forget_the_ring_drop(package):
+    edit(
+        package,
+        FAMILY,
+        "- shape.support_ring_drop - size.grasp_below_ring",
+        "- size.grasp_below_ring",
+    )
+
+
+def allow_a_neck_grasp_without_a_ring(package):
+    edit(package, FAMILY, "if shape.support_ring_diameter <= 0:", "if False:")
+
+
+def ignore_the_drinks_density(package):
+    edit(package, FAMILY, "fill_ml=liquid_ml * density_g_ml,", "fill_ml=liquid_ml,")
+
+
+def keep_the_scenes_pitch(package):
+    edit(package, FAMILY, "pitch_deg=size.grasp_pitch_deg", "pitch_deg=scene.grasp.pitch_deg")
+
+
 FAULTS = [
     (
         ignore_the_overfill,
@@ -78,6 +109,31 @@ FAULTS = [
         always_fit_the_cap,
         FAMILY_TESTS,
         "test_a_bottle_may_lack_its_cap_or_its_label_and_often_has_both",
+    ),
+    (
+        grasp_the_neck_at_the_body_width,
+        SCENE_TESTS,
+        "test_a_neck_grasp_takes_the_bottle_below_its_ring_at_the_neck_width",
+    ),
+    (
+        forget_the_ring_drop,
+        SCENE_TESTS,
+        "test_a_neck_grasp_takes_the_bottle_below_its_ring_at_the_neck_width",
+    ),
+    (
+        allow_a_neck_grasp_without_a_ring,
+        SCENE_TESTS,
+        "test_a_neck_grasp_needs_a_ring_to_stay_below",
+    ),
+    (
+        ignore_the_drinks_density,
+        SCENE_TESTS,
+        "test_the_scene_for_a_bottle_holds_it_with_the_liquid_as_millilitres_of_water",
+    ),
+    (
+        keep_the_scenes_pitch,
+        SCENE_TESTS,
+        "test_the_scene_for_a_bottle_holds_it_with_the_liquid_as_millilitres_of_water",
     ),
     (
         skip_the_check_of_each_list_element,
