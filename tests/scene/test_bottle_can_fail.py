@@ -25,8 +25,26 @@ def count_the_liquid_twice(package):
     edit(
         package,
         BOTTLE,
+        "mass = liquid_ml * density_g_ml * LIQUID_KG_PER_ML",
+        "mass = 2 * liquid_ml * density_g_ml * LIQUID_KG_PER_ML",
+    )
+
+
+def forget_the_drinks_density_in_the_mass(package):
+    edit(
+        package,
+        BOTTLE,
+        "mass = liquid_ml * density_g_ml * LIQUID_KG_PER_ML",
         "mass = liquid_ml * LIQUID_KG_PER_ML",
-        "mass = 2 * liquid_ml * LIQUID_KG_PER_ML",
+    )
+
+
+def find_the_centroid_of_the_mass_as_if_it_were_volume(package):
+    edit(
+        package,
+        BOTTLE,
+        "centroid = liquid_centroid_m(shape, liquid_ml)",
+        "centroid = liquid_centroid_m(shape, liquid_ml * density_g_ml)",
     )
 
 
@@ -68,6 +86,14 @@ FAULTS = [
     (
         count_the_liquid_twice,
         "test_the_model_weighs_the_empty_bottle_plus_the_liquid[payload-pet_250ml]",
+    ),
+    (
+        forget_the_drinks_density_in_the_mass,
+        "test_a_denser_drink_weighs_more_but_stands_at_the_same_height[part]",
+    ),
+    (
+        find_the_centroid_of_the_mass_as_if_it_were_volume,
+        "test_a_denser_drink_weighs_more_but_stands_at_the_same_height[part]",
     ),
     (
         put_the_ring_two_millimetres_low,

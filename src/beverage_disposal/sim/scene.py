@@ -55,6 +55,7 @@ def build_scene(config: SceneConfig, mjcf: str | Path) -> mujoco.MjModel:
             world,
             config.bottle,
             config.fill_ml,
+            density_g_ml=config.fill_density_g_ml,
             x=config.container_x,
             y=config.container_y,
             friction=friction,

@@ -124,6 +124,7 @@ class SceneConfig:
     gripper_pads: GripperPadsConfig
     physics: PhysicsConfig
     bottle: Bottle | None = None  # set by scene_for_bottle; the container is then this bottle
+    fill_density_g_ml: float = 1.0  # a bottle's liquid: fill_ml is its volume, this its density
 
 
 def from_mapping(cls: type, data: dict, where: str = "scene"):
