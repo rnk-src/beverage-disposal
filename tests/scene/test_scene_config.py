@@ -5,7 +5,7 @@ import dataclasses
 import pytest
 from support.paths import ROOT
 
-from beverage_disposal.core.config import load_scene_config
+from beverage_disposal.core.config import from_mapping, load_scene_config
 from beverage_disposal.core.containers import ContainerSpec, Provenance, total_mass
 
 SCENE = ROOT / "configs" / "scene.toml"
@@ -88,3 +88,18 @@ def test_a_negative_fill_is_rejected():
     )
     with pytest.raises(ValueError, match="fill"):
         total_mass(can, -1.0)
+
+
+@dataclasses.dataclass(frozen=True)
+class _Styles:
+    names: tuple[str, ...]
+
+
+def test_a_toml_list_fills_a_tuple_field_of_the_right_element_type():
+    assert from_mapping(_Styles, {"names": ["a", "b"]}).names == ("a", "b")
+
+
+@pytest.mark.parametrize("value", ["ab", ["a", 2], 3])
+def test_a_tuple_field_refuses_a_non_list_or_a_wrong_element(value):
+    with pytest.raises(ValueError, match="names"):
+        from_mapping(_Styles, {"names": value})
