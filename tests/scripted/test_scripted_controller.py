@@ -5,6 +5,7 @@ closed on it. It has no physics, so these tests check the order and the targets 
 test_scripted_rollout.py checks the same script against the real simulation.
 """
 
+import dataclasses
 import math
 
 import numpy as np
@@ -17,7 +18,7 @@ from beverage_disposal.core.controller import MAX_DELTA
 from beverage_disposal.core.ik import solve_ik
 from beverage_disposal.core.kinematics import HOME, fk, load_chain
 from beverage_disposal.core.layout import goals
-from beverage_disposal.core.scripted import Phase, ScriptedController
+from beverage_disposal.core.scripted import Phase, ScriptedController, grasp_offset_m
 
 CONFIG = load_scene_config(ROOT / "configs" / "scene.toml")
 GRIPPER_LOW, GRIPPER_HIGH = load_chain()["gripper_range"]
@@ -174,3 +175,11 @@ def test_resetting_starts_the_sequence_again():
     run(controller, world)
     controller.reset(KinematicWorld().observe())
     assert controller.phase is Phase.ABOVE
+
+
+def test_the_tcp_stands_off_the_container_by_half_the_width_the_jaws_close_on():
+    # Half the width, plus the 2 mm clearance, less the 7.9 mm from the fixed face to the TCP.
+    assert grasp_offset_m(CONFIG) == pytest.approx(0.033 + 0.002 - 0.0079, abs=1e-12)
+    neck = dataclasses.replace(CONFIG.container, diameter=0.08, grasp_diameter=0.026)
+    narrow = dataclasses.replace(CONFIG, container=neck)
+    assert grasp_offset_m(narrow) == pytest.approx(0.013 + 0.002 - 0.0079, abs=1e-12)

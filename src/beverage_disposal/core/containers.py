@@ -22,6 +22,7 @@ class Provenance:
 class ContainerSpec:
     name: str
     diameter: float
+    grasp_diameter: float  # the width the jaws close on: the body, or a bottle's neck
     height: float
     empty_mass: float
     grasp_height: float  # TCP height above the container's bottom when the jaws take it, metres
