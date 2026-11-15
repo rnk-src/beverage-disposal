@@ -43,13 +43,13 @@ def payload_ml(bottle):
     return min(capacity_ml(bottle.shape), (PAYLOAD_KG - bottle.empty_mass_kg) * 1000.0)
 
 
-def scene_of(bottle, liquid_ml):
-    scene = scene_for_bottle(SCENE, bottle, FAMILY.classes[bottle.size], liquid_ml)
+def scene_of(bottle, liquid_ml, density=1.0):
+    scene = scene_for_bottle(SCENE, bottle, FAMILY.classes[bottle.size], liquid_ml, density)
     return dataclasses.replace(scene, container_x=FAR_X, container_y=0.0)
 
 
-def build(bottle, liquid_ml):
-    return build_scene(scene_of(bottle, liquid_ml), SO101 / MJCF)
+def build(bottle, liquid_ml, density=1.0):
+    return build_scene(scene_of(bottle, liquid_ml, density), SO101 / MJCF)
 
 
 def run(model, data, seconds):
@@ -152,3 +152,20 @@ def test_the_shoulder_spans_the_height_between_the_body_and_the_neck():
     assert world[:, 2].max() == pytest.approx(shape.body_height + shape.shoulder_height, abs=1e-6)
     radius = np.hypot(world[:, 0] - FAR_X, world[:, 1])
     assert radius.max() == pytest.approx(shape.body_diameter / 2, abs=1e-6)
+
+
+@pytest.mark.parametrize("fill", ["part", "brim"])
+def test_a_denser_drink_weighs_more_but_stands_at_the_same_height(fill):
+    bottle = bottle_of("pet_500ml")
+    ml = 100.0 if fill == "part" else capacity_ml(bottle.shape)
+    density = 1.05
+    model = build(bottle, ml, density)
+    body = model.body("container").id
+    assert model.body_subtreemass[body] == pytest.approx(
+        bottle.empty_mass_kg + ml * density * 1e-3, rel=1e-9
+    )
+    empty, full = forward(build(bottle, 0.0)), forward(model)
+    moment_full = model.body_subtreemass[body] * full.subtree_com[body][2]
+    moment_empty = bottle.empty_mass_kg * empty.subtree_com[body][2]
+    liquid_height = (moment_full - moment_empty) / (ml * density * 1e-3)
+    assert liquid_height == pytest.approx(liquid_centroid_m(bottle.shape, ml), abs=1e-6)

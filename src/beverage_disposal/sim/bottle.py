@@ -25,7 +25,7 @@ RING_THICKNESS = 0.002  # metres
 LEVEL_RGBA = [0.2, 0.4, 0.9, 0.5]
 LEVEL_INSET = 0.95  # the drawn liquid is a little narrower than the wall so it does not z-fight
 VISUAL_GROUP = 2
-LIQUID_KG_PER_ML = 1e-3  # the scene counts its fill as water
+LIQUID_KG_PER_ML = 1e-3  # per millilitre at a density of 1 g/mL
 
 
 def add_bottle(
@@ -34,6 +34,7 @@ def add_bottle(
     bottle: Bottle,
     liquid_ml: float,
     *,
+    density_g_ml: float,
     x: float,
     y: float,
     friction: list[float],
@@ -97,7 +98,7 @@ def add_bottle(
             ring_mass,
         )
     if liquid_ml > 0:
-        _add_liquid(container, bottle, liquid_ml, local)
+        _add_liquid(container, bottle, liquid_ml, density_g_ml, local)
 
 
 def _add_shoulder(spec, container, bottle, local, mass, friction, condim) -> None:
@@ -123,9 +124,9 @@ def _add_shoulder(spec, container, bottle, local, mass, friction, condim) -> Non
     )
 
 
-def _add_liquid(container, bottle, liquid_ml, local) -> None:
+def _add_liquid(container, bottle, liquid_ml, density_g_ml, local) -> None:
     shape = bottle.shape
-    mass = liquid_ml * LIQUID_KG_PER_ML
+    mass = liquid_ml * density_g_ml * LIQUID_KG_PER_ML
     centroid = liquid_centroid_m(shape, liquid_ml)
     level = level_for_volume_m(shape, liquid_ml)
     radius = shape.body_diameter / 2 - shape.t_side

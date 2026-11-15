@@ -31,8 +31,6 @@ LABEL_PRESENT_P = 0.8  # assumed: some labels are peeled off
 MAX_DRAWS = 1000
 MM = 1e-3  # metres per millimetre
 GRAM = 1e-3  # kilograms per gram
-CONTAINER_FRICTION = 1.0  # the can's figures, until a bottle is measured
-CONTAINER_TORSIONAL_FRICTION = 0.01
 PROBE_RISE = 0.001  # a body this much taller than its base, used only to measure the capacity
 
 
@@ -75,7 +73,8 @@ class SizeClass:
     overfill: Span  # brim capacity over the nominal size
     base_styles: tuple[str, ...]
     grasp_mode: str
-    grasp_below_ring: float  # metres between the ring's underside and the grasp point
+    # Metres from the grasp point up to the ring's underside (neck mode) or the shoulder (body).
+    grasp_below_ring: float
     grasp_pitch_deg: float
     gate: GateRecord
     provenance: Provenance
@@ -170,8 +169,13 @@ def _draw(spec: SizeClass, material: MaterialSpec, rng: np.random.Generator) -> 
     return Bottle(shape_with(height), density, spec.name)
 
 
-def container_spec_for(bottle: Bottle, size: SizeClass) -> ContainerSpec:
-    """The bottle as the jaws and the task tests see it: width and height of the grasp included."""
+def container_spec_for(
+    bottle: Bottle, size: SizeClass, *, friction: float, torsional_friction: float
+) -> ContainerSpec:
+    """The bottle as the jaws and the task tests see it: width and height of the grasp included.
+
+    No bottle's friction is measured, so the caller says which figures to use.
+    """
     shape = bottle.shape
     if size.grasp_mode == "neck":
         if shape.support_ring_diameter <= 0:
@@ -188,8 +192,8 @@ def container_spec_for(bottle: Bottle, size: SizeClass) -> ContainerSpec:
         height=total_height_m(shape),
         empty_mass=bottle.empty_mass_kg,
         grasp_height=grasp_height,
-        friction=CONTAINER_FRICTION,
-        torsional_friction=CONTAINER_TORSIONAL_FRICTION,
+        friction=friction,
+        torsional_friction=torsional_friction,
         provenance=size.provenance,
     )
 
@@ -201,12 +205,18 @@ def scene_for_bottle(
     liquid_ml: float,
     density_g_ml: float = 1.0,
 ) -> SceneConfig:
-    """`scene` with this bottle as its container, `liquid_ml` of a drink of that density in it."""
+    """`scene` with this bottle as its container, `liquid_ml` of a drink of that density in it.
+
+    The bottle takes the friction of the scene's current container (the can) until it is measured.
+    """
+    can = scene.container
     return dataclasses.replace(
         scene,
-        container=container_spec_for(bottle, size),
+        container=container_spec_for(
+            bottle, size, friction=can.friction, torsional_friction=can.torsional_friction
+        ),
         bottle=bottle,
-        # The scene counts fill as millilitres of water, so a denser drink counts as more of it.
-        fill_ml=liquid_ml * density_g_ml,
+        fill_ml=liquid_ml,
+        fill_density_g_ml=density_g_ml,
         grasp=dataclasses.replace(scene.grasp, pitch_deg=size.grasp_pitch_deg),
     )

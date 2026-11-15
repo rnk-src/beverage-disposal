@@ -94,6 +94,10 @@ def test_the_pads_are_hardware_so_the_container_does_not_move_them():
     assert gap == pytest.approx(CONFIG.gripper_pads.design_width, abs=5e-4)
 
 
+def test_the_hardware_is_sized_for_the_can_the_scene_file_names():
+    assert CONFIG.gripper_pads.design_width == CONFIG.container.grasp_diameter
+
+
 def test_the_configured_design_width_sets_the_pad_gap():
     pads = dataclasses.replace(CONFIG.gripper_pads, design_width=0.07)
     gap = pad_gap_at_the_design_angle(dataclasses.replace(CONFIG, gripper_pads=pads))

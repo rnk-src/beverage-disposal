@@ -76,7 +76,7 @@ def allow_a_neck_grasp_without_a_ring(package):
 
 
 def ignore_the_drinks_density(package):
-    edit(package, FAMILY, "fill_ml=liquid_ml * density_g_ml,", "fill_ml=liquid_ml,")
+    edit(package, FAMILY, "fill_density_g_ml=density_g_ml,", "fill_density_g_ml=1.0,")
 
 
 def keep_the_scenes_pitch(package):
@@ -128,12 +128,12 @@ FAULTS = [
     (
         ignore_the_drinks_density,
         SCENE_TESTS,
-        "test_the_scene_for_a_bottle_holds_it_with_the_liquid_as_millilitres_of_water",
+        "test_the_scene_for_a_bottle_holds_it_with_the_liquid_volume_and_density",
     ),
     (
         keep_the_scenes_pitch,
         SCENE_TESTS,
-        "test_the_scene_for_a_bottle_holds_it_with_the_liquid_as_millilitres_of_water",
+        "test_the_scene_for_a_bottle_holds_it_with_the_liquid_volume_and_density",
     ),
     (
         skip_the_check_of_each_list_element,
