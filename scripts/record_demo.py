@@ -6,7 +6,6 @@ from pathlib import Path
 
 import numpy as np
 
-from beverage_disposal.core.coinft import CoinFT
 from beverage_disposal.core.config import load_scene_config
 from beverage_disposal.core.fullness_config import load_fullness_config
 from beverage_disposal.core.pad import PadSensor
@@ -14,7 +13,6 @@ from beverage_disposal.core.registry import load_registry
 from beverage_disposal.core.safety_config import load_safety_limits
 from beverage_disposal.core.sequencer import Item, Sequencer
 from beverage_disposal.core.supervisor import RecordingIndicators, Supervisor
-from beverage_disposal.core.tilt_config import load_tilt_config
 from beverage_disposal.sim.demo import FrameRecorder
 from beverage_disposal.sim.skills import SimSkill
 
@@ -33,7 +31,6 @@ def main(argv):
 
     scene = load_scene_config(CONFIGS / "scene.toml")
     fullness = load_fullness_config(CONFIGS / "fullness.toml")
-    tilt = load_tilt_config(CONFIGS / "tilt.toml")
     record = (registry := load_registry(CONFIGS / "containers.toml")).lookup(args.container)
     rng = np.random.default_rng(args.seed)
     frames = FrameRecorder()
@@ -41,11 +38,9 @@ def main(argv):
         scene=scene,
         registry=registry,
         fullness=fullness,
-        tilt=tilt,
         supervisor=Supervisor(load_safety_limits(CONFIGS / "safety.toml"), RecordingIndicators()),
         skill=SimSkill(scene, MODEL, on_step=frames),
         pad=PadSensor(fullness.pad, rng),
-        coinft=CoinFT(tilt.sensor, rng),
     )
     item = Item(
         record.type_id,

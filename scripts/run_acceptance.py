@@ -9,7 +9,6 @@ from beverage_disposal.core.config import load_scene_config
 from beverage_disposal.core.fullness_config import load_fullness_config
 from beverage_disposal.core.registry import load_registry
 from beverage_disposal.core.safety_config import load_safety_limits
-from beverage_disposal.core.tilt_config import load_tilt_config
 from beverage_disposal.sim.harness import evaluate
 from beverage_disposal.sim.skills import SimSkill
 
@@ -26,7 +25,11 @@ def main(argv):
     parser.add_argument("--trials", type=int, default=DEFAULT_TRIALS, help="runs per volume")
     parser.add_argument("--volumes", type=float, nargs="+", default=DEFAULT_VOLUMES, help="mL")
     parser.add_argument("--container", default="can_12floz", help="registry type id")
-    parser.add_argument("--unknown", action="store_true", help="present it as an unknown type")
+    parser.add_argument(
+        "--unknown",
+        action="store_true",
+        help="present it as an unknown type (every run is then set aside)",
+    )
     parser.add_argument("--out", type=Path, default=ROOT / "runs" / "acceptance.json")
     args = parser.parse_args(argv)
 
@@ -40,7 +43,6 @@ def main(argv):
         scene=scene,
         registry=registry,
         fullness=load_fullness_config(CONFIGS / "fullness.toml"),
-        tilt=load_tilt_config(CONFIGS / "tilt.toml"),
         limits=load_safety_limits(CONFIGS / "safety.toml"),
         known=not args.unknown,
     )
