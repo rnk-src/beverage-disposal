@@ -101,8 +101,16 @@ simulation with statistics, 2 = a real arm, 3 = wider containers and more sensor
   fullness decision became a coded rule (weighing pad and database, a CoinFT tilt for unknown containers
   that was cut on 2026-11-14, a 30 mL promise), RL narrowed to one pick-and-place skill, the bottle was added after the can, and a real-arm
   tier (iteration 9) and headline metrics were added. The Locked decisions and Roadmap below are the result.
-- Iterations 3 to 9 and iteration 2B are planned in detail down to sub-iterations (see Roadmap); 2B is not started beyond the tilt removal and this record.
-- Last updated: 2026-11-14 (tilt removed and merged; iteration 2B decided and recorded in 2B.0). Update this section in the same change as every sub-iteration.
+- **Iteration 2B, 2B.1 and 2B.2 built (2026-11-15).** 2B.1 (merged, PR 5): `core/materials.py` and `core/bottles.py`. 2B.2
+  (`iter2b/2b.2-bottle-family`): `core/bottles.py` gains a support ring and the liquid's centroid; `core/bottle_family.py`
+  and `configs/bottles.toml` hold six PET size classes (250 to 2000 mL) as ranges and a seeded sampler that solves the body
+  height so the brim capacity is the nominal size times a drawn overfill; `ContainerSpec.grasp_diameter` is the width the
+  jaws close on (the neck, for a neck grasp); the gripper pads are fixed hardware (`gripper_pads.design_width`, 66 mm) and no
+  longer follow the container; `sim/bottle.py` builds the bottle in MuJoCo (body, shoulder mesh, neck, ring, liquid at its
+  centroid) and every size stands upright empty and at the 0.6 kg payload. Every bottle figure is "assumed". Not yet known:
+  whether the stock pads can take a 24 to 28 mm neck (2B.3 gate) and whether the 1.5 L and 2 L necks are reachable.
+- Iterations 3 to 9 and the rest of iteration 2B are planned in detail down to sub-iterations (see Roadmap).
+- Last updated: 2026-11-15 (2B.2 bottle family and the MuJoCo bottle). Update this section in the same change as every sub-iteration.
 
 ## Locked decisions
 
@@ -444,7 +452,7 @@ src/beverage_disposal/   Python package (placeholder name)
   core/                    the ROS-free core (no MuJoCo): sequencer.py (pick, weigh, decide, place), acceptance.py (results summary), supervisor.py (safety checks and indicators), supervised.py (a controller
                            under the supervisor), safety_config.py,
                            pad.py (weighing pad model), fullness.py (the weight rule),
-                           fullness_eval.py (Monte Carlo and sweeps), fullness_config.py, statistics.py (Wilson bounds), registry.py (container types as data, enrolment), materials.py (material constants as ranges with sources), bottles.py (a bottle's shape: areas, shell mass, capacity, liquid level), trajectory.py and task_tests.py (an episode record and the
+                           fullness_eval.py (Monte Carlo and sweeps), fullness_config.py, statistics.py (Wilson bounds), registry.py (container types as data, enrolment), materials.py (material constants as ranges with sources), bottles.py (a bottle's shape: areas, shell mass, capacity, liquid level and centroid), bottle_family.py (PET size classes as ranges, the seeded sampler, a bottle as a container spec and a scene), trajectory.py and task_tests.py (an episode record and the
                            task's pass-fail and indicative functions), interfaces.py (Observation, Controller, noise), scripted.py
                            (the scripted pick-and-place), baselines.py (random policy); config.py (frozen scene dataclasses read from TOML),
                            containers.py (ContainerSpec, provenance, liquid mass), layout.py (footprints, spawn sampler, set-aside test),
@@ -452,7 +460,7 @@ src/beverage_disposal/   Python package (placeholder name)
                            so101_chain.json, the generated, frozen robot spec it reads; ik.py (solve_ik);
                            controller.py (EEDeltaController); step_response.py (rise, overshoot, settling)
   sim/                     the MuJoCo side: arm.py loads the vendored arm and adds the TCP site; scene.py (table, bin, pad, set-aside
-                           marker, container and the arm in one model); pads.py (the gripper's two collision pads);
+                           marker, container and the arm in one model); bottle.py (a PET bottle as geoms with the liquid welded in); pads.py (the gripper's two collision pads);
                            grasp.py (prescribed grasp); skills.py (the scripted skill as the sequencer calls it), harness.py (seeded grid and results record), demo.py (GIF frames); rollout.py (one judged episode); recorder.py (an episode as a Trajectory); loop.py
                            (20 Hz closed loop through the PD actuators); actuator_response.py (step tests)
 docker/gazebo/           headless Gazebo validation image: Dockerfile, worlds/, step_world.py,
@@ -473,7 +481,8 @@ tests/                   pytest tests (fast/medium/slow tiers), one folder per a
   safety/                  the supervisor's checks with near-misses, the indicators and faults injected into an episode
   fullness/                the pad model, the weight rule, the Wilson bound and the false-bin Monte Carlo
   materials/               the material table: ranges with sources, the bounds' safe ends
-  bottles/                 bottle geometry against closed forms: areas, shell mass, capacity, liquid level
+  bottles/                 bottle geometry against closed forms: areas, shell mass, capacity, liquid level, centroid
+  bottle_family/           the size classes' file, the sampler's ranges and capacities, the container spec and scene
   containers/              the registry, its weights with sources and the enrolment of unknown types
   tasktests/               the recorder and the task's pass-fail and indicative functions
   scripted/                the observation, the scripted pick-and-place, the goals and the baselines
@@ -484,7 +493,7 @@ tests/                   pytest tests (fast/medium/slow tiers), one folder per a
                            damaged-copy and mutated-package harnesses); no tests
   conftest.py              tier hook and shared fixtures
 assets/                  vendored third-party files with provenance (the SO-101 model)
-configs/                 configs (scene.toml, containers.toml, materials.toml, fullness.toml, safety.toml; training later) and the stored actuator step-response reference (JSON)
+configs/                 configs (scene.toml, containers.toml, materials.toml, bottles.toml, fullness.toml, safety.toml; training later) and the stored actuator step-response reference (JSON)
 scripts/                 helper scripts (view_so101.py, generate_so101_chain.py, measure_actuators.py, run_acceptance.py, record_demo.py)
 pyproject.toml  uv.lock  .python-version   uv project, exact lockfile, pinned Python
 Makefile                                   `make check`, the one command for every gate
