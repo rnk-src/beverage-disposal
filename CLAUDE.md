@@ -185,8 +185,27 @@ simulation with statistics, 2 = a real arm, 3 = wider containers and more sensor
   held-out bottles with the seed-0 bundle: every surely-under bottle scored 0.965 or more, so `veto_score` 0.5 (assumed)
   vetoes none; 3 of 24 235 ambiguous bottles were outside the training ranges. Not wired yet: the sequencer and the grid
   still build the rule-only policy (2B.11).
+- **Iteration 2B, 2B.11 built (2026-11-16): the acceptance grid, decision level.** `core/emptiness_eval.py`: the grid takes
+  a stream (the acceptance bottles share nothing with the training and calibration bottles), crushed bottles and a solid
+  object in an empty bottle; a cell counts the classifier's overturns; `payload_volume_ml` and `summarize_cells`.
+  `scripts/run_emptiness_grid.py --policy full` loads the bundle and also runs the rule-only policy on the same bottles.
+  First full run (thresholds calibrated on bottles spread over 30 to 31 mL): 7 of 6000 bottles of exactly 30 mL binned, all
+  overturns (500 mL 1, 1500 mL 2, 2000 mL 4 of 1000; worst Wilson 95 % upper bound 1.024 %). The owner chose to calibrate at
+  exactly 30 mL: the calibration cell that starts at the threshold now holds bottles of exactly the threshold
+  (`train/emptiness/dataset.py`). Retrained, seed 0: thresholds 0.988, 0.960, 1.000, 0.980, 0.993 and 0.967 for 250 to
+  2000 mL (these replace the 2B.9 figures). Rerun, in simulation, decision level, noisy camera, 1000 bottles per cell, six
+  sizes (`runs/emptiness_full.json`): full policy, 2 of 30 000 bottles of 30 mL or more binned, both 2000 mL bottles of
+  exactly 30 mL (2 of 1000, Wilson 95 % upper bound 0.726 %); every other cell at 30, 31, 35, 50 mL and the payload fill 0
+  of 1000 (0.383 %). Rule-only, same bottles: 0 of 30 000. So every cell's bound is under 1 %, but the "0 misbins per cell"
+  bar is not met for 2000 mL; alpha 0.5 % allows such overturns by design, and the owner accepted
+  2 of 1000 at 2000 mL and exactly 30 mL on 2026-11-16. Empties binned, full against rule-only: 993/1000, 1000/1000, 952/953, 698/607, 412/401 and 489/282 of 1000
+  for 250 to 2000 mL; the full policy bins fewer 250 and 500 mL empties (the out-of-distribution veto), so the "at least as
+  many as rule-only" bar is not met for those two. Under 30 mL the classifier also binned 4 of 1000 2000 mL bottles of 29 mL
+  (allowed). Crushed bottles: 0 of 12 000 binned. An empty bottle with a 50 g or a 100 g object: 0 of 12 000 binned. Not
+  built: the per-size MuJoCo carry grid and the `core/acceptance.py` summary of it (no bottle size is supported, so there
+  is nothing to carry).
 - Iterations 3 to 9 and the rest of iteration 2B are planned in detail down to sub-iterations (see Roadmap).
-- Last updated: 2026-11-16 (2B.10 the full policy). Update this section in the same change as every sub-iteration.
+- Last updated: 2026-11-16 (2B.11 the acceptance grid). Update this section in the same change as every sub-iteration.
 
 ## Locked decisions
 
@@ -509,7 +528,7 @@ uv run python scripts/record_demo.py                   # GIF of one container th
 uv run python scripts/check_bottle_reach.py             # per bottle size: the steepest pitch that reaches each pose of a neck grasp
 uv run python scripts/run_neck_gate.py                  # the grasp gate per size, fill and grasp mode, writes runs/neck_gate.json (about 10 min)
 uv run python scripts/train_emptiness.py               # fit and calibrate the emptiness classifier, writes runs/emptiness_model/ (about 1 min)
-uv run python scripts/run_emptiness_grid.py --trials 1000  # the emptiness policy over sizes and volumes, decision level, noisy camera, writes runs/emptiness_rule_only.json
+uv run python scripts/run_emptiness_grid.py --policy full --sizes all --trials 1000  # the emptiness policy over sizes and volumes, with crushed bottles and foreign objects, decision level, noisy camera; writes runs/emptiness_full.json (about 12 min; --policy rule-only is quick)
 uv run python scripts/measure_actuators.py         # re-measure the servo step responses (configs/actuator_step_response.json)
 uv run pytest tests/gazebo   # Gazebo image tests: need a running Docker daemon, else they skip
 ```

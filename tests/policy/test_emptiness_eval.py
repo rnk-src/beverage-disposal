@@ -7,7 +7,13 @@ import pytest
 from support.paths import ROOT
 from test_policy import ALL_SIZES, CONFIG, FAMILY, PET, POLICY, RULE
 
-from beverage_disposal.core.emptiness_eval import draw_case, misbin_grid
+from beverage_disposal.core.emptiness_eval import (
+    Cell,
+    draw_case,
+    misbin_grid,
+    payload_volume_ml,
+    summarize_cells,
+)
 from beverage_disposal.core.fullness_config import load_fullness_config
 from beverage_disposal.core.pad import PadSensor
 from beverage_disposal.core.perception import load_perception_noise
@@ -175,3 +181,98 @@ def test_a_crushed_bottle_is_seen_as_one_and_needs_the_noise_model():
     assert case(deformed=True).perception.confidence == pytest.approx(0.4)
     with pytest.raises(ValueError, match="noise"):
         case(noise=None, deformed=True)
+
+
+# The acceptance grid: its own bottles, crushed bottles, foreign objects and the summary.
+
+
+def test_a_stream_gives_the_grid_bottles_of_its_own():
+    plain = noisy(volumes_ml=(0.0, 35.0))
+    assert noisy(volumes_ml=(0.0, 35.0), stream=(3, 2)) != plain
+    assert noisy(volumes_ml=(0.0, 35.0), stream=(3, 2)) == noisy(
+        volumes_ml=(0.0, 35.0), stream=(3, 2)
+    )
+    assert noisy(volumes_ml=(0.0, 35.0), stream=()) == plain
+
+
+def test_every_crushed_bottle_of_the_grid_is_vetoed_and_the_cell_says_it_was_crushed():
+    (cell,) = noisy(deformed=True, trials=100)
+    assert (cell.binned, cell.deformed) == (0, True)
+    assert cell.decided_by == {"veto:low_confidence": 100}
+    assert noisy(trials=100)[0].deformed is False
+
+
+def test_a_foreign_object_of_the_grid_is_on_the_scale_and_named_in_the_cell():
+    (cell,) = noisy(foreign_g=100.0, trials=100)
+    assert (cell.binned, cell.foreign_g) == (0, 100.0)
+    # A sound empty 500 mL bottle is nearly always binned, so the object is what stopped these.
+    (sound,) = noisy(trials=100)
+    assert sound.binned > 90 and sound.foreign_g == 0.0
+
+
+def with_model(score, tau):
+    from test_full_policy import bundled
+
+    return bundled(score, tau=tau)
+
+
+def test_a_cell_counts_the_bins_the_classifier_made_in_the_ambiguous_zone():
+    options = dict(sizes=("pet_2000ml",), volumes_ml=(20.0,), trials=100, seed=0, noise=NOISE)
+    (eager,) = misbin_grid(with_model(1.0, 0.0), FAMILY, PET, PAD, **options)
+    # Not every ambiguous bottle: one the noisy camera fits to two sizes is left to the rule.
+    assert eager.zones == {"ambiguous": 100}
+    assert eager.binned == eager.overturned == eager.decided_by["classifier"] > 50
+    (alone,) = misbin_grid(POLICY, FAMILY, PET, PAD, **options)
+    assert alone.overturned == 0 and alone.zones == eager.zones
+    # A bin the rule made is not an overturn.
+    (ruled,) = noisy(trials=100)
+    assert ruled.binned > 90 and ruled.overturned == 0
+
+
+def test_a_classifiers_veto_is_not_counted_as_an_overturn():
+    (cell,) = misbin_grid(
+        with_model(0.0, 1.0), FAMILY, PET, PAD, sizes=("pet_500ml",), volumes_ml=(0.0,), trials=50,
+        seed=0, noise=NOISE,
+    )  # fmt: skip
+    assert cell.decided_by["classifier"] > 40 and (cell.binned, cell.overturned) == (0, 0)
+
+
+def test_the_payload_volume_is_the_nominal_size_or_what_the_arm_may_lift():
+    assert payload_volume_ml(FAMILY, "pet_330ml", payload_kg=0.6) == 330.0
+    assert payload_volume_ml(FAMILY, "pet_2000ml", payload_kg=0.6) == 600.0
+    assert payload_volume_ml(FAMILY, "pet_2000ml", payload_kg=0.5) == 500.0
+
+
+def a_cell(size, volume_ml, binned, trials=100, **more):
+    return Cell(size, volume_ml, trials, binned, wilson_upper(binned, trials), {}, {}, **more)
+
+
+def test_the_summary_counts_misbins_empties_overturns_and_vetoes_by_hand():
+    cells = [
+        a_cell("a", 0.0, 90, overturned=20),
+        a_cell("a", 29.0, 50),  # under the threshold: not a misbin
+        a_cell("a", 30.0, 0),
+        a_cell("a", 35.0, 2, overturned=2),
+        a_cell("b", 0.0, 10),
+        a_cell("b", 31.0, 1, trials=50),
+        a_cell("a", 0.0, 3, deformed=True),
+        a_cell("b", 0.0, 4, foreign_g=50.0),
+        a_cell("b", 0.0, 5, foreign_g=100.0),
+    ]
+    cells[2] = dataclasses.replace(cells[2], decided_by={"rule": 60, "veto:unsettled": 40})
+    cells[4] = dataclasses.replace(cells[4], decided_by={"veto:unsettled": 5, "veto:not_pet": 1})
+    summary = summarize_cells(cells, threshold_ml=30.0)
+    assert summary["binned_at_or_over_threshold"] == 3
+    assert summary["trials_at_or_over_threshold"] == 250
+    assert summary["worst_upper_95_at_or_over_threshold"] == wilson_upper(1, 50)
+    assert summary["empties_binned"] == {"a": [90, 100], "b": [10, 100]}
+    assert summary["overturned"] == 22
+    assert summary["vetoes"] == {"veto:unsettled": 45, "veto:not_pet": 1}
+    assert summary["crushed_binned"] == {"a": [3, 100]}
+    assert summary["foreign_binned"] == {"b": {"50": [4, 100], "100": [5, 100]}}
+
+
+def test_a_crushed_or_foreign_cell_is_not_counted_among_the_sound_bottles():
+    cells = [a_cell("a", 35.0, 7, deformed=True), a_cell("a", 0.0, 9, foreign_g=50.0)]
+    summary = summarize_cells(cells, threshold_ml=30.0)
+    assert summary["binned_at_or_over_threshold"] == 0 and summary["empties_binned"] == {}
