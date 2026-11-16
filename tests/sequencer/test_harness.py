@@ -77,10 +77,10 @@ def test_a_stopped_run_names_its_stop_code_and_the_skills_reason():
     for row in results["runs"]:
         assert row["destination"] == "stopped"
         assert row["stop"] == {
-            "code": "pick_failed",
-            "message": "the first pick failed: time ran out",
+            "code": "place_failed",
+            "message": "the carry failed: time ran out",
         }
-    assert results["summary"]["stops"] == {"pick_failed": 2}
+    assert results["summary"]["stops"] == {"place_failed": 2}
     json.dumps(results)
 
 

@@ -9,6 +9,7 @@ from support.paths import ROOT
 
 from beverage_disposal.core.interfaces import Observation
 from beverage_disposal.core.kinematics import HOME
+from beverage_disposal.core.pad import Weighing
 from beverage_disposal.core.registry import load_registry
 from beverage_disposal.core.safety_config import load_safety_limits
 from beverage_disposal.core.supervisor import (
@@ -37,34 +38,58 @@ def test_the_limits_file_has_the_limits_the_comments_explain():
     assert LIMITS.max_arm_force == 20.0 and LIMITS.max_episode_seconds == 20.0
 
 
+def weighed(mass_kg, **changes):
+    return Weighing(**{"mass_kg": mass_kg, "stable": True, **changes})
+
+
 @pytest.mark.parametrize(
-    ("diameter", "trips"), [(0.0749, False), (0.0751, True)], ids=["near-miss", "trip"]
+    ("widest", "trips"), [(0.0749, False), (0.0751, True)], ids=["near-miss", "trip"]
 )
-def test_a_container_wider_than_the_pads_can_take_is_refused(diameter, trips):
+def test_a_grasp_that_may_be_wider_than_the_pads_can_take_is_refused(widest, trips):
     supervisor, _ = fresh()
-    decision = supervisor.check_container(CAN, diameter=diameter, mass_kg=0.05)
+    # The camera gives the width as an interval; its high end decides.
+    decision = supervisor.check_container(grasp_width=(0.060, widest), weighing=weighed(0.05))
     assert (decision.outcome is Outcome.SAFE_STOP) == trips
     assert (decision.event is not None and decision.event.code == "too_wide") == trips
 
 
-@pytest.mark.parametrize("mass", [0.599, 0.601], ids=["near-miss", "trip"])
-def test_a_container_heavier_than_the_arm_should_lift_is_refused(mass):
+@pytest.mark.parametrize("mass", [0.600, 0.601], ids=["near-miss", "trip"])
+def test_a_container_weighed_over_the_limit_is_left_for_a_person_to_remove(mass):
     supervisor, _ = fresh()
-    decision = supervisor.check_container(CAN, diameter=0.066, mass_kg=mass)
-    assert (decision.outcome is Outcome.SAFE_STOP) == (mass > 0.6)
+    decision = supervisor.check_container(grasp_width=(0.066, 0.066), weighing=weighed(mass))
+    trips = mass > 0.6
+    assert (decision.outcome is Outcome.SAFE_STOP) == trips
+    if trips:
+        assert decision.event.code == "too_heavy_remove_by_hand"
+        assert "by hand" in decision.event.message
 
 
-def test_a_container_of_an_unknown_type_is_set_aside_not_stopped():
+def test_an_overloaded_pad_stops_even_though_its_reading_is_meaningless():
     supervisor, _ = fresh()
-    decision = supervisor.check_container(None, diameter=0.066, mass_kg=0.05)
-    assert decision.outcome is Outcome.SET_ASIDE and decision.event.code == "unknown_type"
+    saturated = Weighing(mass_kg=0.2, stable=False, overloaded=True)
+    decision = supervisor.check_container(grasp_width=(0.027, 0.027), weighing=saturated)
+    assert decision.outcome is Outcome.SAFE_STOP
+    assert decision.event.code == "too_heavy_remove_by_hand"
+
+
+def test_a_too_heavy_and_too_wide_container_is_reported_as_too_heavy():
+    supervisor, _ = fresh()
+    decision = supervisor.check_container(grasp_width=(0.08, 0.08), weighing=weighed(0.7))
+    assert decision.event.code == "too_heavy_remove_by_hand"
 
 
 def test_a_good_container_proceeds_without_a_word():
     supervisor, indicators = fresh()
-    decision = supervisor.check_container(CAN, diameter=0.066, mass_kg=0.05)
+    decision = supervisor.check_container(grasp_width=(0.066, 0.066), weighing=weighed(0.05))
     assert decision.outcome is Outcome.PROCEED and decision.event is None
     assert indicators.log == []
+
+
+def test_a_set_aside_is_reported_in_amber_and_is_not_a_stop():
+    supervisor, indicators = fresh()
+    decision = supervisor.set_aside("unknown_type", "unknown container type: set aside")
+    assert decision.outcome is Outcome.SET_ASIDE and decision.event.code == "unknown_type"
+    assert ("light", "amber") in indicators.log and ("sound", "set_aside") in indicators.log
 
 
 @pytest.mark.parametrize("gain", [0.0271, 0.0269], ids=["near-miss", "trip"])
@@ -167,8 +192,8 @@ def test_an_action_out_of_range_is_clipped_and_not_a_fault():
 @pytest.mark.parametrize(
     "trip",
     [
-        lambda s: s.check_container(CAN, diameter=0.08, mass_kg=0.05),
-        lambda s: s.check_container(None, diameter=0.066, mass_kg=0.05),
+        lambda s: s.check_container(grasp_width=(0.08, 0.08), weighing=weighed(0.05)),
+        lambda s: s.set_aside("unknown_type", "unknown container type"),
         lambda s: s.check_test_lift(gain_m=0.0, asked_m=0.03),
         lambda s: s.check_forces(arm_force_n=50.0, grip_torque_nm=0.6),
         lambda s: s.check_observation(None),
@@ -187,8 +212,8 @@ def test_every_trip_is_reported_by_a_light_a_sound_and_a_message(trip):
 
 def test_a_stop_lights_red_and_a_set_aside_lights_amber():
     supervisor, indicators = fresh()
-    supervisor.check_container(CAN, diameter=0.08, mass_kg=0.05)
-    supervisor.check_container(None, diameter=0.066, mass_kg=0.05)
+    supervisor.check_container(grasp_width=(0.08, 0.08), weighing=weighed(0.05))
+    supervisor.set_aside("unknown_type", "unknown container type")
     lights = [value for kind, value in indicators.log if kind == "light"]
     assert lights == ["red", "amber"]
 

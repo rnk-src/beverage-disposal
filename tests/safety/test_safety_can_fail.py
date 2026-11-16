@@ -7,27 +7,86 @@ UNIT = "tests/safety/test_supervisor.py"
 FAULTS_MODULE = "tests/safety/test_fault_injection.py"
 SUPERVISOR = "core/supervisor.py"
 SUPERVISED = "core/supervised.py"
+SEQUENCER = "tests/sequencer/test_sequencer.py"
 
 
 def widen_the_diameter_limit(package):
     edit(
         package,
         SUPERVISOR,
-        "if diameter > self._limits.max_container_diameter:",
-        "if diameter > 1.0:",
+        "if grasp_width[1] > limits.max_container_diameter:",
+        "if grasp_width[1] > 1.0:",
     )
 
 
+def judge_the_width_by_its_low_end(package):
+    edit(package, SUPERVISOR, "if grasp_width[1] > limits", "if grasp_width[0] > limits")
+
+
 def forget_the_weight_limit(package):
-    edit(package, SUPERVISOR, "if mass_kg > self._limits.max_container_mass:", "if False:")
-
-
-def bin_an_unknown_type_quietly(package):
     edit(
         package,
         SUPERVISOR,
-        "        if record is None:\n            return self._trip(",
-        "        if False:\n            return self._trip(",
+        "if weighing.overloaded or weighing.mass_kg > limits.max_container_mass:",
+        "if weighing.overloaded:",
+    )
+
+
+def trust_an_overloaded_pads_reading(package):
+    edit(
+        package,
+        SUPERVISOR,
+        "if weighing.overloaded or weighing.mass_kg > limits.max_container_mass:",
+        "if weighing.mass_kg > limits.max_container_mass:",
+    )
+
+
+def report_a_set_aside_as_a_stop(package):
+    edit(
+        package,
+        SUPERVISOR,
+        "return self._trip(Outcome.SET_ASIDE, code, message)",
+        "return self._trip(Outcome.SAFE_STOP, code, message)",
+    )
+
+
+def read_a_saturated_cell_as_no_overload(package):
+    edit(
+        package,
+        "core/pad.py",
+        "np.zeros(n, bool), np.ones(n, bool)",
+        "np.zeros(n, bool), np.zeros(n, bool)",
+    )
+
+
+def lift_before_weighing(package):
+    edit(
+        package,
+        "core/sequencer.py",
+        "        if entry.outcome is Outcome.SAFE_STOP:",
+        "        if False:",
+    )
+
+
+def leave_the_wet_outside_off_the_scale(package):
+    edit(
+        package,
+        "core/sequencer.py",
+        "item.volume_ml * item.density + item.wet_g",
+        "item.volume_ml * item.density",
+    )
+
+
+def put_every_container_on_the_pads_centre(package):
+    edit(package, "core/sequencer.py", "-INTAKE_SCATTER, INTAKE_SCATTER, 2", "0.0, 0.0, 2")
+
+
+def bin_an_unknown_type(package):
+    edit(
+        package,
+        "core/sequencer.py",
+        "binned = verdict.action == BIN",
+        "binned = verdict.action == BIN or record is None",
     )
 
 
@@ -123,17 +182,52 @@ FAULTS = [
     (
         UNIT,
         widen_the_diameter_limit,
-        "test_a_container_wider_than_the_pads_can_take_is_refused[trip]",
+        "test_a_grasp_that_may_be_wider_than_the_pads_can_take_is_refused[trip]",
+    ),
+    (
+        UNIT,
+        judge_the_width_by_its_low_end,
+        "test_a_grasp_that_may_be_wider_than_the_pads_can_take_is_refused[trip]",
     ),
     (
         UNIT,
         forget_the_weight_limit,
-        "test_a_container_heavier_than_the_arm_should_lift_is_refused[trip]",
+        "test_a_container_weighed_over_the_limit_is_left_for_a_person_to_remove[trip]",
     ),
     (
         UNIT,
-        bin_an_unknown_type_quietly,
-        "test_a_container_of_an_unknown_type_is_set_aside_not_stopped",
+        trust_an_overloaded_pads_reading,
+        "test_an_overloaded_pad_stops_even_though_its_reading_is_meaningless",
+    ),
+    (
+        UNIT,
+        report_a_set_aside_as_a_stop,
+        "test_a_set_aside_is_reported_in_amber_and_is_not_a_stop",
+    ),
+    (
+        "tests/fullness/test_pad_sensor.py",
+        read_a_saturated_cell_as_no_overload,
+        "test_a_load_over_the_cells_capacity_reads_overloaded_and_never_as_a_light_weight",
+    ),
+    (
+        SEQUENCER,
+        lift_before_weighing,
+        "test_a_container_over_the_payload_is_never_handed_to_the_skill",
+    ),
+    (
+        SEQUENCER,
+        leave_the_wet_outside_off_the_scale,
+        "test_water_on_the_outside_counts_in_the_weighed_mass",
+    ),
+    (
+        SEQUENCER,
+        put_every_container_on_the_pads_centre,
+        "test_the_one_pick_is_from_the_pad_where_a_person_put_the_container",
+    ),
+    (
+        SEQUENCER,
+        bin_an_unknown_type,
+        "test_an_empty_container_of_an_unknown_type_is_set_aside_not_binned",
     ),
     (
         UNIT,

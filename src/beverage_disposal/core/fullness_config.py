@@ -34,6 +34,7 @@ class PadSensorConfig:
     settle_wait_s: float  # time between putting the container down and the first sample
     samples_averaged: int
     stability_limit_g: float  # the two halves of a weighing may differ by this much
+    capacity_g: float  # the load cell saturates here
 
 
 @dataclass(frozen=True)
