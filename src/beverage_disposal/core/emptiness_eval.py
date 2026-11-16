@@ -10,16 +10,63 @@ from dataclasses import dataclass
 import numpy as np
 
 from beverage_disposal.core.bottle_family import BottleFamily, sample_bottle
+from beverage_disposal.core.bottles import Bottle
 from beverage_disposal.core.fullness import BIN
 from beverage_disposal.core.fullness_config import PadSensorConfig
 from beverage_disposal.core.materials import MaterialSpec
-from beverage_disposal.core.pad import PadSensor
-from beverage_disposal.core.perception import PerceptionNoise, exact_perception, perceive
+from beverage_disposal.core.pad import PadSensor, Weighing
+from beverage_disposal.core.perception import (
+    Perception,
+    PerceptionNoise,
+    exact_perception,
+    perceive,
+)
 from beverage_disposal.core.policy import EmptinessPolicy
 from beverage_disposal.core.statistics import wilson_upper
 
 GRAM = 1e-3  # kilograms per gram
 VOLUME_KEY = 10  # volumes are told apart to a tenth of a millilitre in a cell's seed
+
+
+@dataclass(frozen=True)
+class Case:
+    """One drawn bottle as it stands on the pad: the truth, the weighing and the camera's look."""
+
+    bottle: Bottle
+    volume_ml: float
+    weighing: Weighing
+    perception: Perception
+
+
+def draw_case(
+    policy: EmptinessPolicy,
+    sensor: PadSensor,
+    noise: PerceptionNoise | None,
+    size: str,
+    volume_ml: float,
+    rng: np.random.Generator,
+    *,
+    deformed: bool = False,
+    foreign_g: float = 0.0,
+) -> Case:
+    """Draw a bottle of `size` holding `volume_ml`, with its own drink, wetness, look and weighing.
+
+    The drink's density lies between the rule's lightest and heaviest, the water on the outside
+    up to the material's high end. `foreign_g` is a solid object inside: on the scale, invisible
+    to the level. Without `noise` the camera is exact.
+    """
+    rule, material = policy.rule, policy.material
+    bottle = sample_bottle(policy.family, size, material, rng)
+    density = rng.uniform(rule.min_density_g_per_ml, rule.max_density_g_per_ml)
+    wet_g = rng.uniform(material.wet_g.lo, material.wet_g.hi)
+    gross = bottle.empty_mass_kg + (volume_ml * density + wet_g + foreign_g) * GRAM
+    if noise is None:
+        if deformed:
+            raise ValueError("a deformed bottle needs the camera noise model to be seen as one")
+        seen = exact_perception(bottle, volume_ml)
+    else:
+        seen = perceive(bottle, volume_ml, noise, rng, deformed=deformed)
+    return Case(bottle, volume_ml, sensor.weigh(gross), seen)
 
 
 @dataclass(frozen=True)
@@ -53,7 +100,6 @@ def misbin_grid(
     wetness (up to the material's high end) and its own weighing. A cell's draws depend only on
     the seed, the size and the volume. `noise` is the camera's; without it the camera is exact.
     """
-    rule = policy.rule
     cells = []
     for size in sizes:
         for volume in volumes_ml:
@@ -64,16 +110,8 @@ def misbin_grid(
             zones: Counter[str] = Counter()
             decided_by: Counter[str] = Counter()
             for _ in range(trials):
-                bottle = sample_bottle(family, size, material, rng)
-                density = rng.uniform(rule.min_density_g_per_ml, rule.max_density_g_per_ml)
-                wet_g = rng.uniform(material.wet_g.lo, material.wet_g.hi)
-                gross = bottle.empty_mass_kg + (volume * density + wet_g) * GRAM
-                seen = (
-                    exact_perception(bottle, volume)
-                    if noise is None
-                    else perceive(bottle, volume, noise, rng)
-                )
-                verdict = policy.decide(seen, sensor.weigh(gross))
+                case = draw_case(policy, sensor, noise, size, volume, rng)
+                verdict = policy.decide(case.perception, case.weighing)
                 binned += verdict.action == BIN
                 decided_by[verdict.decided_by] += 1
                 if verdict.zone is not None:
