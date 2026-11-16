@@ -7,6 +7,8 @@ volume_bins = [30.0, 31.0, 35.0, 50.0]  # mL: the lower edges of the calibration
 veto_score = 0.5         # the classifier vetoes a bin below this score
 # Assumed. The simulated camera reports 1.0 for a sound bottle and 0.4 for a crushed one.
 min_confidence = 0.8     # a perception less sure than this is not acted on
-allow_overturn = true    # simulation only: hardware sets this false until Tier 2 data recalibrates
+# Off by the owner's choice (2026-11-16): the classifier's bins rest on the camera's level reading.
+# The rule alone decides a bin; true is for the simulation experiment only.
+allow_overturn = false
 # If the weight proves this much more liquid than the camera can see, something else is inside.
 level_slack_ml = 20.0     # assumed

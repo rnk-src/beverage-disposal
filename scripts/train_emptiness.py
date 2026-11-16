@@ -24,6 +24,10 @@ from beverage_disposal.train.emptiness.pipeline import train_bundle
 
 ROOT = Path(__file__).resolve().parents[1]
 CONFIGS = ROOT / "configs"
+# With the least sample size (598) a threshold is its cell's largest score, far stricter than
+# alpha asks. With 5000 rows it is about the 17th largest, close to the 99.5th percentile.
+CALIBRATION_ROWS = 5000
+DRAWS_PER_ROW = 400  # ambiguous bottles are rare for small sizes; give up on a cell after this
 
 
 def main(argv):
@@ -31,6 +35,9 @@ def main(argv):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--sizes", nargs="+", default=list(family.classes))
     parser.add_argument("--rows-per-size", type=int, default=40_000, help="training bottles")
+    parser.add_argument(
+        "--rows-per-cell", type=int, default=CALIBRATION_ROWS, help="calibration bottles per cell"
+    )
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--out", type=Path, default=ROOT / "runs" / "emptiness_model")
     args = parser.parse_args(argv)
@@ -49,7 +56,8 @@ def main(argv):
         sizes=tuple(args.sizes),
         rows_per_size=args.rows_per_size,
         volume_bins=config.volume_bins,
-        rows_per_cell=needed,
+        rows_per_cell=max(needed, args.rows_per_cell),
+        max_draws_per_cell=DRAWS_PER_ROW * max(needed, args.rows_per_cell),
         payload_kg=load_safety_limits(CONFIGS / "safety.toml").max_container_mass,
     )
     noise = load_perception_noise(CONFIGS / "perception.toml")

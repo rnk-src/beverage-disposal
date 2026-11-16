@@ -204,8 +204,29 @@ simulation with statistics, 2 = a real arm, 3 = wider containers and more sensor
   (allowed). Crushed bottles: 0 of 12 000 binned. An empty bottle with a 50 g or a 100 g object: 0 of 12 000 binned. Not
   built: the per-size MuJoCo carry grid and the `core/acceptance.py` summary of it (no bottle size is supported, so there
   is nothing to carry).
+- **Iteration 2B, 2B.13 built (2026-11-16): four more sizes, and the rule alone decides a bin.** `configs/bottles.toml`
+  gains 200, 400, 650 and 800 mL (assumed figures, grasp gate untested), so there are ten size classes in rising order;
+  neighbouring classes share widths and heights, and a bottle seen through the noisy camera matches 3 to 7 of them. A
+  diagnosis of the set-aside empties (six sizes, 0 mL, of 1000) found two causes: several sizes matched while the score
+  passed (44, 201, 236 and 71 for 500, 1000, 1500 and 2000 mL) and a score under the threshold (3, 100, 352 and 440).
+  So in `core/policy.py` a bottle that fits several sizes must now beat the strictest of their thresholds (before, it was
+  never overturned), and `scripts/train_emptiness.py --rows-per-cell` (default 5000; an untested script flag) calibrates
+  on more bottles, since with 598 a threshold is its cell's largest score. Experiment, overturn on, in simulation, decision
+  level, noisy camera, seed 0, 1000 bottles per cell: empties binned 996, 998, 999, 1000, 1000, 1000, 992, 945, 713 and
+  604 of 1000 for 200 to 2000 mL, but 28 of 50 000 bottles of 30 mL or more binned, worst 5 of 1000 at 1500 mL and 30 mL
+  (Wilson 95 % upper bound 1.165 %), and 4 of 10 000 empty bottles holding a 50 g object binned. Those bins rest on the
+  camera's level reading. **The owner decided on 2026-11-16: rule only, with the camera used for dimensions.**
+  `configs/policy.toml` now sets `allow_overturn = false`, so no classifier bins; the classifier, its calibration and the
+  full grid stay as a simulation experiment. Rule-only, ten sizes, same conditions (`runs/emptiness_rule_only_ten.json`):
+  0 of 50 000 bottles of 30 mL or more binned (Wilson 95 % upper bound 0.383 % per cell); empties binned 1000, 1000,
+  1000, 995, 960, 833, 702, 588, 380 and 298 of 1000 for 200 to 2000 mL; bottles of 10 mL binned 871, 769, 626, 528,
+  418, 345, 244, 178, 106 and 78 of 1000; crushed 0 of 10 000 and foreign objects 0 of 20 000 binned. The owner's target
+  (at most 5 % of bottles of 0 and 10 mL set aside) is met at 0 mL up to 500 mL and not at 10 mL for any size. An exact
+  camera gains little (2B.5 against 2B.6), so the gap is the material's spread, not the shape; closing it needs measured
+  material ranges or bottle types enrolled by empty weight (open). Kept, decided here: the weight-against-level veto,
+  which uses the level only to set a bottle aside.
 - Iterations 3 to 9 and the rest of iteration 2B are planned in detail down to sub-iterations (see Roadmap).
-- Last updated: 2026-11-16 (2B.11 the acceptance grid). Update this section in the same change as every sub-iteration.
+- Last updated: 2026-11-16 (2B.13 four more sizes, rule only). Update this section in the same change as every sub-iteration.
 
 ## Locked decisions
 
@@ -302,16 +323,17 @@ Each label is a stable name; the owner's private decision journal uses the same 
   classifier (scikit-learn gradient-boosted trees on weight, size and visible liquid level) works beside the
   rule: it may veto a bin anywhere, and it may bin only in the ambiguous zone, only when its score passes a
   Neyman-Pearson threshold (alpha 0.5 %, delta 5 %, at least 598 calibration bottles per size and volume
-  bin) and its features are in-distribution. That overturn is simulation-only: on hardware
-  `allow_overturn = false` until Tier 2 data recalibrates it. Hard vetoes (never overturned): unsettled
+  bin) and its features are in-distribution. That overturn is switched off (`allow_overturn = false`, the owner's
+  decision of 2026-11-16: no bin rests on the camera's level reading; the rule alone decides a bin and the camera gives
+  dimensions), and it stays as a simulation experiment. Hard vetoes (never overturned): unsettled
   weight, too heavy to lift, size outside the supported range, low perception confidence, a failed
   out-of-distribution check, an unknown non-PET type, the surely-over zone, a supervisor fault. There is no
   cap veto. Out of scope, stated as known blind spots: liquids under 0.95 g/mL (oil, spirits), crushed or
   deformed bottles, foreign objects inside, frozen contents (the harness tests that crushed bottles and
-  foreign objects end set aside). Supported sizes: 250, 330, 500, 1000, 1500 and 2000 mL, each only after it
+  foreign objects end set aside). Supported sizes: 200, 250, 330, 400, 500, 650, 800, 1000, 1500 and 2000 mL, each only after it
   passes the neck-grasp gate. The classifier is supervised learning, not RL: discarding is a one-shot
   labelled decision.
-- **Containers:** the 12 fl oz can, and PET bottles of 250 to 2000 mL. A can is a registry type (data:
+- **Containers:** the 12 fl oz can, and PET bottles of 200 to 2000 mL. A can is a registry type (data:
   dimensions, lightest empty weight, grasp height and width, tab rules); no logic branches on a specific
   container. A PET bottle is a parametric shape (diameter, height, shoulder, neck, support ring, base style,
   wall thickness, cap, label) drawn from per-size ranges in `configs/bottles.toml`, with material constants
@@ -527,7 +549,7 @@ uv run python scripts/run_acceptance.py --trials 381   # sequencer grid in simul
 uv run python scripts/record_demo.py                   # GIF of one container through the sequencer, runs/demo.gif
 uv run python scripts/check_bottle_reach.py             # per bottle size: the steepest pitch that reaches each pose of a neck grasp
 uv run python scripts/run_neck_gate.py                  # the grasp gate per size, fill and grasp mode, writes runs/neck_gate.json (about 10 min)
-uv run python scripts/train_emptiness.py               # fit and calibrate the emptiness classifier, writes runs/emptiness_model/ (about 1 min)
+uv run python scripts/train_emptiness.py               # fit and calibrate the emptiness classifier, writes runs/emptiness_model/ (about 4 min; a simulation experiment since 2B.13)
 uv run python scripts/run_emptiness_grid.py --policy full --sizes all --trials 1000  # the emptiness policy over sizes and volumes, with crushed bottles and foreign objects, decision level, noisy camera; writes runs/emptiness_full.json (about 12 min; --policy rule-only is quick)
 uv run python scripts/measure_actuators.py         # re-measure the servo step responses (configs/actuator_step_response.json)
 uv run pytest tests/gazebo   # Gazebo image tests: need a running Docker daemon, else they skip
@@ -654,7 +676,8 @@ update docs.
   (the can moves onto it too); 2B.5 physics bounds, zones and the rule-only policy (the veto-only
   baseline); 2B.6 perception noise model. Second half, after 4.5: 2B.7 features and dataset; 2B.8 the
   classifier (adds scikit-learn); 2B.9 Neyman-Pearson calibration; 2B.10 the full policy; 2B.11 acceptance
-  per size and volume (381 trials per cell at 30, 31 and 35 mL, Wilson bounds); 2B.12 docs and the learning check.
+  per size and volume (381 trials per cell at 30, 31 and 35 mL, Wilson bounds); 2B.12 docs and the learning check;
+  2B.13 four more sizes and the rule-only decision (added 2026-11-16, built before 2B.12).
 - **3 Gymnasium environment for the skill.** 3.1 observations (with the simulated perception noise);
   3.2 action layer; 3.3 env core (goal B as input); 3.4 reward and termination; 3.5 wrappers and
   vectorization; 3.6 contract and baseline tests.
