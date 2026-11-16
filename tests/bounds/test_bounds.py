@@ -11,7 +11,7 @@ from support.paths import ROOT
 from beverage_disposal.core.bottle_family import load_family, sample_bottle
 from beverage_disposal.core.bottles import areas
 from beverage_disposal.core.bounds import empty_mass_bounds, shoulder_area_bounds_m2
-from beverage_disposal.core.materials import load_materials
+from beverage_disposal.core.materials import load_materials, with_side_wall
 from beverage_disposal.core.perception import DimensionEstimate, exact_perception
 
 FAMILY = load_family(ROOT / "configs" / "bottles.toml")
@@ -106,3 +106,57 @@ def test_a_height_interval_that_leaves_no_room_for_a_body_is_refused():
     dims = DimensionEstimate((0.066,) * 2, (0.05, 0.05), (0.04,) * 2, (0.026,) * 2, (0.02,) * 2)
     with pytest.raises(ValueError, match="body"):
         empty_mass_bounds(dims, PET)
+
+
+def narrowed_by(bottle, half):
+    """PET with its wall narrowed to a reading that holds the bottle's true wall, in mm."""
+    t = bottle.shape.t_side * 1000
+    return with_side_wall(PET, (t / (1 + half), t / (1 - half)))
+
+
+@pytest.mark.parametrize("size", SIZES)
+def test_every_drawn_bottle_weighs_between_its_bounds_with_a_true_wall_reading(size):
+    wet_hi = PET.wet_g.hi * 1e-3
+    for seed in range(300):
+        bottle = sample_bottle(FAMILY, size, PET, np.random.default_rng(seed))
+        narrowed = narrowed_by(bottle, 0.10)
+        bounds = empty_mass_bounds(exact_perception(bottle, 0.0).dims, narrowed)
+        assert bounds.min_kg <= bottle.empty_mass_kg
+        assert bottle.empty_mass_kg + wet_hi <= bounds.max_kg
+
+
+@settings(max_examples=200, derandomize=True, deadline=None)
+@given(
+    seed=st.integers(0, 10_000),
+    size=st.sampled_from(SIZES),
+    half=st.floats(0.0, 0.9),
+)
+def test_a_wall_reading_never_lowers_the_minimum_or_raises_the_maximum(seed, size, half):
+    bottle = sample_bottle(FAMILY, size, PET, np.random.default_rng(seed))
+    dims = exact_perception(bottle, 0.0).dims
+    wide, narrow = empty_mass_bounds(dims, PET), empty_mass_bounds(dims, narrowed_by(bottle, half))
+    assert narrow.min_kg >= wide.min_kg
+    assert narrow.max_kg <= wide.max_kg
+
+
+def test_a_2000_ml_bottle_with_a_measured_wall_worked_by_hand():
+    # D 105 mm, total 335 mm, shoulder 60 mm, neck 30 mm wide and 20 mm tall: body 255 mm.
+    dims = DimensionEstimate(
+        (0.105, 0.105), (0.335, 0.335), (0.06, 0.06), (0.03, 0.03), (0.02, 0.02)
+    )
+    big, small = 0.0525, 0.015
+    side = math.pi * 0.105 * 0.255
+    base = math.pi * big**2
+    shoulder_lo = max(math.pi * (big**2 - small**2), math.pi * (big + small) * 0.06)
+    shoulder_hi = math.pi * (big + small) * (0.06 + big - small)
+    # The wall is read as 0.20 to 0.30 mm, inside the file's 0.07 to 0.40 mm; the rest is as filed.
+    wall = with_side_wall(PET, (0.20, 0.30))
+    lightest = 1330 * ((side + shoulder_lo) * 0.20e-3 + base * 0.15e-3) + 1.2e-3
+    heaviest = (
+        1400 * ((side + shoulder_hi) * 0.30e-3 + base * 1.20e-3) + (4.0 + 3.5 + 1.5 + 5.0) * 1e-3
+    )
+    bounds = empty_mass_bounds(dims, wall)
+    assert bounds.min_kg == pytest.approx(lightest, rel=1e-12)
+    assert bounds.max_kg == pytest.approx(heaviest, rel=1e-12)
+    wide = empty_mass_bounds(dims, PET)
+    assert bounds.min_kg > wide.min_kg and bounds.max_kg < wide.max_kg

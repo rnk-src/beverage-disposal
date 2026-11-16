@@ -12,3 +12,6 @@ min_confidence = 0.8     # a perception less sure than this is not acted on
 allow_overturn = false
 # If the weight proves this much more liquid than the camera can see, something else is inside.
 level_slack_ml = 20.0     # assumed
+# The liquid probe is read only if the weight alone proves at most this much liquid (mL), because
+# contents it cannot see could weigh about that much. inf switches the limit off; open (2B.14).
+probe_reach_ml = inf
