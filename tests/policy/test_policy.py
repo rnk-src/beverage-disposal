@@ -144,3 +144,64 @@ def test_the_vetoes_are_checked_in_the_stated_order():
 def test_a_veto_stands_even_when_the_weight_says_surely_under():
     verdict = decide(volume_ml=0.0, material="glass")
     assert verdict.action == SET_ASIDE and verdict.zone is None
+
+
+SMALL = sample_bottle(FAMILY, "pet_250ml", PET, np.random.default_rng(0))
+
+
+def test_a_weight_that_proves_far_more_liquid_than_the_level_shows_is_vetoed():
+    """Catches a solid object in an empty bottle passing for liquid: the camera sees none."""
+    # The level of an empty bottle, the weight of one with 150 g inside.
+    heavy = weighed(SMALL, 150.0)
+    verdict = POLICY.decide(exact_perception(SMALL, 0.0), heavy)
+    assert verdict.action == SET_ASIDE
+    assert verdict.decided_by == "veto:inconsistent_weight_and_level"
+
+
+def test_a_weight_and_a_level_that_agree_are_left_to_the_zones():
+    verdict = POLICY.decide(exact_perception(SMALL, 150.0), weighed(SMALL, 150.0))
+    assert (verdict.decided_by, verdict.zone) == ("rule", "surely_over")
+
+
+def test_an_unseen_level_cannot_contradict_the_weight():
+    unseen = exact_perception(SMALL, 0.0)
+    unseen = dataclasses.replace(unseen, visual=dataclasses.replace(unseen.visual, level_m=None))
+    assert POLICY.decide(unseen, weighed(SMALL, 150.0)).decided_by == "rule"
+
+
+def test_the_slack_is_how_much_more_the_weight_may_show_before_the_veto():
+    assert CONFIG.level_slack_ml == 20.0
+    heavy = weighed(SMALL, 150.0)
+    assessment = POLICY.assess(exact_perception(SMALL, 0.0), heavy)
+    excess = assessment.v_bounds[0] - assessment.level_ml[1]
+    assert excess > 20.0
+    # A policy that tolerates just more than this excess does not veto, one just under does.
+    tolerant = dataclasses.replace(
+        POLICY, config=dataclasses.replace(CONFIG, level_slack_ml=excess + 0.01)
+    )
+    strict = dataclasses.replace(
+        POLICY, config=dataclasses.replace(CONFIG, level_slack_ml=excess - 0.01)
+    )
+    assert tolerant.decide(exact_perception(SMALL, 0.0), heavy).decided_by == "rule"
+    assert strict.decide(exact_perception(SMALL, 0.0), heavy).decided_by.startswith("veto:")
+
+
+def test_the_assessment_holds_what_the_verdict_was_made_from():
+    perception, weighing = exact_perception(BOTTLE, 10.0), weighed(BOTTLE, 10.0)
+    assessment = POLICY.assess(perception, weighing)
+    verdict = POLICY.decide(perception, weighing)
+    assert assessment.veto is None and assessment.zone.value == verdict.zone
+    assert assessment.v_bounds == verdict.bounds_ml
+    assert assessment.bounds == empty_mass_bounds(perception.dims, PET)
+    vetoed = POLICY.assess(dataclasses.replace(perception, material="glass"), weighing)
+    assert vetoed.veto.decided_by == "veto:not_pet" and vetoed.zone is None
+
+
+def test_a_level_interval_that_may_reach_the_weights_liquid_is_not_a_contradiction():
+    # The camera says the level is somewhere between the floor and well up the body: the 150 g
+    # may be liquid after all, so only the high end of the level counts.
+    perception = exact_perception(SMALL, 0.0)
+    vague = dataclasses.replace(
+        perception, visual=dataclasses.replace(perception.visual, level_m=(0.0, 0.10))
+    )
+    assert POLICY.decide(vague, weighed(SMALL, 150.0)).decided_by == "rule"

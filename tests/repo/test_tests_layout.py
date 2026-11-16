@@ -32,6 +32,8 @@ ALLOWED_IN_TESTS = [
     "bounds",
     "zones",
     "policy",
+    "features",
+    "train",
 ]
 
 
