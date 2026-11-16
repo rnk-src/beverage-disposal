@@ -406,6 +406,58 @@ def test_a_missing_target_volume_is_refused():
         target_met(cells, volumes_ml=(0.0, 10.0), max_set_aside=0.05)
 
 
+# --- thick drinks: slushies, shakes, smoothies (2B.14) ----------------------------------------
+
+THICK = (1.10, 1.20)  # heavier than the rule's 1.05 g/mL, so outside what the weight assumes
+
+
+def test_a_thick_drink_weighs_by_its_own_density():
+    def weight_kg(density):
+        rng = np.random.default_rng(5)
+        case = draw_case(
+            POLICY, PadSensor(PAD, rng), NOISE, "pet_500ml", 100.0, rng, density_g_per_ml=density
+        )
+        return case.weighing.mass_kg
+
+    # Same bottle and same pad noise (same seed); only the drink differs, by 0.20 g/mL on 100 mL.
+    assert weight_kg((1.2, 1.2)) - weight_kg((1.0, 1.0)) == pytest.approx(0.020, abs=5e-4)
+
+
+def test_a_cell_names_its_thick_drink():
+    assert probed(trials=5)[0].density_g_per_ml is None
+    cell = probed(trials=5, density_g_per_ml=THICK)[0]
+    assert cell.density_g_per_ml == THICK
+
+
+def test_a_thick_drink_of_50_ml_is_never_binned_by_the_weight_alone():
+    # A heavier drink looks like more liquid: the safe side, at the price of a set-aside.
+    cell = probed(volumes_ml=(50.0,), density_g_per_ml=THICK)[0]
+    assert cell.binned == 0
+
+
+def test_a_thick_drink_read_low_by_a_precise_probe_is_binned_in_a_big_bottle():
+    # The weight cannot contradict the probe in a 2 L bottle: its empty weight is too uncertain,
+    # so a heavier drink does not save it. The grid has to be able to show this failure.
+    precise = ProbeModels(liquid=LiquidProbeModel(0.5, 0.02, 4.0, 0.0))
+    options = dict(volumes_ml=(50.0,), probes=precise, density_g_per_ml=THICK)
+    assert probed(**options)[0].binned == 0  # a probe that reads true never bins it
+    assert probed(**options, liquid_gain=0.5)[0].binned > 100
+
+
+def test_a_thick_drink_cell_is_counted_apart_from_the_sound_and_the_under_reading_bottles():
+    cells = [
+        a_cell("a", 35.0, 9, density_g_per_ml=THICK),
+        a_cell("a", 50.0, 3, density_g_per_ml=THICK, liquid_gain=0.5),
+        a_cell("a", 0.0, 8, density_g_per_ml=THICK),
+    ]
+    summary = summarize_cells(cells, threshold_ml=30.0)
+    assert summary["binned_at_or_over_threshold"] == 0 and summary["empties_binned"] == {}
+    assert summary["under_reading_binned"] == {}
+    assert summary["thick_drink_binned"] == {
+        "a": {"1": {"35": [9, 100], "0": [8, 100]}, "0.5": {"50": [3, 100]}}
+    }
+
+
 @pytest.mark.medium
 def test_no_2000_ml_bottle_holding_30_ml_is_binned_in_400_trials_with_both_probes():
     cell = probed(volumes_ml=(30.0,), trials=400, probes=PROBES)[0]
