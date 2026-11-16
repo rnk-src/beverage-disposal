@@ -34,6 +34,7 @@ ALLOWED_IN_TESTS = [
     "policy",
     "features",
     "train",
+    "npcal",
 ]
 
 
