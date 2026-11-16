@@ -28,6 +28,10 @@ ALLOWED_IN_TESTS = [
     "materials",
     "bottles",
     "bottle_family",
+    "perception",
+    "bounds",
+    "zones",
+    "policy",
 ]
 
 

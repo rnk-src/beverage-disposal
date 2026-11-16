@@ -17,6 +17,10 @@ class Verdict:
     action: str  # BIN or SET_ASIDE
     reason: str
     net_g: float | None  # weight above the lightest empty container, when it was worked out
+    zone: str | None = None  # the emptiness policy's zone, for a PET bottle
+    decided_by: str = "rule"  # "rule", "classifier" or "veto:<code>"
+    score: float | None = None  # the classifier's score, when it was asked
+    bounds_ml: tuple[float, float] | None = None  # least and most liquid the weight allows
 
 
 def bin_mask(net_g: np.ndarray, rule: RuleConfig) -> np.ndarray:
