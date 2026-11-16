@@ -94,3 +94,16 @@ def test_the_bottle_takes_the_friction_of_the_container_the_scene_had():
         dataclasses.replace(SCENE, container=slippery), BOTTLE, SIZE, liquid_ml=0.0
     )
     assert (scene.container.friction, scene.container.torsional_friction) == (0.7, 0.02)
+
+
+def test_a_neck_grasp_opens_the_approach_by_the_rings_overhang():
+    # The ring stands (33 - 26) / 2 = 3.5 mm proud of the neck; the jaw must pass it going down.
+    scene = scene_for_bottle(SCENE, BOTTLE, SIZE, liquid_ml=0.0)
+    assert scene.grasp.clearance == pytest.approx(SCENE.grasp.clearance + 0.0035)
+
+
+def test_a_body_grasp_keeps_the_scenes_clearance():
+    size = dataclasses.replace(SIZE, grasp_mode="body")
+    assert scene_for_bottle(SCENE, BOTTLE, size, liquid_ml=0.0).grasp.clearance == (
+        SCENE.grasp.clearance
+    )
