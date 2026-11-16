@@ -13,11 +13,19 @@ from beverage_disposal.core.emptiness_eval import (
     misbin_grid,
     payload_volume_ml,
     summarize_cells,
+    target_met,
 )
 from beverage_disposal.core.fullness_config import load_fullness_config
 from beverage_disposal.core.pad import PadSensor
 from beverage_disposal.core.perception import load_perception_noise
 from beverage_disposal.core.policy import EmptinessPolicy
+from beverage_disposal.core.probes import (
+    NO_PROBES,
+    LiquidProbeModel,
+    ProbeModels,
+    WallProbeModel,
+    load_probe_models,
+)
 from beverage_disposal.core.statistics import wilson_upper
 
 PAD = load_fullness_config(ROOT / "configs" / "fullness.toml").pad
@@ -74,9 +82,9 @@ def mean_weight_g(rule=RULE, material=PET):
     seen = []
 
     class Spy(EmptinessPolicy):
-        def decide(self, perception, weighing):
+        def decide(self, perception, weighing, probes=NO_PROBES):
             seen.append(weighing.mass_kg)
-            return super().decide(perception, weighing)
+            return super().decide(perception, weighing, probes)
 
     misbin_grid(
         Spy(rule, material, FAMILY, CONFIG, sizes=ALL_SIZES),
@@ -276,3 +284,129 @@ def test_a_crushed_or_foreign_cell_is_not_counted_among_the_sound_bottles():
     cells = [a_cell("a", 35.0, 7, deformed=True), a_cell("a", 0.0, 9, foreign_g=50.0)]
     summary = summarize_cells(cells, threshold_ml=30.0)
     assert summary["binned_at_or_over_threshold"] == 0 and summary["empties_binned"] == {}
+
+
+# --- probes (2B.14) ---------------------------------------------------------------------------
+
+PROBES = load_probe_models(ROOT / "configs" / "probes.toml")
+ACCEPTANCE_STREAM = (3, 2, 0)
+NEVER_READS = ProbeModels(
+    wall=WallProbeModel(0.05, 4.0, 0.10, dropout=1.0),
+    liquid=LiquidProbeModel(2.0, 0.10, 4.0, dropout=1.0),
+)
+
+
+def probed(**options):
+    defaults = dict(
+        sizes=("pet_2000ml",), volumes_ml=(0.0,), trials=200, seed=0, stream=ACCEPTANCE_STREAM
+    )
+    return misbin_grid(POLICY, FAMILY, PET, PAD, noise=NOISE, **{**defaults, **options})
+
+
+def test_a_grid_without_probes_is_the_grid_it_was():
+    # Counts taken from the grid before probes existed (noisy camera, 200 trials, seed 0).
+    cells = {
+        (c.size, c.volume_ml): c
+        for c in probed(sizes=("pet_500ml", "pet_2000ml"), volumes_ml=(0.0, 10.0))
+    }
+    assert cells[("pet_500ml", 0.0)].binned == 189
+    assert cells[("pet_500ml", 0.0)].zones == {"surely_under": 189, "ambiguous": 11}
+    assert cells[("pet_2000ml", 0.0)].binned == 69
+    assert cells[("pet_2000ml", 10.0)].binned == 13
+    assert cells[("pet_2000ml", 10.0)].zones == {"ambiguous": 187, "surely_under": 13}
+    assert probed(probes=None) == probed()
+
+
+def test_fitting_probes_does_not_change_the_bottles():
+    def drawn(**options):
+        rng = np.random.default_rng(5)
+        return draw_case(POLICY, PadSensor(PAD, rng), NOISE, "pet_500ml", 10.0, rng, **options)
+
+    without = drawn()
+    with_probes = drawn(probes=PROBES, probe_rng=np.random.default_rng(1))
+    assert without.probes == NO_PROBES and with_probes.probes != NO_PROBES
+    assert (with_probes.bottle, with_probes.weighing, with_probes.perception) == (
+        without.bottle,
+        without.weighing,
+        without.perception,
+    )
+
+
+def test_probes_without_a_generator_of_their_own_are_refused():
+    rng = np.random.default_rng(5)
+    with pytest.raises(ValueError, match="probe_rng"):
+        draw_case(POLICY, PadSensor(PAD, rng), NOISE, "pet_500ml", 10.0, rng, probes=PROBES)
+
+
+def test_a_grid_with_probes_that_never_read_is_the_grid_without_them():
+    # If the probes drew from the bottles' generator, every later bottle would change.
+    plain = probed(volumes_ml=(0.0, 10.0))
+    silent = probed(volumes_ml=(0.0, 10.0), probes=NEVER_READS)
+    for a, b in zip(plain, silent, strict=True):
+        assert (a.binned, a.zones, a.decided_by) == (b.binned, b.zones, b.decided_by)
+
+
+def test_probes_bin_more_empty_2000_ml_bottles_than_the_weight_alone():
+    alone = probed()[0].binned
+    wall = probed(probes=dataclasses.replace(PROBES, liquid=None))[0].binned
+    both = probed(probes=PROBES)[0].binned
+    assert alone == 69
+    assert wall > alone + 40 and both > alone + 40
+
+
+def test_a_low_reading_liquid_probe_bins_bottles_of_50_ml():
+    # An accurate probe that sees only half the liquid is the dangerous case: its interval is
+    # tight and wrong. The grid has to be able to show it.
+    precise = ProbeModels(liquid=LiquidProbeModel(0.5, 0.02, 4.0, 0.0))
+    honest = probed(volumes_ml=(50.0,), probes=precise)[0]
+    low = probed(volumes_ml=(50.0,), probes=precise, liquid_gain=0.5)[0]
+    assert honest.binned == 0
+    assert low.binned > 50
+
+
+def test_a_cell_names_its_probes_and_its_gain():
+    assert (probed()[0].probes, probed()[0].liquid_gain) == ("", 1.0)
+    wall = ProbeModels(wall=PROBES.wall)
+    liquid = ProbeModels(liquid=PROBES.liquid)
+    assert probed(trials=5, probes=wall)[0].probes == "wall"
+    assert probed(trials=5, probes=liquid, liquid_gain=0.5)[0].probes == "liquid"
+    both = probed(trials=5, probes=PROBES, liquid_gain=0.0)[0]
+    assert (both.probes, both.liquid_gain) == ("wall+liquid", 0.0)
+
+
+def test_an_under_reading_cell_is_not_counted_among_the_sound_bottles():
+    sound = Cell("pet_2000ml", 50.0, 100, 0, 0.037, {}, {}, probes="liquid")
+    low = Cell("pet_2000ml", 50.0, 100, 7, 0.14, {}, {}, probes="liquid", liquid_gain=0.5)
+    summary = summarize_cells([sound, low], threshold_ml=30.0)
+    assert summary["binned_at_or_over_threshold"] == 0
+    assert summary["trials_at_or_over_threshold"] == 100
+    assert summary["under_reading_binned"] == {"pet_2000ml": {"0.5": {"50": [7, 100]}}}
+    assert summarize_cells([sound], threshold_ml=30.0)["under_reading_binned"] == {}
+
+
+def test_the_target_is_met_per_size_by_hand():
+    def cell(size, volume, binned, **kw):
+        return Cell(size, volume, 100, binned, 0.0, {}, {}, **kw)
+
+    cells = [
+        cell("a", 0.0, 75),  # exactly 25 % set aside: met
+        cell("a", 10.0, 75),
+        cell("b", 0.0, 100),
+        cell("b", 10.0, 74),  # one over: not met
+        cell("b", 35.0, 0),  # not a target volume
+        cell("a", 0.0, 0, deformed=True),  # crushed bottles are not counted
+        cell("a", 0.0, 0, foreign_g=50.0),
+    ]
+    assert target_met(cells, volumes_ml=(0.0, 10.0), max_set_aside=0.25) == {"a": True, "b": False}
+
+
+def test_a_missing_target_volume_is_refused():
+    cells = [Cell("a", 0.0, 100, 100, 0.0, {}, {})]
+    with pytest.raises(ValueError, match="10"):
+        target_met(cells, volumes_ml=(0.0, 10.0), max_set_aside=0.05)
+
+
+@pytest.mark.medium
+def test_no_2000_ml_bottle_holding_30_ml_is_binned_in_400_trials_with_both_probes():
+    cell = probed(volumes_ml=(30.0,), trials=400, probes=PROBES)[0]
+    assert cell.binned == 0 and cell.upper_95 < 0.01

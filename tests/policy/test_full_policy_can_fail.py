@@ -123,11 +123,11 @@ GRID_FAULTS = {
         "test_a_stream_gives_the_grid_bottles_of_its_own",
     ),
     "draw_sound_bottles_for_a_crushed_cell": (
-        change_eval("deformed=deformed, foreign_g=foreign_g", "foreign_g=foreign_g"),
+        change_eval("deformed=deformed,", ""),
         "test_every_crushed_bottle_of_the_grid_is_vetoed_and_the_cell_says_it_was_crushed",
     ),
     "leave_the_foreign_object_out_of_the_grid": (
-        change_eval("deformed=deformed, foreign_g=foreign_g", "deformed=deformed"),
+        change_eval("foreign_g=foreign_g,", ""),
         "test_a_foreign_object_of_the_grid_is_on_the_scale_and_named_in_the_cell",
     ),
     "count_a_classifiers_veto_as_an_overturn": (
@@ -153,11 +153,11 @@ GRID_FAULTS = {
         "test_the_summary_counts_misbins_empties_overturns_and_vetoes_by_hand",
     ),
     "count_crushed_bottles_among_the_sound": (
-        change_eval("if not c.deformed and c.foreign_g == 0.0]", "if c.foreign_g == 0.0]"),
+        change_eval("not cell.deformed and cell.foreign_g", "cell.foreign_g"),
         "test_a_crushed_or_foreign_cell_is_not_counted_among_the_sound_bottles",
     ),
     "count_foreign_objects_among_the_empties": (
-        change_eval("if not c.deformed and c.foreign_g == 0.0]", "if not c.deformed]"),
+        change_eval("not cell.deformed and cell.foreign_g == 0.0", "not cell.deformed"),
         "test_a_crushed_or_foreign_cell_is_not_counted_among_the_sound_bottles",
     ),
     "report_the_best_bound_as_the_worst": (
