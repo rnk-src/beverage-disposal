@@ -164,8 +164,16 @@ simulation with statistics, 2 = a real arm, 3 = wider containers and more sensor
   `train/emptiness/fit.py` fits histogram gradient-boosted trees on the surely-under and ambiguous rows, the same rows giving
   the same model; `train/emptiness/bundle.py` saves the pickled model with thresholds, ranges, names and a checksum, and refuses
   a changed file, another scikit-learn version or other feature names on load (a bundle is trusted input: load only our own).
+- **Iteration 2B, 2B.9 built (2026-11-16): Neyman-Pearson calibration.** `core/np_calibration.py` (NumPy only): the least
+  sample size (598 for alpha 0.5 % and delta 5 %), the violation probability of an order statistic as a binomial tail in log
+  space, the threshold as the smallest safe order statistic, and a threshold per size as the strictest over its volume cells
+  (empty cells listed, a short cell refused). `train/emptiness/pipeline.py` and `scripts/train_emptiness.py` fit on the train
+  split, calibrate on the calibration split and save the bundle (`runs/emptiness_model/`); a size with a cell too small to
+  calibrate gets an infinite threshold. Run of 2026-11-16, seed 0, 239 998 training bottles, 598 ambiguous calibration
+  bottles in each of the 24 cells: thresholds 0.934, 0.997, 0.970, 0.969, 0.911 and 0.935 for 250 to 2000 mL. With exactly 598
+  rows a threshold is the largest score of its cell, so it moves with the seed.
 - Iterations 3 to 9 and the rest of iteration 2B are planned in detail down to sub-iterations (see Roadmap).
-- Last updated: 2026-11-16 (2B.8 classifier). Update this section in the same change as every sub-iteration.
+- Last updated: 2026-11-16 (2B.9 Neyman-Pearson calibration). Update this section in the same change as every sub-iteration.
 
 ## Locked decisions
 
@@ -487,6 +495,7 @@ uv run python scripts/run_acceptance.py --trials 381   # sequencer grid in simul
 uv run python scripts/record_demo.py                   # GIF of one container through the sequencer, runs/demo.gif
 uv run python scripts/check_bottle_reach.py             # per bottle size: the steepest pitch that reaches each pose of a neck grasp
 uv run python scripts/run_neck_gate.py                  # the grasp gate per size, fill and grasp mode, writes runs/neck_gate.json (about 10 min)
+uv run python scripts/train_emptiness.py               # fit and calibrate the emptiness classifier, writes runs/emptiness_model/ (about 1 min)
 uv run python scripts/run_emptiness_grid.py --trials 1000  # the emptiness policy over sizes and volumes, decision level, noisy camera, writes runs/emptiness_rule_only.json
 uv run python scripts/measure_actuators.py         # re-measure the servo step responses (configs/actuator_step_response.json)
 uv run pytest tests/gazebo   # Gazebo image tests: need a running Docker daemon, else they skip
@@ -511,7 +520,7 @@ src/beverage_disposal/   Python package (placeholder name)
   core/                    the ROS-free core (no MuJoCo): sequencer.py (weigh on the pad, decide, carry once), acceptance.py (results summary), supervisor.py (safety checks and indicators), supervised.py (a controller
                            under the supervisor), safety_config.py,
                            pad.py (weighing pad model), fullness.py (the weight rule),
-                           fullness_eval.py (Monte Carlo and sweeps), perception.py (what the camera reports about a bottle, and the simulated camera's noise), bounds.py (empty-mass bounds of a PET bottle), zones.py (liquid interval and zone from a weight), policy.py (the emptiness policy: vetoes, then zones), emptiness_eval.py (its decision-level Monte Carlo), features.py (the classifier's feature vector), classifier.py (the model protocol, the in-distribution check and the bundle), fullness_config.py, statistics.py (Wilson bounds), registry.py (container types as data, enrolment), materials.py (material constants as ranges with sources), bottles.py (a bottle's shape: areas, shell mass, capacity, liquid level and centroid), bottle_family.py (PET size classes as ranges, the seeded sampler, a bottle as a container spec and a scene), trajectory.py and task_tests.py (an episode record and the
+                           fullness_eval.py (Monte Carlo and sweeps), perception.py (what the camera reports about a bottle, and the simulated camera's noise), bounds.py (empty-mass bounds of a PET bottle), zones.py (liquid interval and zone from a weight), policy.py (the emptiness policy: vetoes, then zones), emptiness_eval.py (its decision-level Monte Carlo), features.py (the classifier's feature vector), classifier.py (the model protocol, the in-distribution check and the bundle), np_calibration.py (the Neyman-Pearson threshold), fullness_config.py, statistics.py (Wilson bounds), registry.py (container types as data, enrolment), materials.py (material constants as ranges with sources), bottles.py (a bottle's shape: areas, shell mass, capacity, liquid level and centroid), bottle_family.py (PET size classes as ranges, the seeded sampler, a bottle as a container spec and a scene), trajectory.py and task_tests.py (an episode record and the
                            task's pass-fail and indicative functions), interfaces.py (Observation, Controller, noise), scripted.py
                            (the scripted pick-and-place), baselines.py (random policy); config.py (frozen scene dataclasses read from TOML),
                            containers.py (ContainerSpec, provenance, liquid mass), layout.py (footprints, spawn sampler, set-aside test),
@@ -519,7 +528,7 @@ src/beverage_disposal/   Python package (placeholder name)
                            so101_chain.json, the generated, frozen robot spec it reads; ik.py (solve_ik);
                            controller.py (EEDeltaController); step_response.py (rise, overshoot, settling); gate.py (the grasp gate's bar, slip and swing measurements)
   train/                   training code, never imported by the core: emptiness/dataset.py (simulated labelled bottles for the
-                           emptiness classifier), sklearn_model.py, fit.py and bundle.py (the scikit-learn model, its fit and its saved bundle)
+                           emptiness classifier), sklearn_model.py, fit.py and bundle.py (the scikit-learn model, its fit and its saved bundle), pipeline.py (draw, fit, calibrate, save)
   sim/                     the MuJoCo side: arm.py loads the vendored arm and adds the TCP site; scene.py (table, bin, pad, set-aside
                            marker, container and the arm in one model); bottle.py (a PET bottle as geoms with the liquid welded in); pads.py (the gripper's two collision pads);
                            grasp.py (prescribed grasp); neck_gate.py (seeded gate carries of a bottle from the pad); skills.py (the scripted skill as the sequencer calls it), harness.py (seeded grid and results record), demo.py (GIF frames); rollout.py (one judged episode); recorder.py (an episode as a Trajectory); loop.py
@@ -545,6 +554,7 @@ tests/                   pytest tests (fast/medium/slow tiers), one folder per a
   bounds/                  the empty-mass bounds against drawn bottles and a hand example
   zones/                   the liquid interval and the zone edges, with an exhaustive grid
   policy/                  the emptiness policy's vetoes, order and zones, and its decision-level grid
+  npcal/                   the Neyman-Pearson sample size, violation probability and threshold, per cell and per size
   features/                the classifier's feature vector, by hand
   train/                   the classifier's dataset (labels, seeds, disjoint splits, calibration cells), the range check, the fit
                            and the saved bundle
@@ -564,7 +574,7 @@ tests/                   pytest tests (fast/medium/slow tiers), one folder per a
 assets/                  vendored third-party files with provenance (the SO-101 model)
 configs/                 configs (scene.toml, containers.toml, materials.toml, bottles.toml, gate.toml, fullness.toml, policy.toml, perception.toml, safety.toml; training later) and the stored actuator step-response reference (JSON)
 scripts/                 helper scripts (view_so101.py, generate_so101_chain.py, measure_actuators.py, run_acceptance.py, record_demo.py,
-                         check_bottle_reach.py, run_neck_gate.py, run_emptiness_grid.py)
+                         check_bottle_reach.py, run_neck_gate.py, run_emptiness_grid.py, train_emptiness.py)
 pyproject.toml  uv.lock  .python-version   uv project, exact lockfile, pinned Python
 Makefile                                   `make check`, the one command for every gate
 .github/                                   the check workflow and the pull-request template
