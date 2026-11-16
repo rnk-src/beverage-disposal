@@ -32,6 +32,7 @@ HELD_SPEED = 0.25
 RELEASE_RATE = 0.1  # gripper angle gained per control step while letting go, rad
 RELEASE_MARGIN = 0.004  # the container's bottom is lowered to this far above the release height
 CARRY_CLEARANCE = 0.015  # extra height over the release point while moving across, metres
+TOP_CLEARANCE = 0.015  # metres the tip stays above a container's top while coming in over it
 OPEN_TOLERANCE = 0.05  # rad: the gripper counts as open this close to its open angle
 # The TCP's distance from the fixed pad's inner face along the closing direction, metres (D-77).
 FACE_TO_TCP = 0.0079
@@ -41,6 +42,19 @@ _GRIPPER_LOW, _GRIPPER_HIGH = load_chain()["gripper_range"]
 def grasp_offset_m(config: SceneConfig) -> float:
     """Metres from the container's centre to the TCP along the closing direction, before closing."""
     return config.container.grasp_diameter / 2 + config.grasp.clearance - FACE_TO_TCP
+
+
+def approach_height_m(config: SceneConfig) -> float:
+    """Height of the tip over the container's bottom while it comes in above the container.
+
+    The clearance over the grasp point, or just over the top when the container stands taller
+    than that (a bottle taken by its body: the jaws come down around the neck).
+    """
+    container = config.container
+    return max(
+        container.grasp_height + config.reach.approach_clearance,
+        container.height + TOP_CLEARANCE,
+    )
 
 
 class Phase(Enum):
@@ -64,6 +78,8 @@ class ScriptedController:
         grasp = config.grasp
         self._ramp_steps = math.ceil((grasp.open_angle - grasp.close_target) / grasp.close_rate)
         self.phase = Phase.ABOVE
+        # Each phase with the control step it began on, for measurements on the recorded episode.
+        self.phase_log: list[tuple[Phase, int]] = []
 
     @property
     def done(self) -> bool:
@@ -71,6 +87,8 @@ class ScriptedController:
 
     def reset(self, observation: Observation) -> None:
         self.phase = Phase.ABOVE
+        self.phase_log = [(Phase.ABOVE, 0)]
+        self._step = 0
         self._angle = self._config.grasp.open_angle
         self._ramp = 0  # control steps spent closing
         self._anchor = observation.tip.copy()  # where the current hold or climb started
@@ -92,7 +110,7 @@ class ScriptedController:
         phase = self.phase
 
         if phase is Phase.ABOVE:
-            wanted = np.array([*beside, bottom + height + config.reach.approach_clearance])
+            wanted = np.array([*beside, bottom + approach_height_m(config)])
             if np.linalg.norm(wanted - tip) < ABOVE_TOLERANCE:
                 phase = Phase.DESCEND
         if phase is Phase.DESCEND:
@@ -141,6 +159,9 @@ class ScriptedController:
         if phase is Phase.DONE:
             wanted = tip
 
+        if phase is not self.phase:
+            self.phase_log.append((phase, self._step))
+        self._step += 1
         self.phase = phase
         limit = HELD_SPEED if phase in (Phase.LIFT, Phase.CARRY, Phase.LOWER) else 1.0
         move = np.clip(GAIN * (wanted - tip) / MAX_DELTA, -limit, limit)

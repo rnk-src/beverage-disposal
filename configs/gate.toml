@@ -1,0 +1,8 @@
+# The bar of the 2B.3 grasp gate: what a bottle size must show, empty and at the payload-limit
+# fill, before it counts as supported. The first three figures are the locked decision; the band
+# and the seed count were chosen when the gate was built.
+max_slip_m = 0.002          # the bottle may move this far in the jaws between grip and release
+max_swing_settle_s = 2.0    # its swing after the carry must die out within this
+required_places = 12        # upright places needed, out of `seeds` runs
+swing_band_rad = 0.035      # "settled" means the tilt stays within 2 degrees of its last value
+seeds = 12
