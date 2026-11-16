@@ -88,3 +88,94 @@ def test_the_full_policy_tests_fail_on_a_mutated_policy(tmp_path, name):
     fault, failing_test = FAULTS[name]
     result = run_on_mutated_package(tmp_path, TESTS, fault)
     assert_the_test_failed(result, TESTS, failing_test)
+
+
+EVAL_TESTS = "tests/policy/test_emptiness_eval.py"
+EVAL = "core/emptiness_eval.py"
+
+
+def change_eval(old, new):
+    def fault(package):
+        edit(package, EVAL, old, new)
+
+    return fault
+
+
+GRID_FAULTS = {
+    "ignore_the_grids_stream": (
+        change_eval("default_rng([seed, *stream, index,", "default_rng([seed, index,"),
+        "test_a_stream_gives_the_grid_bottles_of_its_own",
+    ),
+    "draw_sound_bottles_for_a_crushed_cell": (
+        change_eval("deformed=deformed, foreign_g=foreign_g", "foreign_g=foreign_g"),
+        "test_every_crushed_bottle_of_the_grid_is_vetoed_and_the_cell_says_it_was_crushed",
+    ),
+    "leave_the_foreign_object_out_of_the_grid": (
+        change_eval("deformed=deformed, foreign_g=foreign_g", "deformed=deformed"),
+        "test_a_foreign_object_of_the_grid_is_on_the_scale_and_named_in_the_cell",
+    ),
+    "count_a_classifiers_veto_as_an_overturn": (
+        change_eval(
+            "overturned += verdict.action == BIN and verdict.decided_by == CLASSIFIER",
+            "overturned += verdict.decided_by == CLASSIFIER",
+        ),
+        "test_a_classifiers_veto_is_not_counted_as_an_overturn",
+    ),
+    "count_every_bin_as_an_overturn": (
+        change_eval(
+            "overturned += verdict.action == BIN and verdict.decided_by == CLASSIFIER",
+            "overturned += verdict.action == BIN",
+        ),
+        "test_a_cell_counts_the_bins_the_classifier_made_in_the_ambiguous_zone",
+    ),
+    "test_the_nominal_size_over_the_payload": (
+        change_eval("return min(family.classes[size].nominal_ml,", "return max(0.0,"),
+        "test_the_payload_volume_is_the_nominal_size_or_what_the_arm_may_lift",
+    ),
+    "call_exactly_the_threshold_under": (
+        change_eval("if c.volume_ml >= threshold_ml]", "if c.volume_ml > threshold_ml]"),
+        "test_the_summary_counts_misbins_empties_overturns_and_vetoes_by_hand",
+    ),
+    "count_crushed_bottles_among_the_sound": (
+        change_eval("if not c.deformed and c.foreign_g == 0.0]", "if c.foreign_g == 0.0]"),
+        "test_a_crushed_or_foreign_cell_is_not_counted_among_the_sound_bottles",
+    ),
+    "count_foreign_objects_among_the_empties": (
+        change_eval("if not c.deformed and c.foreign_g == 0.0]", "if not c.deformed]"),
+        "test_a_crushed_or_foreign_cell_is_not_counted_among_the_sound_bottles",
+    ),
+    "report_the_best_bound_as_the_worst": (
+        change_eval("max((c.upper_95 for c in over)", "min((c.upper_95 for c in over)"),
+        "test_the_summary_counts_misbins_empties_overturns_and_vetoes_by_hand",
+    ),
+}
+
+
+@pytest.mark.medium
+@pytest.mark.parametrize("name", GRID_FAULTS)
+def test_the_grid_tests_fail_on_a_mutated_grid(tmp_path, name):
+    fault, failing_test = GRID_FAULTS[name]
+    result = run_on_mutated_package(tmp_path, EVAL_TESTS, fault)
+    assert_the_test_failed(result, EVAL_TESTS, failing_test)
+
+
+DATASET_TESTS = "tests/train/test_dataset.py"
+
+
+def spread_the_threshold_cell_over_its_bin(package):
+    edit(
+        package,
+        "train/emptiness/dataset.py",
+        "at_threshold = low == policy.rule.threshold_ml",
+        "at_threshold = False",
+    )
+
+
+@pytest.mark.medium
+def test_the_dataset_tests_notice_a_threshold_cell_that_is_not_at_the_threshold(tmp_path):
+    result = run_on_mutated_package(tmp_path, DATASET_TESTS, spread_the_threshold_cell_over_its_bin)
+    assert_the_test_failed(
+        result,
+        DATASET_TESTS,
+        "test_the_cell_at_the_threshold_holds_bottles_of_exactly_the_threshold",
+    )

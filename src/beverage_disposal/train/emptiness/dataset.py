@@ -142,8 +142,10 @@ def generate_cells(
 ) -> tuple[Dataset, dict[tuple[str, float], int]]:
     """Ambiguous-zone rows per size and volume cell, for calibration, and each cell's row count.
 
-    A cell is filled to `rows_per_cell` rows or until `max_draws_per_cell` bottles were drawn;
-    a cell that stays short or empty is reported by its count, not raised.
+    The cell that starts at the threshold holds bottles of exactly the threshold; the others
+    spread over their bins. A cell is filled to `rows_per_cell` rows or until
+    `max_draws_per_cell` bottles were drawn; a cell that stays short or empty is reported by its
+    count, not raised.
     """
     stream = _stream(split, seed)
     rng = np.random.default_rng([*stream, CELL_STREAM])
@@ -156,7 +158,9 @@ def generate_cells(
             for _ in range(config.max_draws_per_cell):
                 if kept == config.rows_per_cell:
                     break
-                volume = float(rng.uniform(low, high))
+                # The promise names the threshold itself, the hardest volume to tell from empty.
+                at_threshold = low == policy.rule.threshold_ml
+                volume = low if at_threshold else float(rng.uniform(low, high))
                 case = draw_case(policy, sensor, noise, size, volume, rng)
                 kept += rows.add(case, size, only_zone=Zone.AMBIGUOUS)
             counts[(size, low)] = kept
