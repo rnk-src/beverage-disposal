@@ -71,7 +71,7 @@ def midpoint(span):
 
 
 @pytest.mark.parametrize("name", list(FAMILY.classes))
-def test_a_bottle_in_the_middle_of_a_class_matches_that_class_alone(name):
+def test_a_bottle_in_the_middle_of_a_class_matches_it_and_no_class_twice_or_half_its_size(name):
     size = FAMILY.classes[name]
     body, shoulder, neck = (
         midpoint(size.body_height)[0],
@@ -81,7 +81,11 @@ def test_a_bottle_in_the_middle_of_a_class_matches_that_class_alone(name):
     seen = dims(
         body_diameter=midpoint(size.body_diameter), total_height=(body + shoulder + neck,) * 2
     )
-    assert classes_matching(FAMILY, seen) == (name,)
+    # Neighbouring sizes share widths and heights, so a bottle seen exactly can match several.
+    matches = classes_matching(FAMILY, seen)
+    assert name in matches
+    for other in matches:
+        assert 0.5 < FAMILY.classes[other].nominal_ml / size.nominal_ml < 2.0
 
 
 def test_a_bottle_20_cm_wide_matches_no_class():
@@ -95,14 +99,15 @@ def test_a_bottle_too_tall_for_its_width_matches_no_class():
 
 
 def test_an_interval_spanning_two_classes_matches_both():
-    # 250 mL bodies are 50 to 58 mm wide and 330 mL ones 55 to 63 mm.
+    # 200 mL bodies are 46 to 54 mm wide, 250 mL ones 50 to 58, 330 mL ones 55 to 63 and
+    # 400 mL ones 58 to 66; all four can be 150 to 160 mm tall.
     wide = dims(body_diameter=(0.052, 0.060), total_height=(0.15, 0.16))
-    assert classes_matching(FAMILY, wide) == ("pet_250ml", "pet_330ml")
+    assert classes_matching(FAMILY, wide) == ("pet_200ml", "pet_250ml", "pet_330ml", "pet_400ml")
 
 
 def test_an_interval_that_only_touches_a_class_range_at_its_end_still_matches():
-    touching = dims(body_diameter=(0.045, 0.050), total_height=(0.15, 0.15))
-    assert classes_matching(FAMILY, touching) == ("pet_250ml",)
+    touching = dims(body_diameter=(0.040, 0.046), total_height=(0.15, 0.15))
+    assert classes_matching(FAMILY, touching) == ("pet_200ml",)
 
 
 @pytest.mark.parametrize("name", list(FAMILY.classes))

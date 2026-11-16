@@ -24,7 +24,18 @@ from beverage_disposal.core.materials import load_materials
 BOTTLES = ROOT / "configs" / "bottles.toml"
 PET = load_materials(ROOT / "configs" / "materials.toml")["PET"]
 RAW = tomllib.loads(BOTTLES.read_text())
-SIZES = ["pet_250ml", "pet_330ml", "pet_500ml", "pet_1000ml", "pet_1500ml", "pet_2000ml"]
+SIZES = [
+    "pet_200ml",
+    "pet_250ml",
+    "pet_330ml",
+    "pet_400ml",
+    "pet_500ml",
+    "pet_650ml",
+    "pet_800ml",
+    "pet_1000ml",
+    "pet_1500ml",
+    "pet_2000ml",
+]
 
 
 @functools.cache
@@ -44,7 +55,7 @@ def broken_file(tmp_path, old, new):
     return path
 
 
-def test_the_file_holds_six_sizes_named_after_their_tables_with_the_nominal_in_the_name():
+def test_the_file_holds_ten_sizes_in_rising_order_named_after_their_nominal_size():
     assert list(family_of_the_file().classes) == SIZES
     for name, size in family_of_the_file().classes.items():
         assert size.name == name

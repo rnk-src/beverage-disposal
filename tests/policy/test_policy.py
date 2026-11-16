@@ -7,7 +7,12 @@ import numpy as np
 import pytest
 from support.paths import ROOT
 
-from beverage_disposal.core.bottle_family import GateRecord, load_family, sample_bottle
+from beverage_disposal.core.bottle_family import (
+    GateRecord,
+    classes_matching,
+    load_family,
+    sample_bottle,
+)
 from beverage_disposal.core.bounds import empty_mass_bounds
 from beverage_disposal.core.fullness import BIN, SET_ASIDE
 from beverage_disposal.core.fullness_config import load_fullness_config
@@ -26,6 +31,9 @@ ALL_SIZES = tuple(FAMILY.classes)
 POLICY = EmptinessPolicy(RULE, PET, FAMILY, CONFIG, sizes=ALL_SIZES)
 BOTTLE = sample_bottle(FAMILY, "pet_500ml", PET, np.random.default_rng(0))
 BIG = sample_bottle(FAMILY, "pet_2000ml", PET, np.random.default_rng(0))
+# Neighbouring sizes share widths and heights, so the 500 mL bottle fits more than its own class.
+BOTTLE_MATCHES = classes_matching(FAMILY, exact_perception(BOTTLE, 0.0).dims)
+assert "pet_500ml" in BOTTLE_MATCHES and len(BOTTLE_MATCHES) > 1
 
 
 def weighed(bottle, volume_ml, **changes):
@@ -42,7 +50,8 @@ def test_the_policy_file_holds_the_decided_figures():
     raw = tomllib.loads((CONFIGS / "policy.toml").read_text())
     assert (CONFIG.alpha, CONFIG.delta) == (0.005, 0.05) == (raw["alpha"], raw["delta"])
     assert CONFIG.volume_bins == (30.0, 31.0, 35.0, 50.0)
-    assert CONFIG.allow_overturn is True and CONFIG.min_confidence == 0.8
+    # Chosen 2026-11-16: no bin rests on the camera's level reading.
+    assert CONFIG.allow_overturn is False and CONFIG.min_confidence == 0.8
 
 
 def test_an_empty_bottle_whose_weight_proves_it_is_binned_by_the_rule():
@@ -97,7 +106,7 @@ def test_a_size_that_matches_no_class_is_vetoed():
 def test_a_size_outside_the_policys_sizes_is_vetoed_and_one_inside_is_not():
     small_only = dataclasses.replace(POLICY, sizes=("pet_250ml",))
     assert decide(policy=small_only).decided_by == "veto:unsupported_size"
-    assert decide(policy=dataclasses.replace(POLICY, sizes=("pet_500ml",))).action == BIN
+    assert decide(policy=dataclasses.replace(POLICY, sizes=BOTTLE_MATCHES)).action == BIN
 
 
 def test_a_bottle_that_could_also_be_an_unsupported_size_is_vetoed():
@@ -115,10 +124,11 @@ def test_a_bottle_that_could_also_be_an_unsupported_size_is_vetoed():
 def test_without_named_sizes_the_policy_acts_only_on_sizes_that_passed_the_gate():
     default = EmptinessPolicy(RULE, PET, FAMILY, CONFIG)
     assert decide(policy=default).decided_by == "veto:unsupported_size"  # no size has passed
-    passed = dataclasses.replace(
-        FAMILY.classes["pet_500ml"], gate=GateRecord("passed", "2026-11-16", "")
-    )
-    family = dataclasses.replace(FAMILY, classes={**FAMILY.classes, "pet_500ml": passed})
+    passed = {
+        name: dataclasses.replace(FAMILY.classes[name], gate=GateRecord("passed", "2026-11-16", ""))
+        for name in BOTTLE_MATCHES
+    }
+    family = dataclasses.replace(FAMILY, classes={**FAMILY.classes, **passed})
     assert decide(policy=EmptinessPolicy(RULE, PET, family, CONFIG)).action == BIN
 
 
