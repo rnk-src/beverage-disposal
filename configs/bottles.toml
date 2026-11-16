@@ -3,7 +3,9 @@
 # brim capacity is the nominal size times a drawn `overfill`, so `body_height` is only the range
 # that solution must fall in. Nothing here was measured on a real bottle: every figure is a typical
 # value written from memory, marked "assumed", until it is checked against a real bottle (Tier 2).
-# `gate` records the 2B.3 neck-grasp result per size; a size counts as supported only when it passed.
+# `gate` records the 2B.3 grasp-gate result per size (stock pads, scripted controller, runs/neck_gate.json);
+# a size counts as supported only when it passed. `grasp_pitch_deg` is the steepest pitch that reaches
+# every pose of the size's tallest and shortest bottle with a neck grasp (scripts/check_bottle_reach.py).
 
 [pet_250ml]
 nominal_ml = 250.0
@@ -18,8 +20,8 @@ overfill = { lo = 1.03, hi = 1.10 }
 base_styles = ["flat"]
 grasp_mode = "neck"
 grasp_below_ring = 0.004
-grasp_pitch_deg = 60.0
-gate = { status = "untested", date = "2026-11-15", note = "" }
+grasp_pitch_deg = 35.0
+gate = { status = "failed", date = "2026-11-16", note = "neck grasp: 9 of 12 empty and 10 of 12 at payload placed, bottles dropped; body grasp: 11 and 12 of 12 placed, slip 6.9 mm against 2 mm" }
 provenance = { source = "typical 250 mL PET bottle figures recalled from memory, not measured; the 28 mm finish is the common standard", date = "2026-11-15", kind = "assumed" }
 
 [pet_330ml]
@@ -35,8 +37,8 @@ overfill = { lo = 1.03, hi = 1.10 }
 base_styles = ["flat"]
 grasp_mode = "neck"
 grasp_below_ring = 0.004
-grasp_pitch_deg = 60.0
-gate = { status = "untested", date = "2026-11-15", note = "" }
+grasp_pitch_deg = 30.0
+gate = { status = "failed", date = "2026-11-16", note = "neck grasp: 9 of 12 empty and 3 of 12 at payload placed; body grasp: 12 of 12 placed both fills, slip 7.8 mm against 2 mm" }
 provenance = { source = "typical 330 mL PET bottle figures recalled from memory, not measured; the 28 mm finish is the common standard", date = "2026-11-15", kind = "assumed" }
 
 [pet_500ml]
@@ -52,8 +54,8 @@ overfill = { lo = 1.03, hi = 1.10 }
 base_styles = ["flat"]
 grasp_mode = "neck"
 grasp_below_ring = 0.004
-grasp_pitch_deg = 60.0
-gate = { status = "untested", date = "2026-11-15", note = "" }
+grasp_pitch_deg = 20.0
+gate = { status = "failed", date = "2026-11-16", note = "neck grasp: 12 of 12 empty with 21.7 mm slip, 0 of 12 at payload; body grasp: 12 of 12 empty with 8.1 mm slip, 0 of 12 at payload" }
 provenance = { source = "typical 500 mL PET bottle figures recalled from memory, not measured; the 28 mm finish is the common standard", date = "2026-11-15", kind = "assumed" }
 
 [pet_1000ml]
@@ -70,7 +72,7 @@ base_styles = ["flat", "petaloid"]
 grasp_mode = "neck"
 grasp_below_ring = 0.004
 grasp_pitch_deg = 60.0
-gate = { status = "untested", date = "2026-11-15", note = "" }
+gate = { status = "failed", date = "2026-11-16", note = "out of reach: no pitch reaches the carry over the bin with the tallest bottle" }
 provenance = { source = "typical 1000 mL PET bottle figures recalled from memory, not measured; the 28 mm finish is the common standard", date = "2026-11-15", kind = "assumed" }
 
 [pet_1500ml]
@@ -87,7 +89,7 @@ base_styles = ["flat", "petaloid"]
 grasp_mode = "neck"
 grasp_below_ring = 0.004
 grasp_pitch_deg = 60.0
-gate = { status = "untested", date = "2026-11-15", note = "" }
+gate = { status = "failed", date = "2026-11-16", note = "out of reach: no pitch reaches the lift or the carry with the tallest bottle" }
 provenance = { source = "typical 1500 mL PET bottle figures recalled from memory, not measured; the 28 mm finish is the common standard", date = "2026-11-15", kind = "assumed" }
 
 [pet_2000ml]
@@ -104,5 +106,5 @@ base_styles = ["flat", "petaloid"]
 grasp_mode = "neck"
 grasp_below_ring = 0.004
 grasp_pitch_deg = 60.0
-gate = { status = "untested", date = "2026-11-15", note = "" }
+gate = { status = "failed", date = "2026-11-16", note = "out of reach: no pitch reaches the lift or the carry with the tallest bottle" }
 provenance = { source = "typical 2000 mL PET bottle figures recalled from memory, not measured; the 28 mm finish is the common standard", date = "2026-11-15", kind = "assumed" }

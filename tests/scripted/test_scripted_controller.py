@@ -18,7 +18,13 @@ from beverage_disposal.core.controller import MAX_DELTA
 from beverage_disposal.core.ik import solve_ik
 from beverage_disposal.core.kinematics import HOME, fk, load_chain
 from beverage_disposal.core.layout import goals
-from beverage_disposal.core.scripted import Phase, ScriptedController, grasp_offset_m
+from beverage_disposal.core.scripted import (
+    TOP_CLEARANCE,
+    Phase,
+    ScriptedController,
+    approach_height_m,
+    grasp_offset_m,
+)
 
 CONFIG = load_scene_config(ROOT / "configs" / "scene.toml")
 GRIPPER_LOW, GRIPPER_HIGH = load_chain()["gripper_range"]
@@ -183,3 +189,36 @@ def test_the_tcp_stands_off_the_container_by_half_the_width_the_jaws_close_on():
     neck = dataclasses.replace(CONFIG.container, diameter=0.08, grasp_diameter=0.026)
     narrow = dataclasses.replace(CONFIG, container=neck)
     assert grasp_offset_m(narrow) == pytest.approx(0.013 + 0.002 - 0.0079, abs=1e-12)
+
+
+def test_the_phase_log_holds_each_phase_once_with_the_step_it_began_on():
+    controller = ScriptedController(CONFIG)
+    phases = run(controller, KinematicWorld())
+    assert [phase for phase, _ in controller.phase_log] == phases
+    steps = [step for _, step in controller.phase_log]
+    assert steps[0] == 0 and steps == sorted(steps) and len(set(steps)) == len(steps)
+    # Closing takes the ramp plus the settle wait, counted in `act` calls.
+    ramp = math.ceil((CONFIG.grasp.open_angle - CONFIG.grasp.close_target) / 0.02)
+    assert controller.phase_log[3][1] - controller.phase_log[2][1] == ramp + 20 - 1
+
+
+def test_resetting_empties_the_phase_log():
+    controller = ScriptedController(CONFIG)
+    world = KinematicWorld()
+    run(controller, world)
+    controller.reset(world.observe())
+    assert controller.phase_log == [(Phase.ABOVE, 0)]
+
+
+def test_a_container_taller_than_the_approach_height_is_approached_over_its_top():
+    # A bottle taken at 0.10 m but 0.20 m tall: 0.14 m would run the jaws into its neck.
+    tall = dataclasses.replace(CONFIG.container, height=0.20)
+    config = dataclasses.replace(CONFIG, container=tall)
+    assert approach_height_m(config) == pytest.approx(0.20 + TOP_CLEARANCE)
+    assert approach_height_m(CONFIG) == pytest.approx(0.10 + 0.04)  # the can: as before
+    world = KinematicWorld()
+    world.can = np.array([0.29, 0.0, 0.10])  # its centre, standing on the table
+    world.tip = np.array([0.29, 0.0, 0.18])  # between the old approach height and the new one
+    controller = ScriptedController(config)
+    controller.reset(world.observe())
+    assert controller.act(world.observe())[2] > 0  # it climbs

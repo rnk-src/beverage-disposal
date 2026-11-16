@@ -210,6 +210,10 @@ def scene_for_bottle(
     The bottle takes the friction of the scene's current container (the can) until it is measured.
     """
     can = scene.container
+    clearance = scene.grasp.clearance
+    if size.grasp_mode == "neck":
+        # The jaw comes down past the ring before it closes on the narrower neck under it.
+        clearance += (bottle.shape.support_ring_diameter - bottle.shape.neck_diameter) / 2
     return dataclasses.replace(
         scene,
         container=container_spec_for(
@@ -218,5 +222,5 @@ def scene_for_bottle(
         bottle=bottle,
         fill_ml=liquid_ml,
         fill_density_g_ml=density_g_ml,
-        grasp=dataclasses.replace(scene.grasp, pitch_deg=size.grasp_pitch_deg),
+        grasp=dataclasses.replace(scene.grasp, pitch_deg=size.grasp_pitch_deg, clearance=clearance),
     )

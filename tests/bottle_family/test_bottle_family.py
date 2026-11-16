@@ -68,7 +68,7 @@ def test_a_span_with_its_low_end_above_its_high_end_is_refused():
     ("old", "new", "message"),
     [
         ('grasp_mode = "neck"', 'grasp_mode = "claw"', "grasp_mode"),
-        ('status = "untested"', 'status = "maybe"', "status"),
+        ('status = "failed"', 'status = "maybe"', "status"),
         ('base_styles = ["flat"]', 'base_styles = ["round"]', "base_style"),
         ('base_styles = ["flat"]', "base_styles = []", "base_style"),
         ("grasp_below_ring = 0.004\n", "", "grasp_below_ring"),

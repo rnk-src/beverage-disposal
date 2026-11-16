@@ -14,6 +14,7 @@ from beverage_disposal.core.ik import solve_ik
 from beverage_disposal.core.interfaces import Controller, Observation, ObservationNoise
 from beverage_disposal.core.kinematics import HOME
 from beverage_disposal.core.layout import Goal, sample_spawn
+from beverage_disposal.core.scripted import approach_height_m
 from beverage_disposal.core.task_tests import final_state_problem
 from beverage_disposal.core.trajectory import Trajectory
 from beverage_disposal.sim.loop import CONTROL_PERIOD, ArmLoop
@@ -23,9 +24,19 @@ from beverage_disposal.sim.scene import build_scene
 MAX_STEPS = 600
 # Where the tip starts each episode, base frame, metres: above the middle of the spawn box.
 READY_TIP = (0.26, 0.0, 0.15)
-# The controller's target box (base frame, metres): wide enough for every pose of the layout.
-WORKSPACE = (np.array([0.10, -0.25, 0.0]), np.array([0.40, 0.25, 0.25]))
+# The controller's target box (base frame, metres): wide enough for every pose of the layout,
+# and high enough to carry the tallest reachable bottle (500 mL, by its neck) over the bin wall.
+WORKSPACE = (np.array([0.10, -0.25, 0.0]), np.array([0.40, 0.25, 0.33]))
 SETTLE_STEPS = 20  # control steps after the controller is done, so the container can come to rest
+
+
+def ready_tip(config: SceneConfig, surface_z: float) -> tuple[float, float, float]:
+    """Where the tip starts for a container standing on a surface at `surface_z`.
+
+    High enough to come in over the container: a tall bottle would be knocked over otherwise.
+    """
+    x, y, z = READY_TIP
+    return (x, y, max(z, surface_z + approach_height_m(config)))
 
 
 @dataclass(frozen=True)
@@ -61,7 +72,8 @@ def run_episode(
     pitch = math.radians(grasp.pitch_deg)
     start_pose = np.array(HOME, dtype=float)
     start_pose[4] = grasp.wrist_roll
-    ready = solve_ik(np.array(READY_TIP), pitch, start_pose).angles
+    surface_z = 0.0 if start is None else start[2]
+    ready = solve_ik(np.array(ready_tip(config, surface_z)), pitch, start_pose).angles
     loop.reset(ready[:5], grasp.open_angle)
     if start is not None:
         address = loop.model.joint("container").qposadr[0]
