@@ -1,0 +1,14 @@
+# Simulated extra sensors for large PET bottles. Every figure is assumed; no hardware is chosen.
+# The probe study (2B.14) sweeps rel_sigma (wall) and sigma_ml (liquid) to find what accuracy is needed.
+
+[wall]
+rel_sigma = 0.05        # assumed
+interval_k = 4.0
+nonuniformity = 0.10    # assumed: a blow-moulded wall varies along its height
+dropout = 0.05          # assumed
+
+[liquid]
+sigma_ml = 2.0          # assumed
+rel_sigma = 0.10        # assumed
+interval_k = 4.0
+dropout = 0.05          # assumed
