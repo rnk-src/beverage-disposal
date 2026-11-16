@@ -18,11 +18,11 @@ from beverage_disposal.core.layout import goals
 from beverage_disposal.core.materials import MaterialSpec
 from beverage_disposal.core.reach import container_poses, steepest_common_pitch
 from beverage_disposal.core.scripted import Phase, ScriptedController
+from beverage_disposal.core.sequencer import INTAKE_SCATTER
 from beverage_disposal.sim.rollout import run_episode
 
 FILLS = ("empty", "payload")
 WATER_KG_PER_ML = 1e-3
-PLACEMENT_JITTER = 0.005  # metres a person's placement on the pad is off by, each way (assumed)
 
 
 def gate_fill_ml(bottle: Bottle, fill: str, payload_kg: float) -> float:
@@ -87,7 +87,7 @@ def run_gate(
     for seed in range(bar.seeds) if seeds is None else seeds:
         bottle = sample_bottle(family, size.name, material, np.random.default_rng(seed))
         config = scene_for_bottle(scene, bottle, size, gate_fill_ml(bottle, fill, payload_kg))
-        jitter = np.random.default_rng([seed, 2]).uniform(-PLACEMENT_JITTER, PLACEMENT_JITTER, 2)
+        jitter = np.random.default_rng([seed, 2]).uniform(-INTAKE_SCATTER, INTAKE_SCATTER, 2)
         pad = scene.pad
         start = (pad.center_x + jitter[0], pad.center_y + jitter[1], pad.height)
         controller = ScriptedController(config, squeeze=squeeze)
