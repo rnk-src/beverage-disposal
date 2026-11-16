@@ -7,7 +7,7 @@ All runs are rule-only, noisy camera, acceptance stream, decision level, with as
 (no hardware): (a) no probes; (b) the wall probe at each wall error; (c) the liquid probe at each
 liquid error; (d) both, over the whole grid of errors; (e) the liquid probe alone and both at the
 errors of probes.toml, with the probe's reach set to each of REACHES_ML. (e) shows what a reach
-costs in empties binned and saves in hidden contents (solid objects, under-reading probes) binned.
+costs in empties binned and saves in hidden contents (under-reading probes, thick drinks) binned.
 The results file is written to runs/ with its provenance.
 """
 
@@ -37,7 +37,7 @@ LIQUID_SIGMAS_ML = (0.5, 1.0, 2.0, 4.0)
 VOLUMES = (0.0, 10.0, 30.0, 31.0, 35.0, 50.0)
 TARGET_VOLUMES = (0.0, 10.0)
 MAX_SET_ASIDE = 0.05
-REACHES_ML = (math.inf, 100.0, 60.0)
+REACHES_ML = (math.inf, 100.0, 60.0, 45.0, 30.0)
 
 
 def plan(toml: ProbeModels) -> list[tuple[str, ProbeModels | None, float]]:
@@ -90,7 +90,7 @@ def main(argv):
     )
 
     results = []
-    print(f"{'run':44s} met  empties@0  empties@10  misbin>=30  foreign  under-read")
+    print(f"{'run':44s} met  empties@0  empties@10  misbin>=30  thick@1  thick@.5  thick@0  under")
     for label, models, reach in plan(toml):
         policy = EmptinessPolicy(
             fullness.rule,
@@ -109,10 +109,17 @@ def main(argv):
                 if c.volume_ml == volume
                 and not c.deformed
                 and not c.foreign_g
+                and c.density_g_per_ml is None
                 and c.liquid_gain == 1.0
             }
             for volume in TARGET_VOLUMES
         }
+
+        def thick(gain, summary=summary):
+            return sum(
+                total(by_gain.get(gain, {})) for by_gain in summary["thick_drink_binned"].values()
+            )
+
         results.append(
             {
                 "label": label,
@@ -128,7 +135,8 @@ def main(argv):
             f"{sum(at[0.0].values()):6d}/{args.trials * len(sizes)}  "
             f"{sum(at[10.0].values()):6d}/{args.trials * len(sizes)}  "
             f"{summary['binned_at_or_over_threshold']:10d}  "
-            f"{total(summary['foreign_binned']):7d}  {total(summary['under_reading_binned']):10d}",
+            f"{thick('1'):8d}  {thick('0.5'):8d}  {thick('0'):7d}  "
+            f"{total(summary['under_reading_binned']):10d}",
             flush=True,
         )
 

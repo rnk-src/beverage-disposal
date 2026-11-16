@@ -48,6 +48,9 @@ FOREIGN_G = (50.0, 100.0)  # a solid object in an empty bottle
 UNDER_READ = 4  # a stream index after FOREIGN + 1
 UNDER_READ_GAINS = (0.5, 0.0)  # 0.5: a probe that reads low; 0.0: frozen or slushed contents
 UNDER_READ_VOLUMES = (30.0, 50.0, 100.0, 200.0)
+THICK = 6  # a stream index after UNDER_READ + 1
+THICK_DENSITY = (1.10, 1.20)  # slushie, shake, smoothie: heavier than the rule's 1.05 g/mL
+THICK_GAINS = (1.0, 0.5, 0.0)  # the liquid probe reads true, half, or sees nothing
 
 
 def run_grid(policy, family, pet, pad, noise, payload_kg, models, args):
@@ -71,6 +74,11 @@ def run_grid(policy, family, pet, pad, noise, payload_kg, models, args):
             cells += misbin_grid(
                 policy, family, pet, pad, volumes_ml=(0.0,), foreign_g=grams,
                 stream=(*ACCEPTANCE, FOREIGN + index), **one,
+            )  # fmt: skip
+        for index, gain in enumerate(THICK_GAINS if models and models.liquid else (1.0,)):
+            cells += misbin_grid(
+                policy, family, pet, pad, volumes_ml=UNDER_READ_VOLUMES, liquid_gain=gain,
+                density_g_per_ml=THICK_DENSITY, stream=(*ACCEPTANCE, THICK + index), **one,
             )  # fmt: skip
         if models is None or models.liquid is None:
             continue
@@ -196,6 +204,7 @@ def main(argv):
     print(f"crushed binned: {summary['crushed_binned']}")
     print(f"foreign objects binned: {summary['foreign_binned']}")
     print(f"probe under-reading binned (not counted above): {summary['under_reading_binned']}")
+    print(f"thick drinks binned (not counted above): {summary['thick_drink_binned']}")
     print(f"wrote {out}")
     return 1 if misbinned else 0
 
