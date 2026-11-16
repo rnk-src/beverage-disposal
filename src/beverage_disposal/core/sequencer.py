@@ -17,7 +17,9 @@ from beverage_disposal.core.containers import ContainerSpec
 from beverage_disposal.core.fullness import BIN, Verdict, decide
 from beverage_disposal.core.fullness_config import FullnessConfig
 from beverage_disposal.core.layout import Goal, goals
-from beverage_disposal.core.pad import PadSensor
+from beverage_disposal.core.pad import PadSensor, Weighing
+from beverage_disposal.core.perception import exact_perception
+from beverage_disposal.core.policy import PET, EmptinessPolicy
 from beverage_disposal.core.registry import Registry
 from beverage_disposal.core.supervisor import Event, Outcome, Supervisor
 
@@ -31,6 +33,7 @@ REQUIREMENT_ML = 30.0
 INTAKE_SCATTER = 0.005
 INTAKE_STREAM = 3  # the seed stream of the placement scatter, apart from the pad noise
 GRAM = 1e-3  # kilograms per gram
+VETO = "veto:"  # how a verdict names a veto in `decided_by`
 UNRECOGNISED = "unrecognised"  # the name an enrolment request gets when perception gives no type
 
 
@@ -103,6 +106,20 @@ class Sequencer:
     supervisor: Supervisor
     skill: Skill
     pad: PadSensor
+    policy: EmptinessPolicy | None = None  # judges PET bottles; without it they are set aside
+
+    def _decide(self, item: Item, weighing: Weighing) -> Verdict:
+        """The verdict for a container on the pad; a set-aside a person should see is reported."""
+        if self.policy is not None and item.bottle is not None and item.material == PET:
+            perception = exact_perception(item.bottle, item.volume_ml, item.material)
+            verdict = self.policy.decide(perception, weighing)
+            if verdict.decided_by.startswith(VETO):
+                self.supervisor.set_aside(verdict.decided_by.removeprefix(VETO), verdict.reason)
+            return verdict
+        record, self.registry = self.registry.meet(item.type_id or UNRECOGNISED, weighing.mass_kg)
+        if record is None:
+            self.supervisor.set_aside("unknown_type", "unknown container type: set aside")
+        return decide(self.fullness.rule, record, weighing, item.cap_confirmed)
 
     def process(self, item: Item, *, seed: int) -> Run:
         mark = len(self.supervisor.events)
@@ -118,10 +135,7 @@ class Sequencer:
         if entry.outcome is Outcome.SAFE_STOP:
             return run(None, STOPPED)
 
-        record, self.registry = self.registry.meet(item.type_id or UNRECOGNISED, weighing.mass_kg)
-        verdict = decide(self.fullness.rule, record, weighing, item.cap_confirmed)
-        if record is None:
-            self.supervisor.set_aside("unknown_type", "unknown container type: set aside")
+        verdict = self._decide(item, weighing)
 
         binned = verdict.action == BIN
         pad = self.scene.pad

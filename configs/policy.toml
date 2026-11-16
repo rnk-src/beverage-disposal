@@ -1,0 +1,8 @@
+# The emptiness policy for PET bottles (iteration 2B). The supported sizes are not listed here: they
+# are the sizes whose grasp gate passed, in bottles.toml.
+alpha = 0.005            # a bottle of 30 mL or more may be binned by the classifier this often at most
+delta = 0.05             # the chance that a calibration fails to keep alpha
+volume_bins = [30.0, 31.0, 35.0, 50.0]  # mL: the lower edges of the calibration cells
+veto_score = 0.5         # the classifier vetoes a bin below this score (placeholder until 2B.10)
+min_confidence = 0.8     # a perception less sure than this is not acted on (placeholder until 2B.6)
+allow_overturn = true    # simulation only: hardware sets this false until Tier 2 data recalibrates
