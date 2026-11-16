@@ -86,6 +86,19 @@ def draw_the_probes_from_the_bottles_generator(package):
     edit(package, EVAL, "probe_rng=probe_rng,", "probe_rng=rng,")
 
 
+def ignore_the_thick_drinks_density(package):
+    edit(
+        package,
+        EVAL,
+        "low, high = density_g_per_ml or (",
+        "low, high = None or (",
+    )
+
+
+def count_thick_drinks_among_the_sound_bottles(package):
+    edit(package, EVAL, "        and cell.density_g_per_ml is None\n", "")
+
+
 FAULTS = [
     (
         build_the_wall_reading_inside_out,
@@ -136,6 +149,16 @@ FAULTS = [
         draw_the_probes_from_the_bottles_generator,
         EVAL_TESTS,
         "test_a_grid_with_probes_that_never_read_is_the_grid_without_them",
+    ),
+    (
+        ignore_the_thick_drinks_density,
+        EVAL_TESTS,
+        "test_a_thick_drink_weighs_by_its_own_density",
+    ),
+    (
+        count_thick_drinks_among_the_sound_bottles,
+        EVAL_TESTS,
+        "test_a_thick_drink_cell_is_counted_apart_from_the_sound_and_the_under_reading_bottles",
     ),
 ]
 
