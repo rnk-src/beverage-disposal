@@ -1,10 +1,13 @@
 """The rule-only emptiness policy: each veto alone, their order, and the three zones."""
 
 import dataclasses
+import math
 import tomllib
 
 import numpy as np
 import pytest
+from hypothesis import given, settings
+from hypothesis import strategies as st
 from support.paths import ROOT
 
 from beverage_disposal.core.bottle_family import (
@@ -14,13 +17,15 @@ from beverage_disposal.core.bottle_family import (
     sample_bottle,
 )
 from beverage_disposal.core.bounds import empty_mass_bounds
+from beverage_disposal.core.features import level_volume_bounds_ml
 from beverage_disposal.core.fullness import BIN, SET_ASIDE
 from beverage_disposal.core.fullness_config import load_fullness_config
 from beverage_disposal.core.materials import load_materials
 from beverage_disposal.core.pad import Weighing
 from beverage_disposal.core.perception import exact_perception
 from beverage_disposal.core.policy import EmptinessPolicy, load_policy_config
-from beverage_disposal.core.zones import liquid_bounds_ml
+from beverage_disposal.core.probes import NO_PROBES, ProbeReadings
+from beverage_disposal.core.zones import Zone, intersect_ml, liquid_bounds_ml
 
 CONFIGS = ROOT / "configs"
 RULE = load_fullness_config(CONFIGS / "fullness.toml").rule
@@ -215,3 +220,175 @@ def test_a_level_interval_that_may_reach_the_weights_liquid_is_not_a_contradicti
         perception, visual=dataclasses.replace(perception.visual, level_m=(0.0, 0.10))
     )
     assert POLICY.decide(vague, weighed(SMALL, 150.0)).decided_by == "rule"
+
+
+# --- probes (2B.14) ---------------------------------------------------------------------------
+
+WALL_HALF = 0.10
+
+
+def true_wall_reading(bottle, half=WALL_HALF):
+    """A wall reading that holds the bottle's true wall, in mm."""
+    t = bottle.shape.t_side * 1000
+    return (t / (1 + half), t / (1 - half))
+
+
+def reach_of(reach_ml):
+    return dataclasses.replace(POLICY, config=dataclasses.replace(CONFIG, probe_reach_ml=reach_ml))
+
+
+def test_without_probes_the_verdict_is_what_it_was():
+    rng = np.random.default_rng(11)
+    for size in ("pet_250ml", "pet_500ml", "pet_1000ml", "pet_2000ml"):
+        for volume in (0.0, 10.0, 29.0, 31.0, 80.0):
+            bottle = sample_bottle(FAMILY, size, PET, rng)
+            perception, weighing = exact_perception(bottle, volume), weighed(bottle, volume)
+            assert POLICY.decide(perception, weighing) == POLICY.decide(
+                perception, weighing, NO_PROBES
+            )
+            assert POLICY.assess(perception, weighing) == POLICY.assess(
+                perception, weighing, NO_PROBES
+            )
+
+
+def test_a_wall_reading_bins_an_empty_2000_ml_bottle_the_weight_alone_cannot():
+    alone = decide(BIG, 0.0)
+    assert (alone.action, alone.zone) == (SET_ASIDE, "ambiguous")
+    with_wall = POLICY.decide(
+        exact_perception(BIG, 0.0),
+        weighed(BIG, 0.0),
+        ProbeReadings(side_wall_mm=true_wall_reading(BIG)),
+    )
+    # Worked by hand in the study's notes: the weight's liquid interval falls from 0 to 43.8 mL
+    # to 0 to 25.1 mL, under the 30 mL threshold.
+    assert (with_wall.action, with_wall.zone, with_wall.decided_by) == (BIN, "surely_under", "rule")
+    assert with_wall.bounds_ml[1] < 30.0
+
+
+def test_a_wall_reading_outside_the_materials_range_is_a_veto():
+    verdict = POLICY.decide(
+        exact_perception(BIG, 0.0), weighed(BIG, 0.0), ProbeReadings(side_wall_mm=(0.50, 0.60))
+    )
+    assert (verdict.action, verdict.decided_by) == (SET_ASIDE, "veto:implausible_wall")
+
+
+def test_the_camera_seeing_more_than_the_liquid_probe_is_a_veto():
+    perception, weighing = exact_perception(BOTTLE, 100.0), weighed(BOTTLE, 100.0)
+    level_low = level_volume_bounds_ml(perception, PET)[0]
+    slack = CONFIG.level_slack_ml
+    just_outside = ProbeReadings(liquid_ml=(0.0, level_low - slack - 0.01))
+    just_inside = ProbeReadings(liquid_ml=(0.0, level_low - slack + 0.01))
+    seen = POLICY.decide(perception, weighing, just_outside)
+    assert (seen.action, seen.decided_by) == (SET_ASIDE, "veto:inconsistent_level_and_probe")
+    near_miss = POLICY.decide(perception, weighing, just_inside)
+    assert near_miss.decided_by != "veto:inconsistent_level_and_probe"
+    assert near_miss.action == SET_ASIDE  # the probe still contradicts the weight
+
+
+def test_an_unseen_level_leaves_the_liquid_probe_alone():
+    perception, weighing = exact_perception(BOTTLE, 100.0), weighed(BOTTLE, 100.0)
+    blind = dataclasses.replace(
+        perception, visual=dataclasses.replace(perception.visual, level_m=None)
+    )
+    reading = ProbeReadings(liquid_ml=(0.0, 10.0))
+    assert POLICY.decide(perception, weighing, reading).decided_by == (
+        "veto:inconsistent_level_and_probe"
+    )
+    assert (
+        POLICY.decide(blind, weighing, reading).decided_by == "veto:inconsistent_weight_and_probe"
+    )
+
+
+def test_a_liquid_reading_is_dropped_when_the_weight_allows_more_than_the_reach():
+    perception, weighing = exact_perception(BIG, 10.0), weighed(BIG, 10.0)
+    reading = ProbeReadings(liquid_ml=(5.0, 15.0))
+    weight_high = POLICY.assess(perception, weighing).v_bounds[1]
+    assert weight_high > 30.0  # ambiguous without the probe
+    below = reach_of(math.nextafter(weight_high, 0.0)).decide(perception, weighing, reading)
+    assert (below.action, below.decided_by, below.zone) == (SET_ASIDE, "rule", "ambiguous")
+    at = reach_of(weight_high).decide(perception, weighing, reading)
+    assert (at.action, at.decided_by, at.zone) == (BIN, "rule", "surely_under")
+
+
+def test_the_policy_file_gives_an_unlimited_reach():
+    assert CONFIG.probe_reach_ml == math.inf
+
+
+def test_a_liquid_reading_under_the_threshold_bins_an_ambiguous_bottle():
+    perception, weighing = exact_perception(BIG, 10.0), weighed(BIG, 10.0)
+    assert POLICY.decide(perception, weighing).zone == "ambiguous"
+    verdict = POLICY.decide(perception, weighing, ProbeReadings(liquid_ml=(5.0, 15.0)))
+    assert (verdict.action, verdict.zone) == (BIN, "surely_under")
+    assert verdict.bounds_ml == (5.0, 15.0)
+
+
+def test_a_liquid_reading_that_reaches_the_threshold_does_not_bin():
+    perception, weighing = exact_perception(BIG, 25.0), weighed(BIG, 25.0)
+    verdict = POLICY.decide(perception, weighing, ProbeReadings(liquid_ml=(20.0, 30.0)))
+    assert (verdict.action, verdict.zone) == (SET_ASIDE, "ambiguous")
+    assert verdict.bounds_ml[1] == 30.0
+
+
+def test_a_liquid_reading_the_weight_contradicts_is_a_veto():
+    perception, weighing = exact_perception(BIG, 0.0), weighed(BIG, 0.0)
+    verdict = POLICY.decide(perception, weighing, ProbeReadings(liquid_ml=(500.0, 600.0)))
+    assert (verdict.action, verdict.decided_by) == (SET_ASIDE, "veto:inconsistent_weight_and_probe")
+
+
+def test_the_assessment_keeps_the_weights_interval_beside_the_fused_one():
+    perception, weighing = exact_perception(BIG, 10.0), weighed(BIG, 10.0)
+    by_hand = liquid_bounds_ml(weighing.mass_kg, empty_mass_bounds(perception.dims, PET), RULE)
+    alone = POLICY.assess(perception, weighing)
+    assert alone.weight_ml == alone.v_bounds == by_hand
+    fused = POLICY.assess(perception, weighing, ProbeReadings(liquid_ml=(5.0, 15.0)))
+    assert fused.weight_ml == by_hand
+    assert fused.v_bounds == intersect_ml(by_hand, (5.0, 15.0)) == (5.0, 15.0)
+
+
+SIZES = st.sampled_from(["pet_250ml", "pet_500ml", "pet_1000ml", "pet_2000ml"])
+
+
+def interval(low, high):
+    return st.tuples(st.floats(low, high), st.floats(low, high)).map(lambda p: tuple(sorted(p)))
+
+
+@st.composite
+def cases(draw):
+    bottle = sample_bottle(
+        FAMILY, draw(SIZES), PET, np.random.default_rng(draw(st.integers(0, 50)))
+    )
+    volume = draw(st.floats(0.0, 200.0))
+    weighing = Weighing(
+        mass_kg=bottle.empty_mass_kg + volume / 1000 + draw(st.floats(-0.04, 0.0)),
+        stable=draw(st.booleans()),
+    )
+    perception = exact_perception(bottle, volume)
+    if draw(st.booleans()):
+        perception = dataclasses.replace(perception, material="glass")
+    readings = ProbeReadings(
+        side_wall_mm=draw(st.none() | interval(0.0, 1.0)),
+        liquid_ml=draw(st.none() | interval(0.0, 500.0)),
+    )
+    return perception, weighing, readings
+
+
+@settings(max_examples=300, derandomize=True, deadline=None)
+@given(cases())
+def test_no_probe_reading_moves_a_bottle_out_of_the_surely_over_zone(case):
+    perception, weighing, readings = case
+    before = POLICY.assess(perception, weighing)
+    if before.zone is not Zone.SURELY_OVER:
+        return
+    after = POLICY.decide(perception, weighing, readings)
+    assert after.action == SET_ASIDE
+
+
+@settings(max_examples=300, derandomize=True, deadline=None)
+@given(cases())
+def test_no_probe_reading_removes_a_veto_the_policy_gave_without_it(case):
+    perception, weighing, readings = case
+    before = POLICY.decide(perception, weighing)
+    if not before.decided_by.startswith("veto:"):
+        return
+    after = POLICY.decide(perception, weighing, readings)
+    assert after.action == SET_ASIDE and after.decided_by.startswith("veto:")

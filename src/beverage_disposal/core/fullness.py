@@ -20,7 +20,7 @@ class Verdict:
     zone: str | None = None  # the emptiness policy's zone, for a PET bottle
     decided_by: str = "rule"  # "rule", "classifier" or "veto:<code>"
     score: float | None = None  # the classifier's score, when it was asked
-    bounds_ml: tuple[float, float] | None = None  # least and most liquid the weight allows
+    bounds_ml: tuple[float, float] | None = None  # least and most liquid the evidence allows, mL
 
 
 def bin_mask(net_g: np.ndarray, rule: RuleConfig) -> np.ndarray:

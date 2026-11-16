@@ -19,10 +19,11 @@ from beverage_disposal.core.config import from_mapping
 from beverage_disposal.core.features import feature_vector, level_volume_bounds_ml
 from beverage_disposal.core.fullness import BIN, SET_ASIDE, Verdict
 from beverage_disposal.core.fullness_config import RuleConfig
-from beverage_disposal.core.materials import MaterialSpec
+from beverage_disposal.core.materials import MaterialSpec, with_side_wall
 from beverage_disposal.core.pad import Weighing
 from beverage_disposal.core.perception import Perception
-from beverage_disposal.core.zones import Zone, liquid_bounds_ml, zone_of
+from beverage_disposal.core.probes import NO_PROBES, ProbeReadings
+from beverage_disposal.core.zones import Zone, intersect_ml, liquid_bounds_ml, zone_of
 
 PET = "PET"
 
@@ -36,6 +37,9 @@ class PolicyConfig:
     min_confidence: float
     allow_overturn: bool
     level_slack_ml: float  # the weight may show this much more liquid than the level before a veto
+    # The liquid probe's reading is used only when the weight alone proves at most this much liquid:
+    # contents the probe cannot see (ice, a solid) then weigh at most about that much.
+    probe_reach_ml: float = math.inf
 
 
 def load_policy_config(path: str | Path) -> PolicyConfig:
@@ -56,7 +60,9 @@ class EmptinessPolicy:
     def supported(self) -> tuple[str, ...]:
         return self.family.supported() if self.sizes is None else self.sizes
 
-    def assess(self, perception: Perception, weighing: Weighing) -> "Assessment":
+    def assess(
+        self, perception: Perception, weighing: Weighing, probes: ProbeReadings = NO_PROBES
+    ) -> "Assessment":
         """The vetoes, in order, and then what the weight says. Nothing is decided here."""
         if perception.material != PET:
             return _vetoed("not_pet", f"the material is {perception.material}, not PET")
@@ -68,10 +74,16 @@ class EmptinessPolicy:
         if not matches or not set(matches) <= set(self.supported()):
             return _vetoed("unsupported_size", f"the size matches {matches or 'no class'}")
 
-        bounds = empty_mass_bounds(perception.dims, self.material)
+        wall = probes.side_wall_mm
+        material = self.material if wall is None else with_side_wall(self.material, wall)
+        if material is None:
+            return _vetoed("implausible_wall", "the measured wall is outside the material's range")
+
+        bounds = empty_mass_bounds(perception.dims, material)
         v_bounds = liquid_bounds_ml(weighing.mass_kg, bounds, self.rule)
+        # The level's volume uses the material as it was, so a wall reading does not move it.
         level_ml = level_volume_bounds_ml(perception, self.material)
-        found = Assessment(None, matches, bounds, v_bounds, None, level_ml)
+        found = Assessment(None, matches, bounds, v_bounds, None, level_ml, v_bounds)
         if v_bounds[1] < 0:
             return dataclasses.replace(
                 found, veto=_veto("lighter_than_possible", "lighter than any bottle of its size")
@@ -85,11 +97,37 @@ class EmptinessPolicy:
                     "the weight shows more inside than the level does",
                 ),
             )
-        return dataclasses.replace(found, zone=zone_of(*v_bounds, self.rule.threshold_ml))
 
-    def decide(self, perception: Perception, weighing: Weighing) -> Verdict:
+        reading = probes.liquid_ml
+        if reading is not None and level_ml is not None:
+            if level_ml[0] > reading[1] + self.config.level_slack_ml:
+                # The camera's level is used only to set a bottle aside, never to bin one.
+                return dataclasses.replace(
+                    found,
+                    veto=_veto(
+                        "inconsistent_level_and_probe",
+                        "the camera sees more inside than the liquid probe does",
+                    ),
+                )
+        if reading is not None and v_bounds[1] > self.config.probe_reach_ml:
+            reading = None  # the weight leaves too much room for contents the probe cannot see
+        fused = v_bounds if reading is None else intersect_ml(v_bounds, reading)
+        if fused is None:
+            return dataclasses.replace(
+                found,
+                veto=_veto(
+                    "inconsistent_weight_and_probe", "the weight and the liquid probe disagree"
+                ),
+            )
+        return dataclasses.replace(
+            found, v_bounds=fused, zone=zone_of(*fused, self.rule.threshold_ml)
+        )
+
+    def decide(
+        self, perception: Perception, weighing: Weighing, probes: ProbeReadings = NO_PROBES
+    ) -> Verdict:
         """Bin or set aside a bottle standing on the pad."""
-        found = self.assess(perception, weighing)
+        found = self.assess(perception, weighing, probes)
         if found.veto is not None:
             return found.veto
         assert found.zone is not None and found.bounds is not None and found.v_bounds is not None
@@ -144,9 +182,10 @@ class Assessment:
     veto: Verdict | None
     matches: tuple[str, ...] = ()
     bounds: EmptyMassBounds | None = None
-    v_bounds: tuple[float, float] | None = None  # least and most liquid the weight allows, mL
+    v_bounds: tuple[float, float] | None = None  # least and most liquid the evidence allows, mL
     zone: Zone | None = None  # None when vetoed
     level_ml: tuple[float, float] | None = None  # the liquid the seen level stands for
+    weight_ml: tuple[float, float] | None = None  # what the weight alone allows, mL
 
 
 def _vetoed(code: str, reason: str) -> Assessment:
