@@ -21,3 +21,4 @@ sample_period_s = 0.1
 settle_wait_s = 2.0
 samples_averaged = 20
 stability_limit_g = 1.0
+capacity_g = 1000.0  # a 1 kg cell: anything heavier saturates it and is reported as an overload

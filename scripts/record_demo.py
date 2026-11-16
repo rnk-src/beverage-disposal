@@ -1,4 +1,4 @@
-"""Record a GIF of the sequencer carrying one container: to the pad, then to the bin or aside."""
+"""Record a GIF of the sequencer carrying one container from the pad to the bin or aside."""
 
 import argparse
 import sys

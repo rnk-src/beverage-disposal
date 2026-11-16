@@ -103,3 +103,26 @@ def test_an_empty_pad_reads_about_zero_and_a_negative_mass_is_rejected():
     assert abs(sensor(NOMINAL, seed=4).weigh(0.0).mass_kg) < 0.003
     with pytest.raises(ValueError, match="mass"):
         sensor().weigh(-0.1)
+
+
+def test_the_pad_file_gives_the_load_cell_a_capacity_of_one_kilogram():
+    assert NOMINAL.capacity_g == 1000.0
+
+
+def test_a_load_over_the_cells_capacity_reads_overloaded_and_never_as_a_light_weight():
+    # A full 2 L bottle weighs about 2.1 kg: the cell saturates, it does not wrap or read low.
+    weighing = sensor().weigh(2.1)
+    assert weighing.overloaded and not weighing.stable
+    assert weighing.mass_kg == pytest.approx(1.0)
+
+
+def test_a_load_just_under_the_capacity_is_weighed_as_usual():
+    weighing = sensor().weigh(0.999)
+    assert not weighing.overloaded and weighing.stable
+    assert weighing.mass_kg == pytest.approx(0.999, abs=1e-9)
+
+
+def test_many_weighings_report_the_overload_for_each():
+    masses, stable, overloaded = sensor(NOMINAL).weigh_all(2.1, 5)
+    assert overloaded.all() and not stable.any() and masses == pytest.approx(1.0)
+    assert not sensor(NOMINAL).weigh_all(0.4, 5)[2].any()
