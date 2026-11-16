@@ -109,8 +109,20 @@ simulation with statistics, 2 = a real arm, 3 = wider containers and more sensor
   longer follow the container; `sim/bottle.py` builds the bottle in MuJoCo (body, shoulder mesh, neck, ring, liquid at its
   centroid) and every size stands upright empty and at the 0.6 kg payload. Every bottle figure is "assumed". Not yet known:
   whether the stock pads can take a 24 to 28 mm neck (2B.3 gate) and whether the 1.5 L and 2 L necks are reachable.
+- **Iteration 2B, 2B.3 built (2026-11-16): the grasp gate ran and no bottle size passed.** `core/reach.py` gains the poses of
+  one leg from the pad and a pitch sweep down to level; `core/gate.py` and `configs/gate.toml` hold the bar (slip at most 2 mm,
+  swing settled within 2 s, 12 of 12 upright places) and its measurements; the scripted controller logs its phases, comes in
+  over the top of a tall container and passes the support ring; `sim/neck_gate.py` and `scripts/run_neck_gate.py` run 12 seeded
+  carries from the pad per size, fill and grasp mode (`runs/neck_gate.json`). In simulation, stock pads, scripted controller:
+  1000, 1500 and 2000 mL are out of reach (no pitch reaches the lift or the carry over the bin with the tallest bottle); the
+  neck grasp at 35, 30 and 20 degrees placed 9, 9 and 12 of 12 empty bottles of 250, 330 and 500 mL and 10, 3 and 0 of 12 at the
+  payload fill (the pad face, 16 by 24 mm, does not fit the 4 to 14 mm of neck under the ring); a body grasp under the shoulder
+  placed 250 and 330 mL 11 or 12 of 12 with about 7 mm of slip, and dropped every 500 mL bottle at the payload fill. Every size
+  is recorded `failed` in `configs/bottles.toml`, so `BottleFamily.supported()` is empty. The choice between custom jaws, a
+  neck insert and a smaller scope is the owner's and is open. Not measured: the half-friction and soft-contact limits (the
+  nominal grasp already fails).
 - Iterations 3 to 9 and the rest of iteration 2B are planned in detail down to sub-iterations (see Roadmap).
-- Last updated: 2026-11-15 (2B.2 bottle family and the MuJoCo bottle). Update this section in the same change as every sub-iteration.
+- Last updated: 2026-11-16 (2B.3 grasp gate: no size passed). Update this section in the same change as every sub-iteration.
 
 ## Locked decisions
 
@@ -429,6 +441,8 @@ uv run python scripts/view_so101.py --snapshot a.png  # picture of the arm, no w
 uv run python scripts/generate_so101_chain.py        # rewrite the frozen chain file after a model change
 uv run python scripts/run_acceptance.py --trials 381   # sequencer grid in simulation, writes runs/acceptance.json (about 45 min)
 uv run python scripts/record_demo.py                   # GIF of one container through the sequencer, runs/demo.gif
+uv run python scripts/check_bottle_reach.py             # per bottle size: the steepest pitch that reaches each pose of a neck grasp
+uv run python scripts/run_neck_gate.py                  # the grasp gate per size, fill and grasp mode, writes runs/neck_gate.json (about 10 min)
 uv run python scripts/measure_actuators.py         # re-measure the servo step responses (configs/actuator_step_response.json)
 uv run pytest tests/gazebo   # Gazebo image tests: need a running Docker daemon, else they skip
 ```
@@ -458,10 +472,10 @@ src/beverage_disposal/   Python package (placeholder name)
                            containers.py (ContainerSpec, provenance, liquid mass), layout.py (footprints, spawn sampler, set-aside test),
                            reach.py (reach check of the layout); kinematics.py (FK, Jacobian, pitch) and
                            so101_chain.json, the generated, frozen robot spec it reads; ik.py (solve_ik);
-                           controller.py (EEDeltaController); step_response.py (rise, overshoot, settling)
+                           controller.py (EEDeltaController); step_response.py (rise, overshoot, settling); gate.py (the grasp gate's bar, slip and swing measurements)
   sim/                     the MuJoCo side: arm.py loads the vendored arm and adds the TCP site; scene.py (table, bin, pad, set-aside
                            marker, container and the arm in one model); bottle.py (a PET bottle as geoms with the liquid welded in); pads.py (the gripper's two collision pads);
-                           grasp.py (prescribed grasp); skills.py (the scripted skill as the sequencer calls it), harness.py (seeded grid and results record), demo.py (GIF frames); rollout.py (one judged episode); recorder.py (an episode as a Trajectory); loop.py
+                           grasp.py (prescribed grasp); neck_gate.py (seeded gate carries of a bottle from the pad); skills.py (the scripted skill as the sequencer calls it), harness.py (seeded grid and results record), demo.py (GIF frames); rollout.py (one judged episode); recorder.py (an episode as a Trajectory); loop.py
                            (20 Hz closed loop through the PD actuators); actuator_response.py (step tests)
 docker/gazebo/           headless Gazebo validation image: Dockerfile, worlds/, step_world.py,
                          apt-versions.txt (recorded package versions, arm64)
@@ -486,15 +500,17 @@ tests/                   pytest tests (fast/medium/slow tiers), one folder per a
   containers/              the registry, its weights with sources and the enrolment of unknown types
   tasktests/               the recorder and the task's pass-fail and indicative functions
   scripted/                the observation, the scripted pick-and-place, the goals and the baselines
-  grasp/                   the gripper pads and the prescribed grasp, with its measured limits
+  grasp/                   the gripper pads and the prescribed grasp, with its measured limits; the grasp gate's
+                           measurements, bar and runs
   scene/                   the scene config and container record, the can on the table, the jaw opening, the
                            layout (bin, pad, set-aside area, spawn box) and its reach check
   support/                 shared helpers only (paths, git, scanning, the SO-101 facts and the
                            damaged-copy and mutated-package harnesses); no tests
   conftest.py              tier hook and shared fixtures
 assets/                  vendored third-party files with provenance (the SO-101 model)
-configs/                 configs (scene.toml, containers.toml, materials.toml, bottles.toml, fullness.toml, safety.toml; training later) and the stored actuator step-response reference (JSON)
-scripts/                 helper scripts (view_so101.py, generate_so101_chain.py, measure_actuators.py, run_acceptance.py, record_demo.py)
+configs/                 configs (scene.toml, containers.toml, materials.toml, bottles.toml, gate.toml, fullness.toml, safety.toml; training later) and the stored actuator step-response reference (JSON)
+scripts/                 helper scripts (view_so101.py, generate_so101_chain.py, measure_actuators.py, run_acceptance.py, record_demo.py,
+                         check_bottle_reach.py, run_neck_gate.py)
 pyproject.toml  uv.lock  .python-version   uv project, exact lockfile, pinned Python
 Makefile                                   `make check`, the one command for every gate
 .github/                                   the check workflow and the pull-request template
@@ -588,6 +604,9 @@ update docs.
   are unverified (relevant only once the scope goes beyond cans and capped bottles).
 - Whether the cap check should treat a cap that is not confirmed as "set aside": the current rule, to be
   confirmed with the owner when the bottle work starts.
+- The grasp gate (2B.3) failed for every bottle size with the stock pads, so no bottle size is supported. Open, for the
+  owner: custom wider or shaped jaws, a printed neck insert, a lower intake or another arm mount for the large sizes, or a
+  smaller scope. The gate's swing band (2 degrees) and the 5 mm placement scatter on the pad are assumed.
 - Stable-Baselines3 default hyperparameters and CPU-vs-GPU guidance (recalled, not re-read).
 - Steps per second on the development Mac (measured in 3.5).
 - Whether `core/so101_chain.json` ships in a built wheel (hatchling): the editable install finds it, but no
