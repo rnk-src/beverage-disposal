@@ -9,6 +9,9 @@ POLICY_TESTS = "tests/policy/test_policy.py"
 EVAL_TESTS = "tests/policy/test_emptiness_eval.py"
 PERCEPTION_TESTS = "tests/perception/test_perception.py"
 SEQUENCER_TESTS = "tests/sequencer/test_sequencer.py"
+FEATURE_TESTS = "tests/features/test_features.py"
+DATASET_TESTS = "tests/train/test_dataset.py"
+DATASET = "train/emptiness/dataset.py"
 BOUNDS = "core/bounds.py"
 ZONES = "core/zones.py"
 POLICY = "core/policy.py"
@@ -129,7 +132,94 @@ def accept_any_matching_size(package):
 
 
 def bin_a_weight_lighter_than_any_bottle(package):
-    edit(package, POLICY, "if v_hi < 0:", "if False:")
+    edit(package, POLICY, "if v_bounds[1] < 0:", "if False:")
+
+
+def let_the_weight_contradict_the_level(package):
+    edit(
+        package,
+        POLICY,
+        "if level_ml is not None and level_ml[1] + self.config.level_slack_ml < v_bounds[0]:",
+        "if False:",
+    )
+
+
+def ignore_the_level_slack(package):
+    edit(
+        package,
+        POLICY,
+        "level_ml[1] + self.config.level_slack_ml < v_bounds[0]",
+        "level_ml[1] < v_bounds[0]",
+    )
+
+
+def compare_the_levels_low_end(package):
+    edit(
+        package,
+        POLICY,
+        "level_ml[1] + self.config.level_slack_ml",
+        "level_ml[0] + self.config.level_slack_ml",
+    )
+
+
+def copy_the_weight_in_kilograms(package):
+    edit(package, "core/features.py", "weighing.mass_kg * KG_TO_G,", "weighing.mass_kg,")
+
+
+def call_an_unseen_level_zero(package):
+    edit(
+        package, "core/features.py", "*(level or (math.nan, math.nan)),", "*(level or (0.0, 0.0)),"
+    )
+
+
+def flag_only_the_first_matching_size(package):
+    edit(package, "core/features.py", "float(name in matches)", "float(name == matches[0])")
+
+
+def leave_the_foreign_object_off_the_scale(package):
+    edit(
+        package, EVAL, "(volume_ml * density + wet_g + foreign_g)", "(volume_ml * density + wet_g)"
+    )
+
+
+def see_a_crushed_bottle_as_sound(package):
+    edit(
+        package,
+        EVAL,
+        "perceive(bottle, volume_ml, noise, rng, deformed=deformed)",
+        "perceive(bottle, volume_ml, noise, rng)",
+    )
+
+
+def label_exactly_thirty_as_under(package):
+    edit(
+        package,
+        DATASET,
+        "case.volume_ml < policy.rule.threshold_ml,",
+        "case.volume_ml <= 30.0 + 1.0,",
+    )
+
+
+def draw_every_split_from_one_stream(package):
+    edit(package, DATASET, "return (seed, SPLIT_STREAMS[split])", "return (seed, 0)")
+
+
+def fill_the_cells_from_every_zone(package):
+    edit(
+        package,
+        DATASET,
+        "kept += rows.add(case, size, only_zone=Zone.AMBIGUOUS)",
+        "kept += rows.add(case, size)",
+    )
+
+
+def end_every_last_cell_at_the_nominal_size(package):
+    edit(
+        package,
+        DATASET,
+        "top = min(size_nominal_ml, config.payload_kg * KG_TO_ML_OF_WATER)",
+        "top = size_nominal_ml",
+    )
 
 
 def act_on_every_size_by_default(package):
@@ -142,11 +232,16 @@ def act_on_every_size_by_default(package):
 
 
 def weigh_every_drink_as_water(package):
-    edit(package, EVAL, "(volume * density + wet_g) * GRAM", "(volume + wet_g) * GRAM")
+    edit(package, EVAL, "(volume_ml * density + wet_g", "(volume_ml + wet_g")
 
 
 def weigh_every_bottle_dry(package):
-    edit(package, EVAL, "(volume * density + wet_g) * GRAM", "(volume * density) * GRAM")
+    edit(
+        package,
+        EVAL,
+        "(volume_ml * density + wet_g + foreign_g)",
+        "(volume_ml * density + foreign_g)",
+    )
 
 
 def use_one_stream_for_every_seed(package):
@@ -228,6 +323,58 @@ FAULTS = [
         act_on_every_size_by_default,
         POLICY_TESTS,
         "test_without_named_sizes_the_policy_acts_only_on_sizes_that_passed_the_gate",
+    ),
+    (
+        let_the_weight_contradict_the_level,
+        POLICY_TESTS,
+        "test_a_weight_that_proves_far_more_liquid_than_the_level_shows_is_vetoed",
+    ),
+    (
+        ignore_the_level_slack,
+        POLICY_TESTS,
+        "test_the_slack_is_how_much_more_the_weight_may_show_before_the_veto",
+    ),
+    (
+        compare_the_levels_low_end,
+        POLICY_TESTS,
+        "test_a_level_interval_that_may_reach_the_weights_liquid_is_not_a_contradiction",
+    ),
+    (
+        copy_the_weight_in_kilograms,
+        FEATURE_TESTS,
+        "test_sizes_weight_bounds_and_confidence_are_copied_in_their_units",
+    ),
+    (call_an_unseen_level_zero, FEATURE_TESTS, "test_an_unseen_level_is_missing_not_zero"),
+    (
+        flag_only_the_first_matching_size,
+        FEATURE_TESTS,
+        "test_the_size_flags_mark_every_class_the_measured_size_could_be",
+    ),
+    (
+        leave_the_foreign_object_off_the_scale,
+        EVAL_TESTS,
+        "test_a_foreign_object_is_on_the_scale_but_the_level_stays_that_of_the_liquid",
+    ),
+    (
+        see_a_crushed_bottle_as_sound,
+        EVAL_TESTS,
+        "test_a_crushed_bottle_is_seen_as_one_and_needs_the_noise_model",
+    ),
+    (
+        label_exactly_thirty_as_under,
+        DATASET_TESTS,
+        "test_the_label_is_whether_the_true_volume_is_under_thirty",
+    ),
+    (draw_every_split_from_one_stream, DATASET_TESTS, "test_the_splits_share_no_bottle"),
+    (
+        fill_the_cells_from_every_zone,
+        DATASET_TESTS,
+        "test_every_filled_calibration_cell_has_exactly_the_rows_asked_all_ambiguous_and_in_its_bin",
+    ),
+    (
+        end_every_last_cell_at_the_nominal_size,
+        DATASET_TESTS,
+        "test_the_cells_of_a_size_end_at_what_it_can_hold_or_the_arm_can_carry",
     ),
     (weigh_every_drink_as_water, EVAL_TESTS, "test_the_drink_is_weighed_at_its_density"),
     (weigh_every_bottle_dry, EVAL_TESTS, "test_water_on_the_outside_is_on_the_scale"),

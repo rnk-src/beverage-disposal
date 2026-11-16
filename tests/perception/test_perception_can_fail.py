@@ -77,7 +77,7 @@ def keep_a_crushed_bottles_width_interval(package):
 
 
 def judge_on_the_truth_in_the_grid(package):
-    edit(package, "core/emptiness_eval.py", "if noise is None\n", "if True\n")
+    edit(package, "core/emptiness_eval.py", "    if noise is None:\n", "    if True:\n")
 
 
 def judge_on_the_truth_in_the_sequencer(package):
