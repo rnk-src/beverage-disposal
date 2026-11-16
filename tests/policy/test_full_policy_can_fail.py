@@ -5,7 +5,8 @@ from support.damage import assert_the_test_failed, edit, run_on_mutated_package
 
 TESTS = "tests/policy/test_full_policy.py"
 POLICY = "core/policy.py"
-OVERTURN = "if self.config.allow_overturn and len(found.matches) == 1 and score > tau:"
+OVERTURN = "if self.config.allow_overturn and score > tau:"
+TAU = "tau = max(self.bundle.tau_by_size.get(name, math.inf) for name in found.matches)"
 
 
 def change(old, new):
@@ -36,16 +37,31 @@ FAULTS = {
         change(OVERTURN, OVERTURN.replace("self.config.allow_overturn and ", "")),
         "test_without_allow_overturn_the_ambiguous_zone_is_never_binned",
     ),
-    "overturn_a_bottle_of_two_sizes": (
-        change(OVERTURN, OVERTURN.replace("len(found.matches) == 1 and ", "")),
-        "test_a_bottle_that_fits_two_sizes_is_not_overturned",
+    "take_the_looser_of_two_thresholds": (
+        change(TAU, TAU.replace("tau = max(", "tau = min(")),
+        "test_a_bottle_that_fits_two_sizes_must_beat_the_stricter_of_their_thresholds[pet_330ml]",
+    ),
+    "take_the_first_matching_sizes_threshold": (
+        change(TAU, TAU.replace("in found.matches)", "in found.matches[:1])")),
+        "test_a_bottle_that_fits_two_sizes_must_beat_the_stricter_of_their_thresholds[pet_330ml]",
+    ),
+    "take_the_last_matching_sizes_threshold": (
+        change(TAU, TAU.replace("in found.matches)", "in found.matches[-1:])")),
+        "test_a_bottle_that_fits_two_sizes_must_beat_the_stricter_of_their_thresholds[pet_250ml]",
     ),
     "give_a_size_without_a_threshold_zero": (
-        change("get(found.matches[0], math.inf)", "get(found.matches[0], 0.0)"),
+        change(TAU, TAU.replace("math.inf", "0.0")),
         "test_a_size_without_a_threshold_is_never_overturned",
     ),
+    "skip_a_matching_size_without_a_threshold": (
+        change(TAU, TAU.replace("math.inf", "-math.inf")),
+        "test_a_bottle_that_fits_a_size_without_a_threshold_is_not_overturned[pet_330ml]",
+    ),
     "use_the_first_sizes_threshold": (
-        change("get(found.matches[0], math.inf)", "get(next(iter(self.family.classes)), math.inf)"),
+        change(
+            TAU,
+            TAU.replace("for name in found.matches", "for name in list(self.family.classes)[:1]"),
+        ),
         "test_the_threshold_is_that_of_the_bottles_own_size",
     ),
     "trust_the_model_outside_its_ranges": (

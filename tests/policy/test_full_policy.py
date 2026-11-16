@@ -48,7 +48,11 @@ class Raising:
         raise RuntimeError("the model broke")
 
 
-def bundled(model, tau=TAU, ranges=ANYTHING, policy=POLICY, taus=None):
+# The classifier's overturn is an experiment: the config file switches it off.
+OVERTURNING = dataclasses.replace(POLICY, config=dataclasses.replace(CONFIG, allow_overturn=True))
+
+
+def bundled(model, tau=TAU, ranges=ANYTHING, policy=OVERTURNING, taus=None):
     if not hasattr(model, "score"):
         model = Fixed(model)
     taus = dict.fromkeys(ALL_SIZES, tau) if taus is None else taus
@@ -117,11 +121,16 @@ def test_an_infinite_threshold_is_never_beaten():
 
 
 def test_without_allow_overturn_the_ambiguous_zone_is_never_binned():
-    hardware = dataclasses.replace(POLICY, config=dataclasses.replace(CONFIG, allow_overturn=False))
-    verdict = decide(BIG, AMBIGUOUS_ML, policy=bundled(1.0, tau=0.0, policy=hardware))
+    shipped = dataclasses.replace(POLICY, config=dataclasses.replace(CONFIG, allow_overturn=False))
+    verdict = decide(BIG, AMBIGUOUS_ML, policy=bundled(1.0, tau=0.0, policy=shipped))
     assert summary(verdict) == (SET_ASIDE, "rule", "ambiguous")
     # The veto side of the classifier does not depend on the switch.
-    assert decide(policy=bundled(0.0, policy=hardware)).decided_by == "classifier"
+    assert decide(policy=bundled(0.0, policy=shipped)).decided_by == "classifier"
+
+
+def test_the_policy_of_the_config_file_never_lets_a_classifier_bin():
+    verdict = decide(BIG, AMBIGUOUS_ML, policy=bundled(1.0, tau=0.0, policy=POLICY))
+    assert summary(verdict) == (SET_ASIDE, "rule", "ambiguous")
 
 
 def two_class_case(policy):
@@ -138,10 +147,24 @@ def two_class_case(policy):
     raise AssertionError("no weight puts this look in the ambiguous zone")
 
 
-def test_a_bottle_that_fits_two_sizes_is_not_overturned():
-    policy = bundled(1.0, tau=0.0)
-    verdict = policy.decide(*two_class_case(policy))
-    assert summary(verdict) == (SET_ASIDE, "rule", "ambiguous")
+def two_class_verdict(score, taus):
+    policy = bundled(score, taus={**dict.fromkeys(ALL_SIZES, 0.0), **taus})
+    return summary(policy.decide(*two_class_case(policy)))
+
+
+@pytest.mark.parametrize("stricter", ["pet_250ml", "pet_330ml"])
+def test_a_bottle_that_fits_two_sizes_must_beat_the_stricter_of_their_thresholds(stricter):
+    # The bottle may be of either size, so only the stricter threshold keeps both promises.
+    taus = {"pet_250ml": 0.5, "pet_330ml": 0.5, stricter: 0.9}
+    assert two_class_verdict(0.7, taus) == (SET_ASIDE, "rule", "ambiguous")
+    assert two_class_verdict(0.9, taus) == (SET_ASIDE, "rule", "ambiguous")
+    assert two_class_verdict(0.95, taus) == (BIN, "classifier", "ambiguous")
+
+
+@pytest.mark.parametrize("missing", ["pet_250ml", "pet_330ml"])
+def test_a_bottle_that_fits_a_size_without_a_threshold_is_not_overturned(missing):
+    policy = bundled(1.0, taus={name: 0.0 for name in ALL_SIZES if name != missing})
+    assert summary(policy.decide(*two_class_case(policy))) == (SET_ASIDE, "rule", "ambiguous")
 
 
 # The surely-over zone: nothing overturns it.
@@ -243,7 +266,7 @@ def test_a_bin_in_the_ambiguous_zone_passed_every_gate(case, policy):
         found = policy.assess(case.perception, case.weighing)
         assert full.decided_by == "classifier"
         assert policy.config.allow_overturn and policy.bundle.ranges is ANYTHING
-        assert full.score > policy.bundle.tau_by_size[found.matches[0]]
+        assert all(full.score > policy.bundle.tau_by_size[name] for name in found.matches)
 
 
 @settings(max_examples=300, derandomize=True, deadline=None)

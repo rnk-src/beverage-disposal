@@ -129,9 +129,10 @@ class EmptinessPolicy:
             if score < self.config.veto_score:
                 return verdict(SET_ASIDE, "the classifier doubts it is empty", "classifier", score)
             return verdict(BIN, "the weight proves it holds under the threshold", score=score)
-        # Ambiguous: a size with no threshold has an infinite one.
-        tau = self.bundle.tau_by_size.get(found.matches[0], math.inf)
-        if self.config.allow_overturn and len(found.matches) == 1 and score > tau:
+        # Ambiguous: the bottle may be of any size it matches, so its score must beat the
+        # strictest of their thresholds. A size with no threshold has an infinite one.
+        tau = max(self.bundle.tau_by_size.get(name, math.inf) for name in found.matches)
+        if self.config.allow_overturn and score > tau:
             return verdict(BIN, "the classifier is sure it is empty", "classifier", score)
         return verdict(SET_ASIDE, "the weight cannot tell", score=score)
 
