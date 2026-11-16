@@ -121,8 +121,17 @@ simulation with statistics, 2 = a real arm, 3 = wider containers and more sensor
   is recorded `failed` in `configs/bottles.toml`, so `BottleFamily.supported()` is empty. The choice between custom jaws, a
   neck insert and a smaller scope is the owner's and is open. Not measured: the half-friction and soft-contact limits (the
   nominal grasp already fails).
+- **Iteration 2B, 2B.4 built (2026-11-16): intake on the pad, one leg.** A person puts the container on the pad; the sequencer
+  weighs it there (water on the outside counts), the supervisor refuses it before any lift (`too_heavy_remove_by_hand` from the
+  measured weight or an overloaded pad, `too_wide` from the grasp width's high end), the decision is made, and the skill is
+  called once, from the pad (with up to 5 mm of placement scatter, assumed) to the bin or the set-aside area. The pad model
+  saturates at 1 kg (`capacity_g`) and reports the overload. The unknown-type set-aside moved from the supervisor into the
+  sequencer; a PET bottle without a policy is set aside. `SimSkill` builds a bottle item as the bottle. Kept, against the
+  plan: the spawn box and the pad goal (the skill is still trained from a random A), and the layout sizes (no bottle size is
+  supported, so the can is the widest). In simulation, can, scripted skill, 40 trials per volume: 0 of 40 binned at each of
+  30, 31 and 35 mL (Wilson 95 % upper bound 8.8 %), 40 of 40 empties binned, 160 of 160 carries completed, no stops.
 - Iterations 3 to 9 and the rest of iteration 2B are planned in detail down to sub-iterations (see Roadmap).
-- Last updated: 2026-11-16 (2B.3 grasp gate: no size passed). Update this section in the same change as every sub-iteration.
+- Last updated: 2026-11-16 (2B.4 intake on the pad). Update this section in the same change as every sub-iteration.
 
 ## Locked decisions
 
@@ -463,7 +472,7 @@ rewrites files and stops the commit so you re-stage them.
 
 ```
 src/beverage_disposal/   Python package (placeholder name)
-  core/                    the ROS-free core (no MuJoCo): sequencer.py (pick, weigh, decide, place), acceptance.py (results summary), supervisor.py (safety checks and indicators), supervised.py (a controller
+  core/                    the ROS-free core (no MuJoCo): sequencer.py (weigh on the pad, decide, carry once), acceptance.py (results summary), supervisor.py (safety checks and indicators), supervised.py (a controller
                            under the supervisor), safety_config.py,
                            pad.py (weighing pad model), fullness.py (the weight rule),
                            fullness_eval.py (Monte Carlo and sweeps), fullness_config.py, statistics.py (Wilson bounds), registry.py (container types as data, enrolment), materials.py (material constants as ranges with sources), bottles.py (a bottle's shape: areas, shell mass, capacity, liquid level and centroid), bottle_family.py (PET size classes as ranges, the seeded sampler, a bottle as a container spec and a scene), trajectory.py and task_tests.py (an episode record and the

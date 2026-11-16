@@ -12,8 +12,8 @@ from typing import Protocol
 
 import numpy as np
 
-from beverage_disposal.core.containers import ContainerRecord
 from beverage_disposal.core.interfaces import Observation
+from beverage_disposal.core.pad import Weighing
 from beverage_disposal.core.safety_config import SafetyLimits
 
 
@@ -83,27 +83,31 @@ class Supervisor:
         """Report a failure the caller saw (a pick that did not lift, say) as a safe stop."""
         return self._trip(Outcome.SAFE_STOP, code, message)
 
-    def check_container(
-        self, record: ContainerRecord | None, *, diameter: float, mass_kg: float
-    ) -> Decision:
-        """Whether a container may be picked at all."""
-        if diameter > self._limits.max_container_diameter:
+    def set_aside(self, code: str, message: str) -> Decision:
+        """Report that a container is being set aside for a reason a person should hear about."""
+        return self._trip(Outcome.SET_ASIDE, code, message)
+
+    def check_container(self, *, grasp_width: tuple[float, float], weighing: Weighing) -> Decision:
+        """Whether a container standing on the pad may be picked at all, before any lift.
+
+        `grasp_width` is the interval (low, high) perception gives for the width the jaws close
+        on, metres. The weight comes first: a container too heavy to carry is left where it is.
+        """
+        limits = self._limits
+        if weighing.overloaded or weighing.mass_kg > limits.max_container_mass:
+            weight = "over the pad's range" if weighing.overloaded else f"{weighing.mass_kg:.3f} kg"
+            return self._trip(
+                Outcome.SAFE_STOP,
+                "too_heavy_remove_by_hand",
+                f"container of {weight} is over the {limits.max_container_mass} kg limit: "
+                "remove it by hand",
+            )
+        if grasp_width[1] > limits.max_container_diameter:
             return self._trip(
                 Outcome.SAFE_STOP,
                 "too_wide",
-                f"container {diameter * 1000:.1f} mm wide is over the "
-                f"{self._limits.max_container_diameter * 1000:.0f} mm the pads can take",
-            )
-        if mass_kg > self._limits.max_container_mass:
-            return self._trip(
-                Outcome.SAFE_STOP,
-                "too_heavy",
-                f"container of {mass_kg:.3f} kg is over the "
-                f"{self._limits.max_container_mass} kg limit",
-            )
-        if record is None:
-            return self._trip(
-                Outcome.SET_ASIDE, "unknown_type", "unknown container type: set aside for enrolment"
+                f"a grasp up to {grasp_width[1] * 1000:.1f} mm wide is over the "
+                f"{limits.max_container_diameter * 1000:.0f} mm the pads can take",
             )
         return PROCEED
 
