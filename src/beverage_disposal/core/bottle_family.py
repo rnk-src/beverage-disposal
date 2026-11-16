@@ -23,6 +23,7 @@ from beverage_disposal.core.bottles import (
 from beverage_disposal.core.config import SceneConfig, from_mapping
 from beverage_disposal.core.containers import ContainerSpec, Provenance
 from beverage_disposal.core.materials import MaterialSpec
+from beverage_disposal.core.perception import DimensionEstimate
 
 GATE_STATUSES = ("untested", "passed", "failed")
 GRASP_MODES = ("neck", "body")
@@ -224,3 +225,25 @@ def scene_for_bottle(
         fill_density_g_ml=density_g_ml,
         grasp=dataclasses.replace(scene.grasp, pitch_deg=size.grasp_pitch_deg, clearance=clearance),
     )
+
+
+def classes_matching(family: BottleFamily, dims: DimensionEstimate) -> tuple[str, ...]:
+    """The size classes a measured bottle could belong to, in file order.
+
+    A class matches when the measured width overlaps its width range and the measured height
+    overlaps the heights its body, shoulder and neck ranges can add up to.
+    """
+
+    def overlap(interval, low: float, high: float) -> bool:
+        return interval[0] <= high and interval[1] >= low
+
+    found = []
+    for name, size in family.classes.items():
+        parts = (size.body_height, size.shoulder_height, size.neck_height)
+        shortest, tallest = sum(part.lo for part in parts), sum(part.hi for part in parts)
+        width = size.body_diameter
+        if overlap(dims.body_diameter, width.lo, width.hi) and overlap(
+            dims.total_height, shortest, tallest
+        ):
+            found.append(name)
+    return tuple(found)
