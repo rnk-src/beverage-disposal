@@ -1,5 +1,6 @@
 """Material constants as data: every figure is a range with a source, one table per material."""
 
+import dataclasses
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
@@ -43,3 +44,19 @@ def load_materials(path: str | Path) -> dict[str, MaterialSpec]:
         name: from_mapping(MaterialSpec, {"name": name, **table}, name)
         for name, table in tables.items()
     }
+
+
+def with_side_wall(
+    material: MaterialSpec, side_wall_mm: tuple[float, float]
+) -> MaterialSpec | None:
+    """The material with its side wall narrowed to a measured interval, in mm.
+
+    The result's range is the overlap of the material's range and the measurement, so a measurement
+    can only narrow. None when they do not overlap: the measurement is not of this material.
+    """
+    lo = max(material.t_side_mm.lo, side_wall_mm[0])
+    hi = min(material.t_side_mm.hi, side_wall_mm[1])
+    if lo > hi:
+        return None
+    narrowed = Range(lo, hi, material.t_side_mm.provenance)
+    return dataclasses.replace(material, t_side_mm=narrowed)
