@@ -7,6 +7,23 @@
 # a size counts as supported only when it passed. `grasp_pitch_deg` is the steepest pitch that reaches
 # every pose of the size's tallest and shortest bottle with a neck grasp (scripts/check_bottle_reach.py).
 
+[pet_200ml]
+nominal_ml = 200.0
+body_diameter = { lo = 0.046, hi = 0.054 }
+body_height = { lo = 0.07, hi = 0.135 }
+shoulder_height = { lo = 0.02, hi = 0.04 }
+neck_diameter = { lo = 0.024, hi = 0.028 }
+neck_height = { lo = 0.018, hi = 0.024 }
+support_ring_diameter = { lo = 0.032, hi = 0.034 }
+support_ring_drop = { lo = 0.010, hi = 0.014 }
+overfill = { lo = 1.03, hi = 1.10 }
+base_styles = ["flat"]
+grasp_mode = "neck"
+grasp_below_ring = 0.004
+grasp_pitch_deg = 40.0
+gate = { status = "untested", date = "2026-11-16", note = "added in 2B.13 for the decision-level grid; the grasp gate was not run" }
+provenance = { source = "the 250 mL figures scaled by the cube root of the volume ratio, not measured; the 28 mm finish is the common standard", date = "2026-11-16", kind = "assumed" }
+
 [pet_250ml]
 nominal_ml = 250.0
 body_diameter = { lo = 0.05, hi = 0.058 }
@@ -41,6 +58,23 @@ grasp_pitch_deg = 30.0
 gate = { status = "failed", date = "2026-11-16", note = "neck grasp: 9 of 12 empty and 3 of 12 at payload placed; body grasp: 12 of 12 placed both fills, slip 7.8 mm against 2 mm" }
 provenance = { source = "typical 330 mL PET bottle figures recalled from memory, not measured; the 28 mm finish is the common standard", date = "2026-11-15", kind = "assumed" }
 
+[pet_400ml]
+nominal_ml = 400.0
+body_diameter = { lo = 0.058, hi = 0.066 }
+body_height = { lo = 0.095, hi = 0.175 }
+shoulder_height = { lo = 0.028, hi = 0.055 }
+neck_diameter = { lo = 0.024, hi = 0.028 }
+neck_height = { lo = 0.018, hi = 0.024 }
+support_ring_diameter = { lo = 0.032, hi = 0.034 }
+support_ring_drop = { lo = 0.010, hi = 0.014 }
+overfill = { lo = 1.03, hi = 1.10 }
+base_styles = ["flat"]
+grasp_mode = "neck"
+grasp_below_ring = 0.004
+grasp_pitch_deg = 25.0
+gate = { status = "untested", date = "2026-11-16", note = "added in 2B.13 for the decision-level grid; the grasp gate was not run" }
+provenance = { source = "figures set between the 330 mL and the 500 mL classes, not measured; the 28 mm finish is the common standard", date = "2026-11-16", kind = "assumed" }
+
 [pet_500ml]
 nominal_ml = 500.0
 body_diameter = { lo = 0.062, hi = 0.07 }
@@ -57,6 +91,40 @@ grasp_below_ring = 0.004
 grasp_pitch_deg = 20.0
 gate = { status = "failed", date = "2026-11-16", note = "neck grasp: 12 of 12 empty with 21.7 mm slip, 0 of 12 at payload; body grasp: 12 of 12 empty with 8.1 mm slip, 0 of 12 at payload" }
 provenance = { source = "typical 500 mL PET bottle figures recalled from memory, not measured; the 28 mm finish is the common standard", date = "2026-11-15", kind = "assumed" }
+
+[pet_650ml]
+nominal_ml = 650.0
+body_diameter = { lo = 0.066, hi = 0.076 }
+body_height = { lo = 0.12, hi = 0.195 }
+shoulder_height = { lo = 0.033, hi = 0.065 }
+neck_diameter = { lo = 0.024, hi = 0.028 }
+neck_height = { lo = 0.018, hi = 0.024 }
+support_ring_diameter = { lo = 0.032, hi = 0.034 }
+support_ring_drop = { lo = 0.010, hi = 0.014 }
+overfill = { lo = 1.03, hi = 1.10 }
+base_styles = ["flat", "petaloid"]
+grasp_mode = "neck"
+grasp_below_ring = 0.004
+grasp_pitch_deg = 10.0
+gate = { status = "untested", date = "2026-11-16", note = "added in 2B.13 for the decision-level grid; the grasp gate was not run" }
+provenance = { source = "the 500 mL figures scaled by the cube root of the volume ratio, not measured; the 28 mm finish is the common standard", date = "2026-11-16", kind = "assumed" }
+
+[pet_800ml]
+nominal_ml = 800.0
+body_diameter = { lo = 0.07, hi = 0.082 }
+body_height = { lo = 0.14, hi = 0.215 }
+shoulder_height = { lo = 0.037, hi = 0.075 }
+neck_diameter = { lo = 0.024, hi = 0.028 }
+neck_height = { lo = 0.018, hi = 0.024 }
+support_ring_diameter = { lo = 0.032, hi = 0.034 }
+support_ring_drop = { lo = 0.010, hi = 0.014 }
+overfill = { lo = 1.03, hi = 1.10 }
+base_styles = ["flat", "petaloid"]
+grasp_mode = "neck"
+grasp_below_ring = 0.004
+grasp_pitch_deg = 0.0
+gate = { status = "untested", date = "2026-11-16", note = "added in 2B.13 for the decision-level grid; the grasp gate was not run" }
+provenance = { source = "the 1000 mL figures scaled by the cube root of the volume ratio, not measured; the 28 mm finish is the common standard", date = "2026-11-16", kind = "assumed" }
 
 [pet_1000ml]
 nominal_ml = 1000.0

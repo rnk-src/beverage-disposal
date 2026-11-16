@@ -70,9 +70,13 @@ def test_the_names_are_fixed_base_features_then_one_flag_per_size_class():
         "base_petaloid",
         "base_confidence",
         "confidence",
+        "size_pet_200ml",
         "size_pet_250ml",
         "size_pet_330ml",
+        "size_pet_400ml",
         "size_pet_500ml",
+        "size_pet_650ml",
+        "size_pet_800ml",
         "size_pet_1000ml",
         "size_pet_1500ml",
         "size_pet_2000ml",
@@ -82,7 +86,7 @@ def test_the_names_are_fixed_base_features_then_one_flag_per_size_class():
 
 
 def test_the_vector_is_float64_and_as_long_as_the_names():
-    assert vector().dtype == np.float64 and vector().shape == (26,)
+    assert vector().dtype == np.float64 and vector().shape == (30,)
 
 
 def test_sizes_weight_bounds_and_confidence_are_copied_in_their_units():
@@ -137,13 +141,19 @@ def test_cap_and_base_are_flags_and_unknown_is_missing():
 
 
 def test_the_size_flags_mark_every_class_the_measured_size_could_be():
-    # 60 to 70 mm wide and 200 to 220 mm tall: a 330 mL (55 to 63) or a 500 mL (62 to 70).
+    # 60 to 70 mm wide and 200 to 220 mm tall: the widths of 330 mL (55 to 63), 400 mL (58 to 66),
+    # 500 mL (62 to 70), 650 mL (66 to 76) and 800 mL (70 to 82, touching) overlap, and each of
+    # those classes can be that tall.
     found = named()
     flags = {name: value for name, value in found.items() if name.startswith("size_")}
     assert flags == {
+        "size_pet_200ml": 0.0,
         "size_pet_250ml": 0.0,
         "size_pet_330ml": 1.0,
+        "size_pet_400ml": 1.0,
         "size_pet_500ml": 1.0,
+        "size_pet_650ml": 1.0,
+        "size_pet_800ml": 1.0,
         "size_pet_1000ml": 0.0,
         "size_pet_1500ml": 0.0,
         "size_pet_2000ml": 0.0,
