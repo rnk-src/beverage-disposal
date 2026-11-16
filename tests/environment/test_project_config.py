@@ -8,7 +8,7 @@ from support.paths import ROOT
 
 PYPROJECT = tomllib.loads((ROOT / "pyproject.toml").read_text())
 
-RUNTIME = {"mujoco", "numpy", "gymnasium"}
+RUNTIME = {"mujoco", "numpy", "gymnasium", "scikit-learn"}
 # packaging is what test_python_pin.py uses to compare versions; declared so it is not borrowed.
 # mink is the IK oracle of 1.4: it needs MuJoCo, so it checks our core from the test side only.
 # mypy type-checks the core in `make check`.
