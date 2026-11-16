@@ -1,0 +1,12 @@
+# The simulated camera's errors for PET bottles (2B.6). Lengths in metres. Every figure is assumed and
+# meant to be pessimistic; the camera hardware is chosen at 9.3 and these are measured again then.
+dim_sigma_m = 0.002              # random error of each measured length, one standard deviation
+dim_bias_max_m = 0.001           # a calibration bias anywhere up to this, either way, per look
+interval_k = 4.0                 # a length is reported as estimate +- (k sigma + the largest bias)
+level_sigma_m = 0.004            # random error of the liquid level
+label_band = [0.30, 0.70]        # a label hides the level between these fractions of the body height
+level_dropout = 0.10             # how often the level is not seen at all
+cap_miss = 0.05                  # how often the cap is reported wrongly
+base_style_error = 0.10          # how often the base style is reported wrongly
+confidence_drop_crushed = 0.6    # confidence lost on a crushed or deformed bottle
+deformed_width_factor = 3.0      # a deformed bottle's width interval is this many times wider

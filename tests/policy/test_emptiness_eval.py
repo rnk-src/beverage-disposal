@@ -8,6 +8,7 @@ from test_policy import ALL_SIZES, CONFIG, FAMILY, PET, POLICY, RULE
 
 from beverage_disposal.core.emptiness_eval import misbin_grid
 from beverage_disposal.core.fullness_config import load_fullness_config
+from beverage_disposal.core.perception import load_perception_noise
 from beverage_disposal.core.policy import EmptinessPolicy
 from beverage_disposal.core.statistics import wilson_upper
 
@@ -107,4 +108,47 @@ def test_a_policy_that_names_no_size_vetoes_every_bottle():
 @pytest.mark.medium
 def test_no_500_ml_bottle_holding_30_ml_is_binned_in_400_trials():
     cell = grid(sizes=("pet_500ml",), volumes=(30.0,), trials=400)[0]
+    assert cell.binned == 0 and cell.upper_95 < 0.01
+
+
+NOISE = load_perception_noise(ROOT / "configs" / "perception.toml")
+
+
+def noisy(**options):
+    defaults = dict(sizes=("pet_500ml",), volumes_ml=(0.0,), trials=200, seed=0)
+    return misbin_grid(POLICY, FAMILY, PET, PAD, noise=NOISE, **{**defaults, **options})
+
+
+def test_a_noisy_camera_bins_fewer_empties_than_an_exact_one():
+    # At 10 mL about half the 500 mL bottles are provably under 30 mL: wider intervals cost some.
+    exact = grid(sizes=("pet_500ml",), volumes=(10.0,), trials=400)[0]
+    seen = noisy(volumes_ml=(10.0,), trials=400)[0]
+    assert 0 < seen.binned < exact.binned - 10
+
+
+def test_a_noisy_camera_still_bins_no_bottle_of_30_ml_or_more():
+    cells = noisy(sizes=ALL_SIZES, volumes_ml=(30.0, 31.0, 35.0), trials=100)
+    assert all(cell.binned == 0 for cell in cells)
+
+
+def test_a_wider_reported_interval_never_bins_more():
+    """Catches intervals that do not reach the bounds: a vaguer camera cannot be more sure."""
+    vague = dataclasses.replace(NOISE, interval_k=8.0)
+    wide = misbin_grid(
+        POLICY,
+        FAMILY,
+        PET,
+        PAD,
+        noise=vague,
+        sizes=("pet_500ml",),
+        volumes_ml=(0.0,),
+        trials=200,
+        seed=0,
+    )[0]
+    assert wide.binned < noisy()[0].binned
+
+
+@pytest.mark.medium
+def test_no_500_ml_bottle_holding_30_ml_is_binned_in_400_trials_with_a_noisy_camera():
+    cell = noisy(volumes_ml=(30.0,), trials=400)[0]
     assert cell.binned == 0 and cell.upper_95 < 0.01
