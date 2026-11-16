@@ -33,3 +33,14 @@ def zone_of(v_lo: float, v_hi: float, threshold_ml: float) -> Zone:
     if v_lo >= threshold_ml:
         return Zone.SURELY_OVER
     return Zone.AMBIGUOUS
+
+
+def intersect_ml(
+    first: tuple[float, float], second: tuple[float, float]
+) -> tuple[float, float] | None:
+    """The liquid both intervals allow, in mL; None when they share nothing."""
+    lo = max(first[0], second[0])
+    hi = min(first[1], second[1])
+    if lo > hi:
+        return None
+    return (lo, hi)

@@ -11,7 +11,7 @@ from beverage_disposal.core.bounds import EmptyMassBounds, empty_mass_bounds
 from beverage_disposal.core.fullness_config import load_fullness_config
 from beverage_disposal.core.materials import load_materials
 from beverage_disposal.core.perception import exact_perception
-from beverage_disposal.core.zones import Zone, liquid_bounds_ml, zone_of
+from beverage_disposal.core.zones import Zone, intersect_ml, liquid_bounds_ml, zone_of
 
 RULE = load_fullness_config(ROOT / "configs" / "fullness.toml").rule
 FAMILY = load_family(ROOT / "configs" / "bottles.toml")
@@ -86,3 +86,17 @@ def test_a_heavier_drink_assumption_lowers_only_the_least_liquid():
     syrup = dataclasses.replace(RULE, max_density_g_per_ml=1.3)
     assert liquid_bounds_ml(0.050, BOUNDS, syrup)[0] == pytest.approx(18 / 1.3)
     assert liquid_bounds_ml(0.050, BOUNDS, syrup)[1] == liquid_bounds_ml(0.050, BOUNDS, RULE)[1]
+
+
+def test_two_liquid_intervals_overlap_by_hand():
+    assert intersect_ml((0.0, 40.0), (10.0, 60.0)) == (10.0, 40.0)
+    assert intersect_ml((5.0, 8.0), (0.0, 100.0)) == (5.0, 8.0)
+
+
+def test_disjoint_liquid_intervals_share_nothing():
+    assert intersect_ml((0.0, 9.0), (10.0, 20.0)) is None
+    assert intersect_ml((10.0, 20.0), (0.0, 9.0)) is None
+
+
+def test_intervals_that_touch_share_one_point():
+    assert intersect_ml((0.0, 10.0), (10.0, 20.0)) == (10.0, 10.0)
