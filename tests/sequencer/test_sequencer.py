@@ -11,6 +11,7 @@ from beverage_disposal.core.fullness_config import load_fullness_config
 from beverage_disposal.core.layout import goals
 from beverage_disposal.core.materials import load_materials
 from beverage_disposal.core.pad import PadSensor
+from beverage_disposal.core.policy import EmptinessPolicy, load_policy_config
 from beverage_disposal.core.registry import load_registry
 from beverage_disposal.core.safety_config import load_safety_limits
 from beverage_disposal.core.sequencer import (
@@ -33,6 +34,7 @@ LIMITS = load_safety_limits(CONFIGS / "safety.toml")
 CAN = REGISTRY.lookup("can_12floz")
 BOTTLE = REGISTRY.lookup("bottle_500ml")
 FAMILY = load_family(CONFIGS / "bottles.toml")
+POLICY_CONFIG = load_policy_config(CONFIGS / "policy.toml")
 PET = load_materials(CONFIGS / "materials.toml")["PET"]
 GOALS = goals(SCENE)
 
@@ -63,7 +65,7 @@ def item(record=CAN, volume_ml=0.0, density=1.0, known=True, **changes):
     return dataclasses.replace(base, **changes)
 
 
-def sequencer(skill=None, *, registry=REGISTRY, seed=0):
+def sequencer(skill=None, *, registry=REGISTRY, seed=0, policy=None):
     skill = skill or RecordingSkill()
     indicators = RecordingIndicators()
     rng = np.random.default_rng(seed)
@@ -74,6 +76,7 @@ def sequencer(skill=None, *, registry=REGISTRY, seed=0):
         supervisor=Supervisor(LIMITS, indicators),
         skill=skill,
         pad=PadSensor(FULLNESS.pad, rng),
+        policy=policy,
     )
     return machine, skill, indicators
 
@@ -216,3 +219,39 @@ def test_a_run_says_whether_the_rule_binned_something_it_should_not_have():
     run = sloppy.process(item(volume_ml=40.0), seed=0)
     assert run.destination == BINNED
     assert run.misbinned  # judged against the 30 mL requirement, not the loose rule's own number
+
+
+def policy(sizes=tuple(FAMILY.classes)):
+    return EmptinessPolicy(FULLNESS.rule, PET, FAMILY, POLICY_CONFIG, sizes=sizes)
+
+
+def test_with_a_policy_an_empty_pet_bottle_is_binned_and_a_half_full_one_set_aside():
+    machine, skill, _ = sequencer(policy=policy())
+    empty = machine.process(pet_item(volume_ml=0.0), seed=0)
+    assert empty.destination == BINNED and empty.verdict.zone == "surely_under"
+    half = machine.process(pet_item(volume_ml=250.0), seed=0)
+    assert half.destination == SET_ASIDE_AREA and half.verdict.zone == "surely_over"
+    assert [goal for _, goal in skill.calls] == ["bin", "set_aside"]
+
+
+def test_a_pet_bottle_judged_by_the_policy_is_not_sent_for_enrolment():
+    machine, _, indicators = sequencer(policy=policy())
+    run = machine.process(pet_item(volume_ml=0.0), seed=0)
+    assert machine.registry.pending == REGISTRY.pending
+    assert run.events == [] and indicators.log == []
+
+
+def test_a_policy_veto_is_reported_under_its_code_and_the_bottle_set_aside():
+    machine, _, indicators = sequencer(policy=policy(sizes=()))
+    run = machine.process(pet_item(volume_ml=0.0), seed=0)
+    assert run.destination == SET_ASIDE_AREA
+    assert run.verdict.decided_by == "veto:unsupported_size"
+    assert [event.code for event in run.events] == ["unsupported_size"]
+    assert ("light", "amber") in indicators.log
+
+
+def test_the_policy_does_not_touch_a_can_or_an_unknown_container_that_is_not_pet():
+    machine, _, _ = sequencer(policy=policy())
+    assert machine.process(item(volume_ml=0.0), seed=0).verdict.decided_by == "rule"
+    unknown = machine.process(item(known=False, volume_ml=0.0), seed=0)
+    assert unknown.verdict.reason == "unknown container type"

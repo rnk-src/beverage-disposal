@@ -8,6 +8,8 @@ threshold_ml = 30.0
 min_density_g_per_ml = 0.95
 # Roughly four standard deviations of one weighing (see the sweep test); pure oil or spirit would defeat it.
 margin_g = 2.0
+# The heaviest drink assumed: sugary sodas and juices are about 1.04 g/mL; syrups are heavier.
+max_density_g_per_ml = 1.05
 
 [pad]
 noise_sigma_g = 0.5

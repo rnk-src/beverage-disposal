@@ -12,6 +12,7 @@ class RuleConfig:
     threshold_ml: float  # a container holding this much or more must be set aside
     min_density_g_per_ml: float  # the lightest drink assumed, so the threshold has a weight
     margin_g: float  # the scale's error margin, grams
+    max_density_g_per_ml: float  # the heaviest drink assumed, for the least liquid a weight means
 
     @property
     def limit_g(self) -> float:
