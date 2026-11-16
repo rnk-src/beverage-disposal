@@ -148,3 +148,17 @@ def test_the_calibration_rows_follow_the_seed_and_differ_from_the_training_rows(
     assert cells(seed=2)[0].X.tobytes() == cells(seed=2)[0].X.tobytes()
     train = {row.tobytes() for row in mixture(split="train").X}
     assert not train & {row.tobytes() for row in cells()[0].X}
+
+
+def test_the_cell_at_the_threshold_holds_bottles_of_exactly_the_threshold():
+    # The promise names 30 mL itself, the hardest volume to tell from empty: a threshold set on
+    # bottles spread over 30 to 31 mL let 7 of 6000 bottles of exactly 30 mL through (2B.11).
+    data, _ = cells()
+    first = data.volume[data.volume < SMALL.volume_bins[1]]
+    assert len(first) > 0 and set(first.tolist()) == {SMALL.volume_bins[0]}
+
+
+def test_the_cells_over_the_threshold_still_spread_over_their_bins():
+    data, _ = cells()
+    later = data.volume[data.volume >= SMALL.volume_bins[1]]
+    assert len(set(later.tolist())) > len(later) // 2

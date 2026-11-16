@@ -1,11 +1,15 @@
 """Run the emptiness policy over a grid of bottle sizes and volumes and write the results file.
 
-    uv run python scripts/run_emptiness_grid.py --policy rule-only --trials 1000
+    uv run python scripts/run_emptiness_grid.py --policy rule-only --sizes all --trials 1000
+    uv run python scripts/run_emptiness_grid.py --policy full --sizes all --trials 1000
 
 Decision level only: bottles are drawn, weighed on the pad model, seen through the camera noise
-model and judged; no arm moves. The
-sizes default to every size the arm can reach, whether or not its grasp gate has passed, so the
-file says which of them are supported.
+model and judged; no arm moves. Each size is also tested at its payload fill, with crushed bottles
+and with a solid object in an empty bottle. The bottles come from the acceptance streams, which
+share nothing with the classifier's training and calibration bottles. `--policy full` loads the
+classifier's bundle and also runs the rule-only policy on the same bottles, to compare. The sizes
+default to every size the arm can reach, whether or not its grasp gate has passed, so the file
+says which of them are supported.
 """
 
 import argparse
@@ -15,12 +19,15 @@ import sys
 from pathlib import Path
 
 from beverage_disposal.core.bottle_family import load_family
-from beverage_disposal.core.emptiness_eval import misbin_grid
+from beverage_disposal.core.emptiness_eval import misbin_grid, payload_volume_ml, summarize_cells
+from beverage_disposal.core.features import feature_names
 from beverage_disposal.core.fullness_config import load_fullness_config
 from beverage_disposal.core.materials import load_materials
 from beverage_disposal.core.perception import load_perception_noise
 from beverage_disposal.core.policy import EmptinessPolicy, load_policy_config
+from beverage_disposal.core.safety_config import load_safety_limits
 from beverage_disposal.sim.harness import provenance
+from beverage_disposal.train.emptiness.bundle import load_bundle
 
 ROOT = Path(__file__).resolve().parents[1]
 CONFIGS = ROOT / "configs"
@@ -28,12 +35,44 @@ DEFAULT_VOLUMES = (0.0, 10.0, 20.0, 29.0, 30.0, 31.0, 35.0, 50.0)
 # The sizes the arm reached in 2B.3; the larger ones are out of its reach.
 REACHABLE = ("pet_250ml", "pet_330ml", "pet_500ml")
 PROMISE_ML = 30.0
+# The acceptance split of the dataset streams, then a stream per kind of cell.
+ACCEPTANCE = (3, 2)
+SOUND, CRUSHED, FOREIGN = 0, 1, 2
+CRUSHED_VOLUMES = (0.0, 35.0)
+FOREIGN_G = (50.0, 100.0)  # a solid object in an empty bottle
+
+
+def run_grid(policy, family, pet, pad, noise, payload_kg, args):
+    """The sound cells per size, payload fill included, then the crushed and foreign cells."""
+    common = dict(trials=args.trials, seed=args.seed, noise=noise)
+    cells = []
+    for size in args.sizes:
+        one = dict(common, sizes=(size,))
+        top = payload_volume_ml(family, size, payload_kg=payload_kg)
+        volumes = tuple(sorted({*args.volumes, top}))
+        cells += misbin_grid(
+            policy, family, pet, pad, volumes_ml=volumes, stream=(*ACCEPTANCE, SOUND), **one
+        )
+        if noise is None:
+            continue  # a crushed bottle needs the camera model, and the level check a seen level
+        cells += misbin_grid(
+            policy, family, pet, pad, volumes_ml=CRUSHED_VOLUMES, stream=(*ACCEPTANCE, CRUSHED),
+            deformed=True, **one,
+        )  # fmt: skip
+        for index, grams in enumerate(FOREIGN_G):
+            cells += misbin_grid(
+                policy, family, pet, pad, volumes_ml=(0.0,), foreign_g=grams,
+                stream=(*ACCEPTANCE, FOREIGN + index), **one,
+            )  # fmt: skip
+    return cells
 
 
 def main(argv):
+    family = load_family(CONFIGS / "bottles.toml")
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--policy", choices=["rule-only"], default="rule-only")
-    parser.add_argument("--sizes", nargs="+", default=list(REACHABLE))
+    parser.add_argument("--policy", choices=["rule-only", "full"], default="rule-only")
+    parser.add_argument("--bundle", type=Path, default=ROOT / "runs" / "emptiness_model")
+    parser.add_argument("--sizes", nargs="+", default=list(REACHABLE), help="size ids, or all")
     parser.add_argument("--volumes", type=float, nargs="+", default=list(DEFAULT_VOLUMES))
     parser.add_argument("--trials", type=int, default=1000)
     parser.add_argument("--seed", type=int, default=0)
@@ -42,45 +81,70 @@ def main(argv):
     )
     parser.add_argument("--out", type=Path, default=None)
     args = parser.parse_args(argv)
+    if args.sizes == ["all"]:
+        args.sizes = list(family.classes)
 
     fullness = load_fullness_config(CONFIGS / "fullness.toml")
-    family = load_family(CONFIGS / "bottles.toml")
     pet = load_materials(CONFIGS / "materials.toml")["PET"]
     config = load_policy_config(CONFIGS / "policy.toml")
+    payload_kg = load_safety_limits(CONFIGS / "safety.toml").max_container_mass
     noise = None if args.exact_camera else load_perception_noise(CONFIGS / "perception.toml")
-    policy = EmptinessPolicy(fullness.rule, pet, family, config, sizes=tuple(args.sizes))
-    cells = misbin_grid(
-        policy,
-        family,
-        pet,
-        fullness.pad,
-        sizes=tuple(args.sizes),
-        volumes_ml=tuple(args.volumes),
-        trials=args.trials,
-        seed=args.seed,
-        noise=noise,
-    )
+    rule_only = EmptinessPolicy(fullness.rule, pet, family, config, sizes=tuple(args.sizes))
+    grid = (family, pet, fullness.pad, noise, payload_kg, args)
+
     results = {
         "policy": args.policy,
         "level": "decision only: no arm, no physics",
         "grasp_gate_passed": {size: size in family.supported() for size in args.sizes},
         "camera": "exact" if noise is None else "noisy (perception.toml)",
         "seed": args.seed,
-        "cells": [dataclasses.asdict(cell) for cell in cells],
-        "provenance": provenance(fullness, family, pet, config, noise),
+        "streams": "acceptance: disjoint from the training and calibration bottles",
     }
+    if args.policy == "full":
+        bundle = load_bundle(args.bundle, feature_names(family))
+        policy = dataclasses.replace(rule_only, bundle=bundle)
+        results["bundle"] = {
+            "model_sha256": bundle.model_sha256,
+            "tau_by_size": bundle.tau_by_size,
+            "meta": bundle.meta,
+        }
+        results["allow_overturn"] = config.allow_overturn
+        results["rule_only_summary"] = summarize_cells(
+            run_grid(rule_only, *grid), threshold_ml=PROMISE_ML
+        )
+    else:
+        policy = rule_only
+    cells = run_grid(policy, *grid)
+    summary = summarize_cells(cells, threshold_ml=PROMISE_ML)
+    results["summary"] = summary
+    results["cells"] = [dataclasses.asdict(cell) for cell in cells]
+    results["provenance"] = provenance(fullness, family, pet, config, noise)
     out = args.out or ROOT / "runs" / f"emptiness_{args.policy.replace('-', '_')}.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(results, indent=2) + "\n")
 
-    print("size          volume  binned      upper 95 %  zones")
+    print("size          volume  kind         binned      upper 95 %  overturned  zones")
     for cell in cells:
-        print(
-            f"{cell.size:12s} {cell.volume_ml:6g}  {cell.binned:5d}/{cell.trials:<5d} "
-            f"{cell.upper_95 * 100:8.3f} %  {cell.zones}"
+        kind = (
+            "crushed" if cell.deformed else f"object {cell.foreign_g:g} g" if cell.foreign_g else ""
         )
-    misbinned = [cell for cell in cells if cell.volume_ml >= PROMISE_ML and cell.binned]
-    print(f"binned at {PROMISE_ML:g} mL or more: {sum(cell.binned for cell in misbinned)}")
+        print(
+            f"{cell.size:12s} {cell.volume_ml:6g}  {kind:12s} {cell.binned:5d}/{cell.trials:<5d} "
+            f"{cell.upper_95 * 100:8.3f} %  {cell.overturned:10d}  {cell.zones}"
+        )
+    misbinned = summary["binned_at_or_over_threshold"]
+    worst = summary["worst_upper_95_at_or_over_threshold"]
+    print(
+        f"in simulation, binned at {PROMISE_ML:g} mL or more: {misbinned} of "
+        f"{summary['trials_at_or_over_threshold']}; worst cell's Wilson 95 % upper bound "
+        f"{worst * 100:.3f} %"
+    )
+    print(f"empties binned: {summary['empties_binned']}")
+    if args.policy == "full":
+        print(f"rule-only, same bottles: {results['rule_only_summary']['empties_binned']}")
+    print(f"overturned: {summary['overturned']}; vetoes: {summary['vetoes']}")
+    print(f"crushed binned: {summary['crushed_binned']}")
+    print(f"foreign objects binned: {summary['foreign_binned']}")
     print(f"wrote {out}")
     return 1 if misbinned else 0
 

@@ -245,7 +245,7 @@ def weigh_every_bottle_dry(package):
 
 
 def use_one_stream_for_every_seed(package):
-    edit(package, EVAL, "stream = [seed, ", "stream = [0, ")
+    edit(package, EVAL, "default_rng([seed, ", "default_rng([0, ")
 
 
 def match_a_class_by_width_alone(package):
