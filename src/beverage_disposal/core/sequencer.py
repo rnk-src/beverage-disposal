@@ -18,7 +18,12 @@ from beverage_disposal.core.fullness import BIN, Verdict, decide
 from beverage_disposal.core.fullness_config import FullnessConfig
 from beverage_disposal.core.layout import Goal, goals
 from beverage_disposal.core.pad import PadSensor, Weighing
-from beverage_disposal.core.perception import exact_perception
+from beverage_disposal.core.perception import (
+    Perception,
+    PerceptionNoise,
+    exact_perception,
+    perceive,
+)
 from beverage_disposal.core.policy import PET, EmptinessPolicy
 from beverage_disposal.core.registry import Registry
 from beverage_disposal.core.supervisor import Event, Outcome, Supervisor
@@ -31,6 +36,7 @@ STOPPED = "stopped"
 REQUIREMENT_ML = 30.0
 # A person puts the container on the pad this far off its centre at most, each way (assumed).
 INTAKE_SCATTER = 0.005
+PERCEPTION_STREAM = 4  # the seed stream of the camera's errors
 INTAKE_STREAM = 3  # the seed stream of the placement scatter, apart from the pad noise
 GRAM = 1e-3  # kilograms per gram
 VETO = "veto:"  # how a verdict names a veto in `decided_by`
@@ -107,11 +113,31 @@ class Sequencer:
     skill: Skill
     pad: PadSensor
     policy: EmptinessPolicy | None = None  # judges PET bottles; without it they are set aside
+    perception_noise: PerceptionNoise | None = None  # the camera's errors; None is an exact camera
 
-    def _decide(self, item: Item, weighing: Weighing) -> Verdict:
+    def _perceive(self, item: Item, seed: int) -> Perception | None:
+        """What the camera reports for a bottle on the pad; nothing for other containers."""
+        if item.bottle is None:
+            return None
+        if self.perception_noise is None:
+            return exact_perception(item.bottle, item.volume_ml, item.material)
+        rng = np.random.default_rng([seed, PERCEPTION_STREAM])
+        return perceive(
+            item.bottle, item.volume_ml, self.perception_noise, rng, material=item.material
+        )
+
+    @staticmethod
+    def _grasp_width(item: Item, perception: Perception | None) -> tuple[float, float]:
+        """The interval for the width the jaws close on: the camera's for a bottle, else exact."""
+        width = item.spec.grasp_diameter
+        if perception is None or item.bottle is None:
+            return (width, width)
+        by_the_neck = width == item.bottle.shape.neck_diameter
+        return perception.dims.neck_diameter if by_the_neck else perception.dims.body_diameter
+
+    def _decide(self, item: Item, perception: Perception | None, weighing: Weighing) -> Verdict:
         """The verdict for a container on the pad; a set-aside a person should see is reported."""
-        if self.policy is not None and item.bottle is not None and item.material == PET:
-            perception = exact_perception(item.bottle, item.volume_ml, item.material)
+        if self.policy is not None and perception is not None and item.material == PET:
             verdict = self.policy.decide(perception, weighing)
             if verdict.decided_by.startswith(VETO):
                 self.supervisor.set_aside(verdict.decided_by.removeprefix(VETO), verdict.reason)
@@ -130,12 +156,14 @@ class Sequencer:
             return Run(item, verdict, destination, self.supervisor.events[mark:], REQUIREMENT_ML)
 
         weighing = self.pad.weigh(gross)
-        width = item.spec.grasp_diameter
-        entry = self.supervisor.check_container(grasp_width=(width, width), weighing=weighing)
+        perception = self._perceive(item, seed)
+        entry = self.supervisor.check_container(
+            grasp_width=self._grasp_width(item, perception), weighing=weighing
+        )
         if entry.outcome is Outcome.SAFE_STOP:
             return run(None, STOPPED)
 
-        verdict = self._decide(item, weighing)
+        verdict = self._decide(item, perception, weighing)
 
         binned = verdict.action == BIN
         pad = self.scene.pad

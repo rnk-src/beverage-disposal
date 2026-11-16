@@ -14,7 +14,7 @@ from beverage_disposal.core.fullness import BIN
 from beverage_disposal.core.fullness_config import PadSensorConfig
 from beverage_disposal.core.materials import MaterialSpec
 from beverage_disposal.core.pad import PadSensor
-from beverage_disposal.core.perception import exact_perception
+from beverage_disposal.core.perception import PerceptionNoise, exact_perception, perceive
 from beverage_disposal.core.policy import EmptinessPolicy
 from beverage_disposal.core.statistics import wilson_upper
 
@@ -45,12 +45,13 @@ def misbin_grid(
     volumes_ml: tuple[float, ...],
     trials: int,
     seed: int,
+    noise: PerceptionNoise | None = None,
 ) -> list[Cell]:
     """Draw `trials` bottles per size and volume, weigh and judge each, and count the binned.
 
     Each bottle gets its own drink density (between the rule's lightest and heaviest), its own
     wetness (up to the material's high end) and its own weighing. A cell's draws depend only on
-    the seed, the size and the volume.
+    the seed, the size and the volume. `noise` is the camera's; without it the camera is exact.
     """
     rule = policy.rule
     cells = []
@@ -67,7 +68,12 @@ def misbin_grid(
                 density = rng.uniform(rule.min_density_g_per_ml, rule.max_density_g_per_ml)
                 wet_g = rng.uniform(material.wet_g.lo, material.wet_g.hi)
                 gross = bottle.empty_mass_kg + (volume * density + wet_g) * GRAM
-                verdict = policy.decide(exact_perception(bottle, volume), sensor.weigh(gross))
+                seen = (
+                    exact_perception(bottle, volume)
+                    if noise is None
+                    else perceive(bottle, volume, noise, rng)
+                )
+                verdict = policy.decide(seen, sensor.weigh(gross))
                 binned += verdict.action == BIN
                 decided_by[verdict.decided_by] += 1
                 if verdict.zone is not None:

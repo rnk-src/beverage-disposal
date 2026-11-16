@@ -2,7 +2,8 @@
 
     uv run python scripts/run_emptiness_grid.py --policy rule-only --trials 1000
 
-Decision level only: bottles are drawn, weighed on the pad model and judged; no arm moves. The
+Decision level only: bottles are drawn, weighed on the pad model, seen through the camera noise
+model and judged; no arm moves. The
 sizes default to every size the arm can reach, whether or not its grasp gate has passed, so the
 file says which of them are supported.
 """
@@ -17,6 +18,7 @@ from beverage_disposal.core.bottle_family import load_family
 from beverage_disposal.core.emptiness_eval import misbin_grid
 from beverage_disposal.core.fullness_config import load_fullness_config
 from beverage_disposal.core.materials import load_materials
+from beverage_disposal.core.perception import load_perception_noise
 from beverage_disposal.core.policy import EmptinessPolicy, load_policy_config
 from beverage_disposal.sim.harness import provenance
 
@@ -35,6 +37,9 @@ def main(argv):
     parser.add_argument("--volumes", type=float, nargs="+", default=list(DEFAULT_VOLUMES))
     parser.add_argument("--trials", type=int, default=1000)
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument(
+        "--exact-camera", action="store_true", help="skip the camera noise of perception.toml"
+    )
     parser.add_argument("--out", type=Path, default=None)
     args = parser.parse_args(argv)
 
@@ -42,6 +47,7 @@ def main(argv):
     family = load_family(CONFIGS / "bottles.toml")
     pet = load_materials(CONFIGS / "materials.toml")["PET"]
     config = load_policy_config(CONFIGS / "policy.toml")
+    noise = None if args.exact_camera else load_perception_noise(CONFIGS / "perception.toml")
     policy = EmptinessPolicy(fullness.rule, pet, family, config, sizes=tuple(args.sizes))
     cells = misbin_grid(
         policy,
@@ -52,14 +58,16 @@ def main(argv):
         volumes_ml=tuple(args.volumes),
         trials=args.trials,
         seed=args.seed,
+        noise=noise,
     )
     results = {
         "policy": args.policy,
         "level": "decision only: no arm, no physics",
         "grasp_gate_passed": {size: size in family.supported() for size in args.sizes},
+        "camera": "exact" if noise is None else "noisy (perception.toml)",
         "seed": args.seed,
         "cells": [dataclasses.asdict(cell) for cell in cells],
-        "provenance": provenance(fullness, family, pet, config),
+        "provenance": provenance(fullness, family, pet, config, noise),
     }
     out = args.out or ROOT / "runs" / f"emptiness_{args.policy.replace('-', '_')}.json"
     out.parent.mkdir(parents=True, exist_ok=True)

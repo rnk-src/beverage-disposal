@@ -140,8 +140,18 @@ simulation with statistics, 2 = a real arm, 3 = wider containers and more sensor
   them. In simulation, decision level, rule-only, exact perception, 1000 bottles per cell (`runs/emptiness_rule_only_all.json`):
   0 of 1000 binned at each of 29, 30, 31, 35 and 50 mL for all six sizes (Wilson 95 % upper bound 0.383 %); empties binned
   1000, 1000, 983, 646, 434 and 330 of 1000 for 250, 330, 500, 1000, 1500 and 2000 mL, which is the classifier's target.
+- **Iteration 2B, 2B.6 built (2026-11-16): the perception noise model.** `configs/perception.toml` (all assumed, pessimistic)
+  and `perceive` in `core/perception.py`: each length gets a 2 mm random error and one shared bias of up to 1 mm per look, and
+  is reported as an interval of the estimate plus and minus 4 sigma and the bias; the level is missing on a 10 % dropout and
+  behind a label (30 to 70 % of the body height); cap and base are misread at 5 and 10 %; a crushed bottle is seen with a three
+  times wider width interval and confidence 0.4, under the policy's minimum. The sequencer judges a bottle on this look and
+  gives the supervisor the grasp width as the camera's interval; the decision grid uses it too. In simulation, decision level,
+  rule-only, noisy camera, 1000 bottles per cell (`runs/emptiness_rule_only_noisy_all.json`): 0 of 1000 binned at each of 29,
+  30, 31, 35 and 50 mL for all six sizes (Wilson 95 % upper bound 0.383 %); empties binned 1000, 1000, 968, 591, 376 and 315
+  of 1000 for 250 to 2000 mL. The owner asked on 2026-11-16 for the whole 2B plan to be finished, so 2B.7 to 2B.12 follow
+  now, not after 4.5.
 - Iterations 3 to 9 and the rest of iteration 2B are planned in detail down to sub-iterations (see Roadmap).
-- Last updated: 2026-11-16 (2B.5 bounds, zones and the rule-only policy). Update this section in the same change as every sub-iteration.
+- Last updated: 2026-11-16 (2B.6 perception noise model). Update this section in the same change as every sub-iteration.
 
 ## Locked decisions
 
@@ -462,7 +472,7 @@ uv run python scripts/run_acceptance.py --trials 381   # sequencer grid in simul
 uv run python scripts/record_demo.py                   # GIF of one container through the sequencer, runs/demo.gif
 uv run python scripts/check_bottle_reach.py             # per bottle size: the steepest pitch that reaches each pose of a neck grasp
 uv run python scripts/run_neck_gate.py                  # the grasp gate per size, fill and grasp mode, writes runs/neck_gate.json (about 10 min)
-uv run python scripts/run_emptiness_grid.py --trials 1000  # the emptiness policy over sizes and volumes, decision level, writes runs/emptiness_rule_only.json
+uv run python scripts/run_emptiness_grid.py --trials 1000  # the emptiness policy over sizes and volumes, decision level, noisy camera, writes runs/emptiness_rule_only.json
 uv run python scripts/measure_actuators.py         # re-measure the servo step responses (configs/actuator_step_response.json)
 uv run pytest tests/gazebo   # Gazebo image tests: need a running Docker daemon, else they skip
 ```
@@ -486,7 +496,7 @@ src/beverage_disposal/   Python package (placeholder name)
   core/                    the ROS-free core (no MuJoCo): sequencer.py (weigh on the pad, decide, carry once), acceptance.py (results summary), supervisor.py (safety checks and indicators), supervised.py (a controller
                            under the supervisor), safety_config.py,
                            pad.py (weighing pad model), fullness.py (the weight rule),
-                           fullness_eval.py (Monte Carlo and sweeps), perception.py (what the camera reports about a bottle), bounds.py (empty-mass bounds of a PET bottle), zones.py (liquid interval and zone from a weight), policy.py (the emptiness policy: vetoes, then zones), emptiness_eval.py (its decision-level Monte Carlo), fullness_config.py, statistics.py (Wilson bounds), registry.py (container types as data, enrolment), materials.py (material constants as ranges with sources), bottles.py (a bottle's shape: areas, shell mass, capacity, liquid level and centroid), bottle_family.py (PET size classes as ranges, the seeded sampler, a bottle as a container spec and a scene), trajectory.py and task_tests.py (an episode record and the
+                           fullness_eval.py (Monte Carlo and sweeps), perception.py (what the camera reports about a bottle, and the simulated camera's noise), bounds.py (empty-mass bounds of a PET bottle), zones.py (liquid interval and zone from a weight), policy.py (the emptiness policy: vetoes, then zones), emptiness_eval.py (its decision-level Monte Carlo), fullness_config.py, statistics.py (Wilson bounds), registry.py (container types as data, enrolment), materials.py (material constants as ranges with sources), bottles.py (a bottle's shape: areas, shell mass, capacity, liquid level and centroid), bottle_family.py (PET size classes as ranges, the seeded sampler, a bottle as a container spec and a scene), trajectory.py and task_tests.py (an episode record and the
                            task's pass-fail and indicative functions), interfaces.py (Observation, Controller, noise), scripted.py
                            (the scripted pick-and-place), baselines.py (random policy); config.py (frozen scene dataclasses read from TOML),
                            containers.py (ContainerSpec, provenance, liquid mass), layout.py (footprints, spawn sampler, set-aside test),
@@ -514,7 +524,7 @@ tests/                   pytest tests (fast/medium/slow tiers), one folder per a
   sequencer/               the sequencer (ideal and simulated skill), the results summary, the harness and the demo recorder
   safety/                  the supervisor's checks with near-misses, the indicators and faults injected into an episode
   fullness/                the pad model, the weight rule, the Wilson bound and the false-bin Monte Carlo
-  perception/              the perception record, the exact perception and size-class matching
+  perception/              the perception record, the exact perception, size-class matching and the camera noise model
   bounds/                  the empty-mass bounds against drawn bottles and a hand example
   zones/                   the liquid interval and the zone edges, with an exhaustive grid
   policy/                  the emptiness policy's vetoes, order and zones, and its decision-level grid
@@ -532,7 +542,7 @@ tests/                   pytest tests (fast/medium/slow tiers), one folder per a
                            damaged-copy and mutated-package harnesses); no tests
   conftest.py              tier hook and shared fixtures
 assets/                  vendored third-party files with provenance (the SO-101 model)
-configs/                 configs (scene.toml, containers.toml, materials.toml, bottles.toml, gate.toml, fullness.toml, policy.toml, safety.toml; training later) and the stored actuator step-response reference (JSON)
+configs/                 configs (scene.toml, containers.toml, materials.toml, bottles.toml, gate.toml, fullness.toml, policy.toml, perception.toml, safety.toml; training later) and the stored actuator step-response reference (JSON)
 scripts/                 helper scripts (view_so101.py, generate_so101_chain.py, measure_actuators.py, run_acceptance.py, record_demo.py,
                          check_bottle_reach.py, run_neck_gate.py, run_emptiness_grid.py)
 pyproject.toml  uv.lock  .python-version   uv project, exact lockfile, pinned Python
