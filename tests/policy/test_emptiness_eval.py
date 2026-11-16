@@ -2,12 +2,14 @@
 
 import dataclasses
 
+import numpy as np
 import pytest
 from support.paths import ROOT
 from test_policy import ALL_SIZES, CONFIG, FAMILY, PET, POLICY, RULE
 
-from beverage_disposal.core.emptiness_eval import misbin_grid
+from beverage_disposal.core.emptiness_eval import draw_case, misbin_grid
 from beverage_disposal.core.fullness_config import load_fullness_config
+from beverage_disposal.core.pad import PadSensor
 from beverage_disposal.core.perception import load_perception_noise
 from beverage_disposal.core.policy import EmptinessPolicy
 from beverage_disposal.core.statistics import wilson_upper
@@ -152,3 +154,24 @@ def test_a_wider_reported_interval_never_bins_more():
 def test_no_500_ml_bottle_holding_30_ml_is_binned_in_400_trials_with_a_noisy_camera():
     cell = noisy(volumes_ml=(30.0,), trials=400)[0]
     assert cell.binned == 0 and cell.upper_95 < 0.01
+
+
+def case(noise=NOISE, **options):
+    rng = np.random.default_rng(0)
+    return draw_case(POLICY, PadSensor(PAD, rng), noise, "pet_500ml", 0.0, rng, **options)
+
+
+def test_a_foreign_object_is_on_the_scale_but_the_level_stays_that_of_the_liquid():
+    plain, loaded = case(), case(foreign_g=50.0)
+    # The same bottle, drink and look (the same stream); only the scale differs, by the object.
+    assert loaded.bottle == plain.bottle and loaded.perception == plain.perception
+    assert (loaded.weighing.mass_kg - plain.weighing.mass_kg) * 1000 == pytest.approx(
+        50.0, abs=1e-6
+    )
+
+
+def test_a_crushed_bottle_is_seen_as_one_and_needs_the_noise_model():
+    assert case().perception.confidence == 1.0
+    assert case(deformed=True).perception.confidence == pytest.approx(0.4)
+    with pytest.raises(ValueError, match="noise"):
+        case(noise=None, deformed=True)

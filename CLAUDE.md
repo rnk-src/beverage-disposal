@@ -150,8 +150,15 @@ simulation with statistics, 2 = a real arm, 3 = wider containers and more sensor
   30, 31, 35 and 50 mL for all six sizes (Wilson 95 % upper bound 0.383 %); empties binned 1000, 1000, 968, 591, 376 and 315
   of 1000 for 250 to 2000 mL. The owner asked on 2026-11-16 for the whole 2B plan to be finished, so 2B.7 to 2B.12 follow
   now, not after 4.5.
+- **Iteration 2B, 2B.7 built (2026-11-16): features and dataset.** `core/features.py` (a fixed-order vector of 20 base
+  features and one flag per size class, made only from the camera's look, the pad weight and the bounds; the level's volume is
+  missing, not zero, when the level is unseen). `EmptinessPolicy.assess` exposes what a verdict is made from, and a new veto,
+  `inconsistent_weight_and_level` (the weight proves over 20 mL more than the seen level can stand for, slack assumed), sets
+  aside a bottle with something solid inside; an object too light to show stays a stated blind spot. `train/emptiness/dataset.py`
+  (a new `train` package, outside the core) draws labelled rows: a mixture around the threshold for fitting and testing, and
+  ambiguous-zone rows per size and volume cell for calibration, from seed streams that share no bottle between splits.
 - Iterations 3 to 9 and the rest of iteration 2B are planned in detail down to sub-iterations (see Roadmap).
-- Last updated: 2026-11-16 (2B.6 perception noise model). Update this section in the same change as every sub-iteration.
+- Last updated: 2026-11-16 (2B.7 features and dataset). Update this section in the same change as every sub-iteration.
 
 ## Locked decisions
 
@@ -496,13 +503,15 @@ src/beverage_disposal/   Python package (placeholder name)
   core/                    the ROS-free core (no MuJoCo): sequencer.py (weigh on the pad, decide, carry once), acceptance.py (results summary), supervisor.py (safety checks and indicators), supervised.py (a controller
                            under the supervisor), safety_config.py,
                            pad.py (weighing pad model), fullness.py (the weight rule),
-                           fullness_eval.py (Monte Carlo and sweeps), perception.py (what the camera reports about a bottle, and the simulated camera's noise), bounds.py (empty-mass bounds of a PET bottle), zones.py (liquid interval and zone from a weight), policy.py (the emptiness policy: vetoes, then zones), emptiness_eval.py (its decision-level Monte Carlo), fullness_config.py, statistics.py (Wilson bounds), registry.py (container types as data, enrolment), materials.py (material constants as ranges with sources), bottles.py (a bottle's shape: areas, shell mass, capacity, liquid level and centroid), bottle_family.py (PET size classes as ranges, the seeded sampler, a bottle as a container spec and a scene), trajectory.py and task_tests.py (an episode record and the
+                           fullness_eval.py (Monte Carlo and sweeps), perception.py (what the camera reports about a bottle, and the simulated camera's noise), bounds.py (empty-mass bounds of a PET bottle), zones.py (liquid interval and zone from a weight), policy.py (the emptiness policy: vetoes, then zones), emptiness_eval.py (its decision-level Monte Carlo), features.py (the classifier's feature vector), fullness_config.py, statistics.py (Wilson bounds), registry.py (container types as data, enrolment), materials.py (material constants as ranges with sources), bottles.py (a bottle's shape: areas, shell mass, capacity, liquid level and centroid), bottle_family.py (PET size classes as ranges, the seeded sampler, a bottle as a container spec and a scene), trajectory.py and task_tests.py (an episode record and the
                            task's pass-fail and indicative functions), interfaces.py (Observation, Controller, noise), scripted.py
                            (the scripted pick-and-place), baselines.py (random policy); config.py (frozen scene dataclasses read from TOML),
                            containers.py (ContainerSpec, provenance, liquid mass), layout.py (footprints, spawn sampler, set-aside test),
                            reach.py (reach check of the layout); kinematics.py (FK, Jacobian, pitch) and
                            so101_chain.json, the generated, frozen robot spec it reads; ik.py (solve_ik);
                            controller.py (EEDeltaController); step_response.py (rise, overshoot, settling); gate.py (the grasp gate's bar, slip and swing measurements)
+  train/                   training code, never imported by the core: emptiness/dataset.py (simulated labelled bottles for the
+                           emptiness classifier)
   sim/                     the MuJoCo side: arm.py loads the vendored arm and adds the TCP site; scene.py (table, bin, pad, set-aside
                            marker, container and the arm in one model); bottle.py (a PET bottle as geoms with the liquid welded in); pads.py (the gripper's two collision pads);
                            grasp.py (prescribed grasp); neck_gate.py (seeded gate carries of a bottle from the pad); skills.py (the scripted skill as the sequencer calls it), harness.py (seeded grid and results record), demo.py (GIF frames); rollout.py (one judged episode); recorder.py (an episode as a Trajectory); loop.py
@@ -528,6 +537,8 @@ tests/                   pytest tests (fast/medium/slow tiers), one folder per a
   bounds/                  the empty-mass bounds against drawn bottles and a hand example
   zones/                   the liquid interval and the zone edges, with an exhaustive grid
   policy/                  the emptiness policy's vetoes, order and zones, and its decision-level grid
+  features/                the classifier's feature vector, by hand
+  train/                   the classifier's dataset: labels, seeds, disjoint splits, calibration cells
   materials/               the material table: ranges with sources, the bounds' safe ends
   bottles/                 bottle geometry against closed forms: areas, shell mass, capacity, liquid level, centroid
   bottle_family/           the size classes' file, the sampler's ranges and capacities, the container spec and scene
