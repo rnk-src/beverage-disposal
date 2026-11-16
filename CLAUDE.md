@@ -157,8 +157,15 @@ simulation with statistics, 2 = a real arm, 3 = wider containers and more sensor
   aside a bottle with something solid inside; an object too light to show stays a stated blind spot. `train/emptiness/dataset.py`
   (a new `train` package, outside the core) draws labelled rows: a mixture around the threshold for fitting and testing, and
   ambiguous-zone rows per size and volume cell for calibration, from seed streams that share no bottle between splits.
+- **Iteration 2B, 2B.8 built (2026-11-16): the classifier.** scikit-learn 1.9.1 is a runtime dependency, imported only under
+  `train/` (a test imports the core with it blocked). `core/classifier.py` holds what the policy needs with no learning
+  library: the `EmptinessModel` protocol (a score, higher is emptier), `FeatureRanges` (the in-distribution check: every feature
+  inside the span of the training rows, a missing value only where missing is ordinary) and `ModelBundle`.
+  `train/emptiness/fit.py` fits histogram gradient-boosted trees on the surely-under and ambiguous rows, the same rows giving
+  the same model; `train/emptiness/bundle.py` saves the pickled model with thresholds, ranges, names and a checksum, and refuses
+  a changed file, another scikit-learn version or other feature names on load (a bundle is trusted input: load only our own).
 - Iterations 3 to 9 and the rest of iteration 2B are planned in detail down to sub-iterations (see Roadmap).
-- Last updated: 2026-11-16 (2B.7 features and dataset). Update this section in the same change as every sub-iteration.
+- Last updated: 2026-11-16 (2B.8 classifier). Update this section in the same change as every sub-iteration.
 
 ## Locked decisions
 
@@ -180,7 +187,8 @@ Each label is a stable name; the owner's private decision journal uses the same 
   versions in `uv.lock`, hatchling build backend, src layout), pytest with fast/medium/slow
   tiers, hypothesis, ruff (rules E, F, I, UP, B; 100 columns) and pre-commit.
   Versions locked 2026-09-24: mujoco 3.14.0, numpy 2.5.3, gymnasium 1.3.0, pytest 9.1.1,
-  hypothesis 6.168.1, ruff 0.16.9, pre-commit 4.6.2; mink 1.3.0 added in 1.4.
+  hypothesis 6.168.1, ruff 0.16.9, pre-commit 4.6.2; mink 1.3.0 added in 1.4;
+  scikit-learn 1.9.1 added in 2B.8 (the emptiness classifier; used only under `train/`).
 - **Arm model:** official SO-101 MJCF/URDF (TheRobotStudio/SO-ARM100, "new" calibration),
   vendored untouched under `assets/so101/` with a provenance file (upstream commit
   `5f6d2b876a53a4872e405b991dd925556c9e38a4`, file checksums) and a NOTICE. Those files stay under
@@ -485,7 +493,7 @@ uv run pytest tests/gazebo   # Gazebo image tests: need a running Docker daemon,
 ```
 
 Dependencies: ranges in `pyproject.toml`, exact versions in `uv.lock`. Runtime: `mujoco`,
-`numpy`, `gymnasium`. Dev group: `pytest`, `hypothesis`, `packaging`, `ruff`, `pre-commit`,
+`numpy`, `gymnasium`, `scikit-learn` (the emptiness classifier, imported only under `train/`). Dev group: `pytest`, `hypothesis`, `packaging`, `ruff`, `pre-commit`,
 `pillow`, `mypy` (types of `core/`, run by `make check`), `mink` (the IK oracle of 1.4; it pulls in `qpsolvers`, `daqp` and `scipy`). A test
 fails if the installed environment drifts from `uv.lock`, and another fails if the "Versions
 locked" sentence above disagrees with it, so update both together when a dependency changes. To add or upgrade a dependency, edit `pyproject.toml`, run
@@ -503,7 +511,7 @@ src/beverage_disposal/   Python package (placeholder name)
   core/                    the ROS-free core (no MuJoCo): sequencer.py (weigh on the pad, decide, carry once), acceptance.py (results summary), supervisor.py (safety checks and indicators), supervised.py (a controller
                            under the supervisor), safety_config.py,
                            pad.py (weighing pad model), fullness.py (the weight rule),
-                           fullness_eval.py (Monte Carlo and sweeps), perception.py (what the camera reports about a bottle, and the simulated camera's noise), bounds.py (empty-mass bounds of a PET bottle), zones.py (liquid interval and zone from a weight), policy.py (the emptiness policy: vetoes, then zones), emptiness_eval.py (its decision-level Monte Carlo), features.py (the classifier's feature vector), fullness_config.py, statistics.py (Wilson bounds), registry.py (container types as data, enrolment), materials.py (material constants as ranges with sources), bottles.py (a bottle's shape: areas, shell mass, capacity, liquid level and centroid), bottle_family.py (PET size classes as ranges, the seeded sampler, a bottle as a container spec and a scene), trajectory.py and task_tests.py (an episode record and the
+                           fullness_eval.py (Monte Carlo and sweeps), perception.py (what the camera reports about a bottle, and the simulated camera's noise), bounds.py (empty-mass bounds of a PET bottle), zones.py (liquid interval and zone from a weight), policy.py (the emptiness policy: vetoes, then zones), emptiness_eval.py (its decision-level Monte Carlo), features.py (the classifier's feature vector), classifier.py (the model protocol, the in-distribution check and the bundle), fullness_config.py, statistics.py (Wilson bounds), registry.py (container types as data, enrolment), materials.py (material constants as ranges with sources), bottles.py (a bottle's shape: areas, shell mass, capacity, liquid level and centroid), bottle_family.py (PET size classes as ranges, the seeded sampler, a bottle as a container spec and a scene), trajectory.py and task_tests.py (an episode record and the
                            task's pass-fail and indicative functions), interfaces.py (Observation, Controller, noise), scripted.py
                            (the scripted pick-and-place), baselines.py (random policy); config.py (frozen scene dataclasses read from TOML),
                            containers.py (ContainerSpec, provenance, liquid mass), layout.py (footprints, spawn sampler, set-aside test),
@@ -511,7 +519,7 @@ src/beverage_disposal/   Python package (placeholder name)
                            so101_chain.json, the generated, frozen robot spec it reads; ik.py (solve_ik);
                            controller.py (EEDeltaController); step_response.py (rise, overshoot, settling); gate.py (the grasp gate's bar, slip and swing measurements)
   train/                   training code, never imported by the core: emptiness/dataset.py (simulated labelled bottles for the
-                           emptiness classifier)
+                           emptiness classifier), sklearn_model.py, fit.py and bundle.py (the scikit-learn model, its fit and its saved bundle)
   sim/                     the MuJoCo side: arm.py loads the vendored arm and adds the TCP site; scene.py (table, bin, pad, set-aside
                            marker, container and the arm in one model); bottle.py (a PET bottle as geoms with the liquid welded in); pads.py (the gripper's two collision pads);
                            grasp.py (prescribed grasp); neck_gate.py (seeded gate carries of a bottle from the pad); skills.py (the scripted skill as the sequencer calls it), harness.py (seeded grid and results record), demo.py (GIF frames); rollout.py (one judged episode); recorder.py (an episode as a Trajectory); loop.py
@@ -538,7 +546,8 @@ tests/                   pytest tests (fast/medium/slow tiers), one folder per a
   zones/                   the liquid interval and the zone edges, with an exhaustive grid
   policy/                  the emptiness policy's vetoes, order and zones, and its decision-level grid
   features/                the classifier's feature vector, by hand
-  train/                   the classifier's dataset: labels, seeds, disjoint splits, calibration cells
+  train/                   the classifier's dataset (labels, seeds, disjoint splits, calibration cells), the range check, the fit
+                           and the saved bundle
   materials/               the material table: ranges with sources, the bounds' safe ends
   bottles/                 bottle geometry against closed forms: areas, shell mass, capacity, liquid level, centroid
   bottle_family/           the size classes' file, the sampler's ranges and capacities, the container spec and scene
