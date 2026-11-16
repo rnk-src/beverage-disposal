@@ -1,18 +1,22 @@
-"""The emptiness policy for PET bottles: hard vetoes, then the physics zones.
+"""The emptiness policy for PET bottles: hard vetoes, then the physics zones, then the classifier.
 
-Rule-only for now: a bottle is binned only when its weight proves it holds under the threshold.
-The classifier that may overturn the ambiguous zone comes later; without it that zone is set aside.
+Without a bundle the policy is rule-only: a bottle is binned only when its weight proves it holds
+under the threshold. With one, the classifier may veto that bin, and may bin a bottle of the
+ambiguous zone whose score beats its size's calibrated threshold. It never touches a bottle whose
+weight proves the threshold or more.
 """
 
 import dataclasses
+import math
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
 from beverage_disposal.core.bottle_family import BottleFamily, classes_matching
 from beverage_disposal.core.bounds import EmptyMassBounds, empty_mass_bounds
+from beverage_disposal.core.classifier import ModelBundle
 from beverage_disposal.core.config import from_mapping
-from beverage_disposal.core.features import level_volume_bounds_ml
+from beverage_disposal.core.features import feature_vector, level_volume_bounds_ml
 from beverage_disposal.core.fullness import BIN, SET_ASIDE, Verdict
 from beverage_disposal.core.fullness_config import RuleConfig
 from beverage_disposal.core.materials import MaterialSpec
@@ -47,6 +51,7 @@ class EmptinessPolicy:
     config: PolicyConfig
     # The sizes the policy acts on; None means the sizes whose grasp gate passed.
     sizes: tuple[str, ...] | None = None
+    bundle: ModelBundle | None = None  # the classifier; None is the rule-only policy
 
     def supported(self) -> tuple[str, ...]:
         return self.family.supported() if self.sizes is None else self.sizes
@@ -87,13 +92,48 @@ class EmptinessPolicy:
         found = self.assess(perception, weighing)
         if found.veto is not None:
             return found.veto
-        assert found.zone is not None
-        action, reason = {
-            Zone.SURELY_UNDER: (BIN, "the weight proves it holds under the threshold"),
-            Zone.SURELY_OVER: (SET_ASIDE, "the weight proves it holds the threshold or more"),
-            Zone.AMBIGUOUS: (SET_ASIDE, "the weight cannot tell"),
-        }[found.zone]
-        return Verdict(action, reason, None, zone=found.zone.value, bounds_ml=found.v_bounds)
+        assert found.zone is not None and found.bounds is not None and found.v_bounds is not None
+        zone = found.zone
+
+        def verdict(action: str, reason: str, by: str = "rule", score: float | None = None):
+            return Verdict(
+                action,
+                reason,
+                None,
+                zone.value,
+                decided_by=by,
+                score=score,
+                bounds_ml=found.v_bounds,
+            )
+
+        if zone is Zone.SURELY_OVER:
+            return verdict(SET_ASIDE, "the weight proves it holds the threshold or more")
+        if self.bundle is None:
+            if zone is Zone.SURELY_UNDER:
+                return verdict(BIN, "the weight proves it holds under the threshold")
+            return verdict(SET_ASIDE, "the weight cannot tell")
+
+        x = feature_vector(
+            perception, weighing, found.bounds, found.v_bounds, self.family, self.material
+        )
+        if not self.bundle.ranges.in_distribution(x):
+            return _veto("out_of_distribution", "unlike any bottle the classifier was trained on")
+        try:
+            score = float(self.bundle.model.score(x))
+        except Exception as error:  # a broken model must never bin, whatever it raises
+            return _veto("model_error", f"the classifier failed: {error}")
+        if math.isnan(score):
+            return _veto("model_error", "the classifier gave no score")
+
+        if zone is Zone.SURELY_UNDER:
+            if score < self.config.veto_score:
+                return verdict(SET_ASIDE, "the classifier doubts it is empty", "classifier", score)
+            return verdict(BIN, "the weight proves it holds under the threshold", score=score)
+        # Ambiguous: a size with no threshold has an infinite one.
+        tau = self.bundle.tau_by_size.get(found.matches[0], math.inf)
+        if self.config.allow_overturn and len(found.matches) == 1 and score > tau:
+            return verdict(BIN, "the classifier is sure it is empty", "classifier", score)
+        return verdict(SET_ASIDE, "the weight cannot tell", score=score)
 
 
 @dataclass(frozen=True)
