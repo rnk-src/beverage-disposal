@@ -11,6 +11,7 @@ from beverage_disposal.core.fullness_config import load_fullness_config
 from beverage_disposal.core.layout import goals
 from beverage_disposal.core.materials import load_materials
 from beverage_disposal.core.pad import PadSensor
+from beverage_disposal.core.perception import load_perception_noise
 from beverage_disposal.core.policy import EmptinessPolicy, load_policy_config
 from beverage_disposal.core.registry import load_registry
 from beverage_disposal.core.safety_config import load_safety_limits
@@ -35,6 +36,7 @@ CAN = REGISTRY.lookup("can_12floz")
 BOTTLE = REGISTRY.lookup("bottle_500ml")
 FAMILY = load_family(CONFIGS / "bottles.toml")
 POLICY_CONFIG = load_policy_config(CONFIGS / "policy.toml")
+NOISE = load_perception_noise(CONFIGS / "perception.toml")
 PET = load_materials(CONFIGS / "materials.toml")["PET"]
 GOALS = goals(SCENE)
 
@@ -65,7 +67,7 @@ def item(record=CAN, volume_ml=0.0, density=1.0, known=True, **changes):
     return dataclasses.replace(base, **changes)
 
 
-def sequencer(skill=None, *, registry=REGISTRY, seed=0, policy=None):
+def sequencer(skill=None, *, registry=REGISTRY, seed=0, policy=None, noise=None):
     skill = skill or RecordingSkill()
     indicators = RecordingIndicators()
     rng = np.random.default_rng(seed)
@@ -77,6 +79,7 @@ def sequencer(skill=None, *, registry=REGISTRY, seed=0, policy=None):
         skill=skill,
         pad=PadSensor(FULLNESS.pad, rng),
         policy=policy,
+        perception_noise=noise,
     )
     return machine, skill, indicators
 
@@ -255,3 +258,30 @@ def test_the_policy_does_not_touch_a_can_or_an_unknown_container_that_is_not_pet
     assert machine.process(item(volume_ml=0.0), seed=0).verdict.decided_by == "rule"
     unknown = machine.process(item(known=False, volume_ml=0.0), seed=0)
     assert unknown.verdict.reason == "unknown container type"
+
+
+def test_with_camera_noise_the_bottle_is_judged_on_what_the_camera_reports():
+    def most_liquid(noise):
+        machine, _, _ = sequencer(policy=policy(), noise=noise)
+        return machine.process(pet_item(volume_ml=0.0), seed=0).verdict.bounds_ml[1]
+
+    # The wider the camera's intervals, the lighter the bottle may be and the more it may hold.
+    vague = dataclasses.replace(NOISE, interval_k=10.0)
+    assert most_liquid(None) < most_liquid(NOISE) < most_liquid(vague)
+
+
+def test_the_supervisor_gets_the_grasp_width_the_camera_reports_as_an_interval():
+    # A 26 mm neck seen with +-81 mm may be far too wide for the pads: stop before any lift.
+    blind = dataclasses.replace(NOISE, interval_k=40.0)
+    machine, skill, _ = sequencer(policy=policy(), noise=blind)
+    run = machine.process(pet_item(volume_ml=0.0), seed=0)
+    assert run.destination == STOPPED and skill.calls == []
+    assert run.events[0].code == "too_wide"
+
+
+def test_the_cameras_look_follows_the_seed():
+    def bounds(seed):
+        machine, _, _ = sequencer(policy=policy(), noise=NOISE)
+        return machine.process(pet_item(volume_ml=0.0), seed=seed).verdict.bounds_ml
+
+    assert bounds(1) == bounds(1) and bounds(1) != bounds(2)
