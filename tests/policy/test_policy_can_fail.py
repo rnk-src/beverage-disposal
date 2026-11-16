@@ -117,8 +117,8 @@ def bin_the_ambiguous_zone(package):
     edit(
         package,
         POLICY,
-        'Zone.AMBIGUOUS: (SET_ASIDE, "the weight cannot tell")',
-        'Zone.AMBIGUOUS: (BIN, "the weight cannot tell")',
+        'return verdict(SET_ASIDE, "the weight cannot tell")',
+        'return verdict(BIN, "the weight cannot tell")',
     )
 
 

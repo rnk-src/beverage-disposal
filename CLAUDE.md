@@ -172,8 +172,21 @@ simulation with statistics, 2 = a real arm, 3 = wider containers and more sensor
   calibrate gets an infinite threshold. Run of 2026-11-16, seed 0, 239 998 training bottles, 598 ambiguous calibration
   bottles in each of the 24 cells: thresholds 0.934, 0.997, 0.970, 0.969, 0.911 and 0.935 for 250 to 2000 mL. With exactly 598
   rows a threshold is the largest score of its cell, so it moves with the seed.
+- **Iteration 2B, 2B.10 built (2026-11-16): the full policy.** `EmptinessPolicy` takes an optional `bundle`; without one
+  it is the rule-only policy, unchanged. With one, after the vetoes: a surely-over bottle is set aside and the model is not
+  asked; otherwise the features are made once, a bottle outside the training ranges is vetoed (`out_of_distribution`), and a
+  model that raises or scores NaN is vetoed (`model_error`). In the surely-under zone a score under `veto_score` sets the
+  bottle aside (`classifier`), else the rule bins. In the ambiguous zone the classifier bins only if `allow_overturn` is
+  set, exactly one size matches and the score is strictly over that size's threshold; a size without a threshold is never
+  overturned. Tested with hypothesis properties over drawn bottles and arbitrary scores (no classifier changes a veto or the
+  surely-over zone; a bin in the ambiguous zone passed every gate; in the surely-under zone a classifier only turns a bin
+  into a set-aside) and with adversarial models calibrated like a real one: always-empty and always-full never beat their
+  own threshold, a random and an inverted model binned at most 3 of 400 ambiguous 2 L bottles of 35 mL. Measured on 30 000
+  held-out bottles with the seed-0 bundle: every surely-under bottle scored 0.965 or more, so `veto_score` 0.5 (assumed)
+  vetoes none; 3 of 24 235 ambiguous bottles were outside the training ranges. Not wired yet: the sequencer and the grid
+  still build the rule-only policy (2B.11).
 - Iterations 3 to 9 and the rest of iteration 2B are planned in detail down to sub-iterations (see Roadmap).
-- Last updated: 2026-11-16 (2B.9 Neyman-Pearson calibration). Update this section in the same change as every sub-iteration.
+- Last updated: 2026-11-16 (2B.10 the full policy). Update this section in the same change as every sub-iteration.
 
 ## Locked decisions
 
@@ -520,7 +533,7 @@ src/beverage_disposal/   Python package (placeholder name)
   core/                    the ROS-free core (no MuJoCo): sequencer.py (weigh on the pad, decide, carry once), acceptance.py (results summary), supervisor.py (safety checks and indicators), supervised.py (a controller
                            under the supervisor), safety_config.py,
                            pad.py (weighing pad model), fullness.py (the weight rule),
-                           fullness_eval.py (Monte Carlo and sweeps), perception.py (what the camera reports about a bottle, and the simulated camera's noise), bounds.py (empty-mass bounds of a PET bottle), zones.py (liquid interval and zone from a weight), policy.py (the emptiness policy: vetoes, then zones), emptiness_eval.py (its decision-level Monte Carlo), features.py (the classifier's feature vector), classifier.py (the model protocol, the in-distribution check and the bundle), np_calibration.py (the Neyman-Pearson threshold), fullness_config.py, statistics.py (Wilson bounds), registry.py (container types as data, enrolment), materials.py (material constants as ranges with sources), bottles.py (a bottle's shape: areas, shell mass, capacity, liquid level and centroid), bottle_family.py (PET size classes as ranges, the seeded sampler, a bottle as a container spec and a scene), trajectory.py and task_tests.py (an episode record and the
+                           fullness_eval.py (Monte Carlo and sweeps), perception.py (what the camera reports about a bottle, and the simulated camera's noise), bounds.py (empty-mass bounds of a PET bottle), zones.py (liquid interval and zone from a weight), policy.py (the emptiness policy: vetoes, then zones, then the classifier when a bundle is given), emptiness_eval.py (its decision-level Monte Carlo), features.py (the classifier's feature vector), classifier.py (the model protocol, the in-distribution check and the bundle), np_calibration.py (the Neyman-Pearson threshold), fullness_config.py, statistics.py (Wilson bounds), registry.py (container types as data, enrolment), materials.py (material constants as ranges with sources), bottles.py (a bottle's shape: areas, shell mass, capacity, liquid level and centroid), bottle_family.py (PET size classes as ranges, the seeded sampler, a bottle as a container spec and a scene), trajectory.py and task_tests.py (an episode record and the
                            task's pass-fail and indicative functions), interfaces.py (Observation, Controller, noise), scripted.py
                            (the scripted pick-and-place), baselines.py (random policy); config.py (frozen scene dataclasses read from TOML),
                            containers.py (ContainerSpec, provenance, liquid mass), layout.py (footprints, spawn sampler, set-aside test),
@@ -553,7 +566,7 @@ tests/                   pytest tests (fast/medium/slow tiers), one folder per a
   perception/              the perception record, the exact perception, size-class matching and the camera noise model
   bounds/                  the empty-mass bounds against drawn bottles and a hand example
   zones/                   the liquid interval and the zone edges, with an exhaustive grid
-  policy/                  the emptiness policy's vetoes, order and zones, and its decision-level grid
+  policy/                  the emptiness policy's vetoes, order and zones, the full policy with a classifier, and its decision-level grid
   npcal/                   the Neyman-Pearson sample size, violation probability and threshold, per cell and per size
   features/                the classifier's feature vector, by hand
   train/                   the classifier's dataset (labels, seeds, disjoint splits, calibration cells), the range check, the fit
