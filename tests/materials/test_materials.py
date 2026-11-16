@@ -6,7 +6,7 @@ import pytest
 from support.paths import ROOT
 
 from beverage_disposal.core.containers import PROVENANCE_KINDS, Provenance
-from beverage_disposal.core.materials import MaterialSpec, Range, load_materials
+from beverage_disposal.core.materials import MaterialSpec, Range, load_materials, with_side_wall
 
 MATERIALS = load_materials(ROOT / "configs" / "materials.toml")
 PET = MATERIALS["PET"]
@@ -80,3 +80,29 @@ def test_the_density_lies_between_amorphous_and_crystalline_pet():
 def test_the_lightest_empty_bottle_has_no_cap_no_label_and_no_water_on_it(name):
     """The lightest bound must not count extras: they can be missing from a real empty bottle."""
     assert getattr(PET, name).lo == 0.0
+
+
+def test_a_measured_wall_inside_the_range_replaces_it():
+    narrowed = with_side_wall(PET, (0.20, 0.30))
+    assert (narrowed.t_side_mm.lo, narrowed.t_side_mm.hi) == (0.20, 0.30)
+
+
+def test_a_measured_wall_wider_than_the_range_is_cut_to_it():
+    narrowed = with_side_wall(PET, (0.01, 0.90))
+    assert (narrowed.t_side_mm.lo, narrowed.t_side_mm.hi) == (
+        PET.t_side_mm.lo,
+        PET.t_side_mm.hi,
+    )
+    half = with_side_wall(PET, (0.30, 0.90))
+    assert (half.t_side_mm.lo, half.t_side_mm.hi) == (0.30, PET.t_side_mm.hi)
+
+
+def test_a_measured_wall_outside_the_range_is_refused():
+    assert with_side_wall(PET, (0.50, 0.60)) is None
+    assert with_side_wall(PET, (0.01, 0.05)) is None
+
+
+def test_narrowing_the_wall_changes_nothing_else():
+    narrowed = with_side_wall(PET, (0.20, 0.30))
+    assert dataclasses.replace(narrowed, t_side_mm=PET.t_side_mm) == PET
+    assert narrowed.t_side_mm.provenance == PET.t_side_mm.provenance
