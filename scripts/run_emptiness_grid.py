@@ -3,6 +3,10 @@
     uv run python scripts/run_emptiness_grid.py --policy rule-only --sizes all --trials 1000
     uv run python scripts/run_emptiness_grid.py --policy full --sizes all --trials 1000
 
+`--probes wall|liquid|both` fits the simulated wall and liquid probes of configs/probes.toml (an
+experiment: no hardware, every figure assumed). With the liquid probe the grid also runs bottles
+it reads low or cannot see, which are expected to be binned: they show the failure to expect.
+
 Decision level only: bottles are drawn, weighed on the pad model, seen through the camera noise
 model and judged; no arm moves. Each size is also tested at its payload fill, with crushed bottles
 and with a solid object in an empty bottle. The bottles come from the acceptance streams, which
@@ -25,6 +29,7 @@ from beverage_disposal.core.fullness_config import load_fullness_config
 from beverage_disposal.core.materials import load_materials
 from beverage_disposal.core.perception import load_perception_noise
 from beverage_disposal.core.policy import EmptinessPolicy, load_policy_config
+from beverage_disposal.core.probes import ProbeModels, load_probe_models
 from beverage_disposal.core.safety_config import load_safety_limits
 from beverage_disposal.sim.harness import provenance
 from beverage_disposal.train.emptiness.bundle import load_bundle
@@ -40,11 +45,17 @@ ACCEPTANCE = (3, 2)
 SOUND, CRUSHED, FOREIGN = 0, 1, 2
 CRUSHED_VOLUMES = (0.0, 35.0)
 FOREIGN_G = (50.0, 100.0)  # a solid object in an empty bottle
+UNDER_READ = 4  # a stream index after FOREIGN + 1
+UNDER_READ_GAINS = (0.5, 0.0)  # 0.5: a probe that reads low; 0.0: frozen or slushed contents
+UNDER_READ_VOLUMES = (30.0, 50.0, 100.0, 200.0)
+THICK = 6  # a stream index after UNDER_READ + 1
+THICK_DENSITY = (1.10, 1.20)  # slushie, shake, smoothie: heavier than the rule's 1.05 g/mL
+THICK_GAINS = (1.0, 0.5, 0.0)  # the liquid probe reads true, half, or sees nothing
 
 
-def run_grid(policy, family, pet, pad, noise, payload_kg, args):
+def run_grid(policy, family, pet, pad, noise, payload_kg, models, args):
     """The sound cells per size, payload fill included, then the crushed and foreign cells."""
-    common = dict(trials=args.trials, seed=args.seed, noise=noise)
+    common = dict(trials=args.trials, seed=args.seed, noise=noise, probes=models)
     cells = []
     for size in args.sizes:
         one = dict(common, sizes=(size,))
@@ -64,7 +75,35 @@ def run_grid(policy, family, pet, pad, noise, payload_kg, args):
                 policy, family, pet, pad, volumes_ml=(0.0,), foreign_g=grams,
                 stream=(*ACCEPTANCE, FOREIGN + index), **one,
             )  # fmt: skip
+        for index, gain in enumerate(THICK_GAINS if models and models.liquid else (1.0,)):
+            cells += misbin_grid(
+                policy, family, pet, pad, volumes_ml=UNDER_READ_VOLUMES, liquid_gain=gain,
+                density_g_per_ml=THICK_DENSITY, stream=(*ACCEPTANCE, THICK + index), **one,
+            )  # fmt: skip
+        if models is None or models.liquid is None:
+            continue
+        for index, gain in enumerate(UNDER_READ_GAINS):
+            cells += misbin_grid(
+                policy, family, pet, pad, volumes_ml=UNDER_READ_VOLUMES, liquid_gain=gain,
+                stream=(*ACCEPTANCE, UNDER_READ + index), **one,
+            )  # fmt: skip
     return cells
+
+
+def probe_models(args) -> ProbeModels | None:
+    """The probes the flags ask for, with any error override, or None for no probes."""
+    if args.probes == "none":
+        return None
+    models = load_probe_models(CONFIGS / "probes.toml")
+    wall, liquid = models.wall, models.liquid
+    if args.wall_rel_sigma is not None:
+        wall = dataclasses.replace(wall, rel_sigma=args.wall_rel_sigma)
+    if args.liquid_sigma_ml is not None:
+        liquid = dataclasses.replace(liquid, sigma_ml=args.liquid_sigma_ml)
+    return ProbeModels(
+        wall=wall if args.probes in ("wall", "both") else None,
+        liquid=liquid if args.probes in ("liquid", "both") else None,
+    )
 
 
 def main(argv):
@@ -79,18 +118,32 @@ def main(argv):
     parser.add_argument(
         "--exact-camera", action="store_true", help="skip the camera noise of perception.toml"
     )
+    parser.add_argument(
+        "--probes", choices=["none", "wall", "liquid", "both"], default="none",
+        help="fit the simulated probes of probes.toml",
+    )  # fmt: skip
+    parser.add_argument("--wall-rel-sigma", type=float, default=None)
+    parser.add_argument("--liquid-sigma-ml", type=float, default=None)
+    parser.add_argument("--probe-reach-ml", type=float, default=None)
     parser.add_argument("--out", type=Path, default=None)
     args = parser.parse_args(argv)
+    if args.policy == "full" and args.probes != "none":
+        parser.error(
+            "--policy full cannot be combined with --probes: the classifier never saw them"
+        )
     if args.sizes == ["all"]:
         args.sizes = list(family.classes)
 
     fullness = load_fullness_config(CONFIGS / "fullness.toml")
     pet = load_materials(CONFIGS / "materials.toml")["PET"]
     config = load_policy_config(CONFIGS / "policy.toml")
+    if args.probe_reach_ml is not None:
+        config = dataclasses.replace(config, probe_reach_ml=args.probe_reach_ml)
+    models = probe_models(args)
     payload_kg = load_safety_limits(CONFIGS / "safety.toml").max_container_mass
     noise = None if args.exact_camera else load_perception_noise(CONFIGS / "perception.toml")
     rule_only = EmptinessPolicy(fullness.rule, pet, family, config, sizes=tuple(args.sizes))
-    grid = (family, pet, fullness.pad, noise, payload_kg, args)
+    grid = (family, pet, fullness.pad, noise, payload_kg, models, args)
 
     results = {
         "policy": args.policy,
@@ -98,6 +151,8 @@ def main(argv):
         "grasp_gate_passed": {size: size in family.supported() for size in args.sizes},
         "camera": "exact" if noise is None else "noisy (perception.toml)",
         "seed": args.seed,
+        "probes": None if models is None else dataclasses.asdict(models),
+        "probe_reach_ml": config.probe_reach_ml,
         "streams": "acceptance: disjoint from the training and calibration bottles",
     }
     if args.policy == "full":
@@ -118,8 +173,11 @@ def main(argv):
     summary = summarize_cells(cells, threshold_ml=PROMISE_ML)
     results["summary"] = summary
     results["cells"] = [dataclasses.asdict(cell) for cell in cells]
-    results["provenance"] = provenance(fullness, family, pet, config, noise)
-    out = args.out or ROOT / "runs" / f"emptiness_{args.policy.replace('-', '_')}.json"
+    results["provenance"] = provenance(fullness, family, pet, config, noise, models)
+    name = f"emptiness_{args.policy.replace('-', '_')}"
+    if models is not None:
+        name += f"_probes_{args.probes}"
+    out = args.out or ROOT / "runs" / f"{name}.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(results, indent=2) + "\n")
 
@@ -145,6 +203,8 @@ def main(argv):
     print(f"overturned: {summary['overturned']}; vetoes: {summary['vetoes']}")
     print(f"crushed binned: {summary['crushed_binned']}")
     print(f"foreign objects binned: {summary['foreign_binned']}")
+    print(f"probe under-reading binned (not counted above): {summary['under_reading_binned']}")
+    print(f"thick drinks binned (not counted above): {summary['thick_drink_binned']}")
     print(f"wrote {out}")
     return 1 if misbinned else 0
 

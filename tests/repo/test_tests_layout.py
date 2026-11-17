@@ -19,6 +19,7 @@ ALLOWED_IN_TESTS = [
     "control",
     "scene",
     "grasp",
+    "probes",
     "scripted",
     "tasktests",
     "containers",
