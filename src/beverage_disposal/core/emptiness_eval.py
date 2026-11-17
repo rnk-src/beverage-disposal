@@ -66,8 +66,6 @@ def draw_case(
     from `rng`, so fitting them leaves every bottle as it was. `density_g_per_ml` replaces the
     rule's drink range, for a thick drink (slushie, shake) heavier than the rule assumes.
     """
-    if probes is not None and probe_rng is None:
-        raise ValueError("probes need a probe_rng of their own")
     rule, material = policy.rule, policy.material
     bottle = sample_bottle(policy.family, size, material, rng)
     low, high = density_g_per_ml or (rule.min_density_g_per_ml, rule.max_density_g_per_ml)
@@ -81,11 +79,12 @@ def draw_case(
     else:
         seen = perceive(bottle, volume_ml, noise, rng, deformed=deformed)
     weighing = sensor.weigh(gross)
-    readings = (
-        NO_PROBES
-        if probes is None
-        else probe(bottle, volume_ml, probes, probe_rng, liquid_gain=liquid_gain)
-    )
+    if probes is None:
+        readings = NO_PROBES
+    elif probe_rng is None:
+        raise ValueError("probes need a probe_rng of their own")
+    else:
+        readings = probe(bottle, volume_ml, probes, probe_rng, liquid_gain=liquid_gain)
     return Case(bottle, volume_ml, weighing, seen, readings)
 
 
