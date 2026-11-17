@@ -52,7 +52,6 @@ PROJECT_TOP_LEVEL = [
     ".gitignore",
     ".pre-commit-config.yaml",
     ".python-version",
-    "CLAUDE.md",
     "LICENSE",
     "Makefile",
     "README.md",
