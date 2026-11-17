@@ -132,7 +132,8 @@ NOISE = load_perception_noise(ROOT / "configs" / "perception.toml")
 
 def noisy(**options):
     defaults = dict(sizes=("pet_500ml",), volumes_ml=(0.0,), trials=200, seed=0)
-    return misbin_grid(POLICY, FAMILY, PET, PAD, noise=NOISE, **{**defaults, **options})
+    policy = options.pop("policy", UNLIMITED)
+    return misbin_grid(policy, FAMILY, PET, PAD, noise=NOISE, **{**defaults, **options})
 
 
 def test_a_noisy_camera_bins_fewer_empties_than_an_exact_one():
@@ -296,11 +297,17 @@ NEVER_READS = ProbeModels(
 )
 
 
+UNLIMITED = dataclasses.replace(
+    POLICY, config=dataclasses.replace(CONFIG, probe_reach_ml=float("inf"))
+)
+
+
 def probed(**options):
     defaults = dict(
         sizes=("pet_2000ml",), volumes_ml=(0.0,), trials=200, seed=0, stream=ACCEPTANCE_STREAM
     )
-    return misbin_grid(POLICY, FAMILY, PET, PAD, noise=NOISE, **{**defaults, **options})
+    policy = options.pop("policy", UNLIMITED)
+    return misbin_grid(policy, FAMILY, PET, PAD, noise=NOISE, **{**defaults, **options})
 
 
 def test_a_grid_without_probes_is_the_grid_it_was():
@@ -456,6 +463,13 @@ def test_a_thick_drink_cell_is_counted_apart_from_the_sound_and_the_under_readin
     assert summary["thick_drink_binned"] == {
         "a": {"1": {"35": [9, 100], "0": [8, 100]}, "0.5": {"50": [3, 100]}}
     }
+
+
+def test_the_reach_of_the_policy_file_keeps_a_slushie_the_probe_cannot_see_from_being_binned():
+    precise = ProbeModels(liquid=LiquidProbeModel(0.5, 0.02, 4.0, 0.0))
+    options = dict(volumes_ml=(50.0,), probes=precise, liquid_gain=0.0, density_g_per_ml=THICK)
+    assert probed(**options)[0].binned > 100  # no reach: the probe's "nothing" is believed
+    assert probed(**options, policy=POLICY)[0].binned == 0
 
 
 @pytest.mark.medium

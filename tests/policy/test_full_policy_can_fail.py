@@ -153,11 +153,13 @@ GRID_FAULTS = {
         "test_the_summary_counts_misbins_empties_overturns_and_vetoes_by_hand",
     ),
     "count_crushed_bottles_among_the_sound": (
-        change_eval("not cell.deformed and cell.foreign_g", "cell.foreign_g"),
+        change_eval(
+            "not cell.deformed\n        and cell.foreign_g == 0.0", "cell.foreign_g == 0.0"
+        ),
         "test_a_crushed_or_foreign_cell_is_not_counted_among_the_sound_bottles",
     ),
     "count_foreign_objects_among_the_empties": (
-        change_eval("not cell.deformed and cell.foreign_g == 0.0", "not cell.deformed"),
+        change_eval("\n        and cell.foreign_g == 0.0", ""),
         "test_a_crushed_or_foreign_cell_is_not_counted_among_the_sound_bottles",
     ),
     "report_the_best_bound_as_the_worst": (

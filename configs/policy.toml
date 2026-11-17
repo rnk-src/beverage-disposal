@@ -13,5 +13,6 @@ allow_overturn = false
 # If the weight proves this much more liquid than the camera can see, something else is inside.
 level_slack_ml = 20.0     # assumed
 # The liquid probe is read only if the weight alone proves at most this much liquid (mL), because
-# contents it cannot see could weigh about that much. inf switches the limit off; open (2B.14).
-probe_reach_ml = inf
+# contents it cannot see could weigh about that much. inf switches the limit off. 45 is the owner's
+# choice (2B.14, 2026-11-17): it keeps slushies the probe cannot see from being binned.
+probe_reach_ml = 45.0
