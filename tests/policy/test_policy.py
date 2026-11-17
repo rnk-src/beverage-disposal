@@ -237,6 +237,9 @@ def reach_of(reach_ml):
     return dataclasses.replace(POLICY, config=dataclasses.replace(CONFIG, probe_reach_ml=reach_ml))
 
 
+UNLIMITED = reach_of(math.inf)  # the fusing tests below are about the fusion, not the reach
+
+
 def test_without_probes_the_verdict_is_what_it_was():
     rng = np.random.default_rng(11)
     for size in ("pet_250ml", "pet_500ml", "pet_1000ml", "pet_2000ml"):
@@ -291,11 +294,12 @@ def test_an_unseen_level_leaves_the_liquid_probe_alone():
         perception, visual=dataclasses.replace(perception.visual, level_m=None)
     )
     reading = ProbeReadings(liquid_ml=(0.0, 10.0))
-    assert POLICY.decide(perception, weighing, reading).decided_by == (
+    assert UNLIMITED.decide(perception, weighing, reading).decided_by == (
         "veto:inconsistent_level_and_probe"
     )
     assert (
-        POLICY.decide(blind, weighing, reading).decided_by == "veto:inconsistent_weight_and_probe"
+        UNLIMITED.decide(blind, weighing, reading).decided_by
+        == "veto:inconsistent_weight_and_probe"
     )
 
 
@@ -310,21 +314,22 @@ def test_a_liquid_reading_is_dropped_when_the_weight_allows_more_than_the_reach(
     assert (at.action, at.decided_by, at.zone) == (BIN, "rule", "surely_under")
 
 
-def test_the_policy_file_gives_an_unlimited_reach():
-    assert CONFIG.probe_reach_ml == math.inf
+def test_the_policy_file_gives_a_reach_of_45_ml():
+    # Chosen 2026-11-17, from the sweep of thick drinks and frozen contents.
+    assert CONFIG.probe_reach_ml == 45.0
 
 
 def test_a_liquid_reading_under_the_threshold_bins_an_ambiguous_bottle():
     perception, weighing = exact_perception(BIG, 10.0), weighed(BIG, 10.0)
-    assert POLICY.decide(perception, weighing).zone == "ambiguous"
-    verdict = POLICY.decide(perception, weighing, ProbeReadings(liquid_ml=(5.0, 15.0)))
+    assert UNLIMITED.decide(perception, weighing).zone == "ambiguous"
+    verdict = UNLIMITED.decide(perception, weighing, ProbeReadings(liquid_ml=(5.0, 15.0)))
     assert (verdict.action, verdict.zone) == (BIN, "surely_under")
     assert verdict.bounds_ml == (5.0, 15.0)
 
 
 def test_a_liquid_reading_that_reaches_the_threshold_does_not_bin():
     perception, weighing = exact_perception(BIG, 25.0), weighed(BIG, 25.0)
-    verdict = POLICY.decide(perception, weighing, ProbeReadings(liquid_ml=(20.0, 30.0)))
+    verdict = UNLIMITED.decide(perception, weighing, ProbeReadings(liquid_ml=(20.0, 30.0)))
     assert (verdict.action, verdict.zone) == (SET_ASIDE, "ambiguous")
     assert verdict.bounds_ml[1] == 30.0
 
@@ -338,9 +343,9 @@ def test_a_liquid_reading_the_weight_contradicts_is_a_veto():
 def test_the_assessment_keeps_the_weights_interval_beside_the_fused_one():
     perception, weighing = exact_perception(BIG, 10.0), weighed(BIG, 10.0)
     by_hand = liquid_bounds_ml(weighing.mass_kg, empty_mass_bounds(perception.dims, PET), RULE)
-    alone = POLICY.assess(perception, weighing)
+    alone = UNLIMITED.assess(perception, weighing)
     assert alone.weight_ml == alone.v_bounds == by_hand
-    fused = POLICY.assess(perception, weighing, ProbeReadings(liquid_ml=(5.0, 15.0)))
+    fused = UNLIMITED.assess(perception, weighing, ProbeReadings(liquid_ml=(5.0, 15.0)))
     assert fused.weight_ml == by_hand
     assert fused.v_bounds == intersect_ml(by_hand, (5.0, 15.0)) == (5.0, 15.0)
 
