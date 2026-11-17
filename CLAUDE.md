@@ -225,8 +225,25 @@ simulation with statistics, 2 = a real arm, 3 = wider containers and more sensor
   camera gains little (2B.5 against 2B.6), so the gap is the material's spread, not the shape; closing it needs measured
   material ranges or bottle types enrolled by empty weight (open). Kept, decided here: the weight-against-level veto,
   which uses the level only to set a bottle aside.
+- **Iteration 2B, 2B.14 built (2026-11-17): probe sensitivity study (an experiment, no hardware).** `core/probes.py` and
+  `configs/probes.toml` (assumed models of a wall probe that narrows the wall thickness and a liquid probe that reads the
+  liquid; each reading is a hard-bound interval; they draw from their own random generator). `core/policy.py` fuses a reading
+  with the weight's interval and adds three vetoes (`implausible_wall`, `inconsistent_level_and_probe`,
+  `inconsistent_weight_and_probe`); an empty overlap is a veto, never a bin. `probe_reach_ml = 45` in `configs/policy.toml`
+  (owner, 2026-11-17): a liquid reading is used only if the weight alone proves at most 45 mL, so contents the probe cannot
+  see (frozen slush) are not trusted. No probes are fitted by default, so the shipped policy is unchanged; with probes
+  off, all 130 cells of the ten-size grid match `runs/emptiness_rule_only_ten.json`. In simulation, decision level, rule-only,
+  noisy camera, assumed probe models, 1000 bottles per cell, ten sizes (`runs/probe_sweep.json`): no probes meets the 5 %
+  target (0 and 10 mL) for 0 of 10 sizes; the liquid probe's error decides it (1 mL or better meets 8 to 10 of 10 sizes, 2 mL
+  meets 0); the wall probe alone meets at most 2 of 10; 0 of the sound bottles of 30 mL or more were binned in every run.
+  The owner cares about slushies, shakes and smoothies, not solid objects. For 40 000 thick drinks (density 1.10 to 1.20,
+  30 to 200 mL) the liquid probe at its configured error binned 0 when it read true; when it read half, 214 with no reach and
+  2 at 45 mL; when it saw nothing, 10 764 and 86. At 45 mL, both probes cost about 27 fewer empties binned at 0 mL and 152 at
+  10 mL (of 10 000). A heavier drink does not protect a 2 L bottle. Known limits: the slush model is crude (the probe reads
+  true, half or nothing); the camera's level interval (about 16 mm) catches only large hidden amounts in 2 L bottles; no
+  reach between 30 and 45 mL was tried; a bench test must set a probe's real worst case before any bin rests on it.
 - Iterations 3 to 9 and the rest of iteration 2B are planned in detail down to sub-iterations (see Roadmap).
-- Last updated: 2026-11-16 (2B.13 four more sizes, rule only). Update this section in the same change as every sub-iteration.
+- Last updated: 2026-11-17 (2B.14 probe sensitivity study). Update this section in the same change as every sub-iteration.
 
 ## Locked decisions
 
@@ -330,7 +347,7 @@ Each label is a stable name; the owner's private decision journal uses the same 
   out-of-distribution check, an unknown non-PET type, the surely-over zone, a supervisor fault. There is no
   cap veto. Out of scope, stated as known blind spots: liquids under 0.95 g/mL (oil, spirits), crushed or
   deformed bottles, foreign objects inside, frozen contents (the harness tests that crushed bottles and
-  foreign objects end set aside). Supported sizes: 200, 250, 330, 400, 500, 650, 800, 1000, 1500 and 2000 mL, each only after it
+  foreign objects end set aside; the 2B.14 probe experiment reports thick drinks and frozen contents instead, and a solid object is the user's to remove). Supported sizes: 200, 250, 330, 400, 500, 650, 800, 1000, 1500 and 2000 mL, each only after it
   passes the neck-grasp gate. The classifier is supervised learning, not RL: discarding is a one-shot
   labelled decision.
 - **Containers:** the 12 fl oz can, and PET bottles of 200 to 2000 mL. A can is a registry type (data:
@@ -551,6 +568,7 @@ uv run python scripts/check_bottle_reach.py             # per bottle size: the s
 uv run python scripts/run_neck_gate.py                  # the grasp gate per size, fill and grasp mode, writes runs/neck_gate.json (about 10 min)
 uv run python scripts/train_emptiness.py               # fit and calibrate the emptiness classifier, writes runs/emptiness_model/ (about 4 min; a simulation experiment since 2B.13)
 uv run python scripts/run_emptiness_grid.py --policy full --sizes all --trials 1000  # the emptiness policy over sizes and volumes, with crushed bottles and foreign objects, decision level, noisy camera; writes runs/emptiness_full.json (about 12 min; --policy rule-only is quick)
+uv run python scripts/sweep_probe_error.py   # how accurate the wall and liquid probes must be, per reach; writes runs/probe_sweep.json (about 25 min; assumed probe models, no hardware)
 uv run python scripts/measure_actuators.py         # re-measure the servo step responses (configs/actuator_step_response.json)
 uv run pytest tests/gazebo   # Gazebo image tests: need a running Docker daemon, else they skip
 ```
@@ -574,7 +592,7 @@ src/beverage_disposal/   Python package (placeholder name)
   core/                    the ROS-free core (no MuJoCo): sequencer.py (weigh on the pad, decide, carry once), acceptance.py (results summary), supervisor.py (safety checks and indicators), supervised.py (a controller
                            under the supervisor), safety_config.py,
                            pad.py (weighing pad model), fullness.py (the weight rule),
-                           fullness_eval.py (Monte Carlo and sweeps), perception.py (what the camera reports about a bottle, and the simulated camera's noise), bounds.py (empty-mass bounds of a PET bottle), zones.py (liquid interval and zone from a weight), policy.py (the emptiness policy: vetoes, then zones, then the classifier when a bundle is given), emptiness_eval.py (its decision-level Monte Carlo), features.py (the classifier's feature vector), classifier.py (the model protocol, the in-distribution check and the bundle), np_calibration.py (the Neyman-Pearson threshold), fullness_config.py, statistics.py (Wilson bounds), registry.py (container types as data, enrolment), materials.py (material constants as ranges with sources), bottles.py (a bottle's shape: areas, shell mass, capacity, liquid level and centroid), bottle_family.py (PET size classes as ranges, the seeded sampler, a bottle as a container spec and a scene), trajectory.py and task_tests.py (an episode record and the
+                           fullness_eval.py (Monte Carlo and sweeps), probes.py (simulated wall and liquid probes, an experiment), perception.py (what the camera reports about a bottle, and the simulated camera's noise), bounds.py (empty-mass bounds of a PET bottle), zones.py (liquid interval and zone from a weight), policy.py (the emptiness policy: vetoes, then zones, then the classifier when a bundle is given), emptiness_eval.py (its decision-level Monte Carlo), features.py (the classifier's feature vector), classifier.py (the model protocol, the in-distribution check and the bundle), np_calibration.py (the Neyman-Pearson threshold), fullness_config.py, statistics.py (Wilson bounds), registry.py (container types as data, enrolment), materials.py (material constants as ranges with sources), bottles.py (a bottle's shape: areas, shell mass, capacity, liquid level and centroid), bottle_family.py (PET size classes as ranges, the seeded sampler, a bottle as a container spec and a scene), trajectory.py and task_tests.py (an episode record and the
                            task's pass-fail and indicative functions), interfaces.py (Observation, Controller, noise), scripted.py
                            (the scripted pick-and-place), baselines.py (random policy); config.py (frozen scene dataclasses read from TOML),
                            containers.py (ContainerSpec, provenance, liquid mass), layout.py (footprints, spawn sampler, set-aside test),
@@ -612,6 +630,7 @@ tests/                   pytest tests (fast/medium/slow tiers), one folder per a
   features/                the classifier's feature vector, by hand
   train/                   the classifier's dataset (labels, seeds, disjoint splits, calibration cells), the range check, the fit
                            and the saved bundle
+  probes/                  the simulated probes' readings and the mutants that prove the probe tests can fail
   materials/               the material table: ranges with sources, the bounds' safe ends
   bottles/                 bottle geometry against closed forms: areas, shell mass, capacity, liquid level, centroid
   bottle_family/           the size classes' file, the sampler's ranges and capacities, the container spec and scene
@@ -626,9 +645,9 @@ tests/                   pytest tests (fast/medium/slow tiers), one folder per a
                            damaged-copy and mutated-package harnesses); no tests
   conftest.py              tier hook and shared fixtures
 assets/                  vendored third-party files with provenance (the SO-101 model)
-configs/                 configs (scene.toml, containers.toml, materials.toml, bottles.toml, gate.toml, fullness.toml, policy.toml, perception.toml, safety.toml; training later) and the stored actuator step-response reference (JSON)
+configs/                 configs (probes.toml, scene.toml, containers.toml, materials.toml, bottles.toml, gate.toml, fullness.toml, policy.toml, perception.toml, safety.toml; training later) and the stored actuator step-response reference (JSON)
 scripts/                 helper scripts (view_so101.py, generate_so101_chain.py, measure_actuators.py, run_acceptance.py, record_demo.py,
-                         check_bottle_reach.py, run_neck_gate.py, run_emptiness_grid.py, train_emptiness.py)
+                         check_bottle_reach.py, run_neck_gate.py, run_emptiness_grid.py, sweep_probe_error.py, train_emptiness.py)
 pyproject.toml  uv.lock  .python-version   uv project, exact lockfile, pinned Python
 Makefile                                   `make check`, the one command for every gate
 .github/                                   the check workflow and the pull-request template
@@ -677,7 +696,7 @@ update docs.
   baseline); 2B.6 perception noise model. Second half, after 4.5: 2B.7 features and dataset; 2B.8 the
   classifier (adds scikit-learn); 2B.9 Neyman-Pearson calibration; 2B.10 the full policy; 2B.11 acceptance
   per size and volume (381 trials per cell at 30, 31 and 35 mL, Wilson bounds); 2B.12 docs and the learning check;
-  2B.13 four more sizes and the rule-only decision (added 2026-11-16, built before 2B.12).
+  2B.13 four more sizes and the rule-only decision (added 2026-11-16, built before 2B.12); 2B.14 probe sensitivity study (added 2026-11-16, built 2026-11-17, before 2B.12).
 - **3 Gymnasium environment for the skill.** 3.1 observations (with the simulated perception noise);
   3.2 action layer; 3.3 env core (goal B as input); 3.4 reward and termination; 3.5 wrappers and
   vectorization; 3.6 contract and baseline tests.
